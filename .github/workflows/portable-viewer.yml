@@ -9,6 +9,22 @@ permissions:
   contents: read
 
 jobs:
+  cuda-linux:
+    runs-on: ubuntu-24.04
+    container: nvidia/cuda:12.8.1-devel-ubuntu24.04
+    steps:
+      - name: Install Linux CUDA viewer build dependencies
+        run: apt-get update && apt-get install -y git ca-certificates cmake ninja-build g++ libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+      - uses: actions/checkout@v4
+      - name: Compile and link the Linux CUDA viewer
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCOV_ENABLE_CUDA=ON -DCOV_BUILD_TESTS=OFF -DGLFW_BUILD_WAYLAND=OFF
+          cmake --build build --parallel 2
+          cuobjdump --list-elf build/CMakeFiles/cov_gpu.dir/src/cuda/orbital.cu.o > build/cuda-architectures.txt
+          for arch in 60 61 70 75 80 86 89 90 100 120; do
+            grep -q "sm_${arch}\\." build/cuda-architectures.txt
+          done
+
   desktop:
     strategy:
       fail-fast: false
