@@ -1,4 +1,5 @@
 #include "cov/cuda_orbital.hpp"
+#include "cov/gl_api.hpp"
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -16,6 +17,8 @@
 
 #include <cmath>
 #include <cstring>
+#include <algorithm>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -23,6 +26,12 @@
 
 #ifndef GL_TEXTURE_3D
 #define GL_TEXTURE_3D 0x806F
+#endif
+#ifndef GL_TEXTURE_BINDING_3D
+#define GL_TEXTURE_BINDING_3D 0x806A
+#endif
+#ifndef GL_RED
+#define GL_RED 0x1903
 #endif
 
 namespace cov {
@@ -244,30 +253,12 @@ __device__ float evaluate_shell_component(
     return contracted * monomial;
 }
 
-__global__ void orbital_kernel(
-    cudaSurfaceObject_t surface,
+__device__ float orbital_value(
     const GpuShell* shells,
     const std::uint32_t shell_count,
     const GpuPrimitive* primitives,
     const float* coefficients,
-    const GridBox box,
-    const int nx,
-    const int ny,
-    const int nz) {
-
-    const int ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const int iy = blockIdx.y * blockDim.y + threadIdx.y;
-    const int iz = blockIdx.z * blockDim.z + threadIdx.z;
-    if (ix >= nx || iy >= ny || iz >= nz) return;
-
-    const float tx = nx > 1 ? static_cast<float>(ix) / static_cast<float>(nx - 1) : 0.0f;
-    const float ty = ny > 1 ? static_cast<float>(iy) / static_cast<float>(ny - 1) : 0.0f;
-    const float tz = nz > 1 ? static_cast<float>(iz) / static_cast<float>(nz - 1) : 0.0f;
-
-    const float x = box.min_x + tx * (box.max_x - box.min_x);
-    const float y = box.min_y + ty * (box.max_y - box.min_y);
-    const float z = box.min_z + tz * (box.max_z - box.min_z);
-
+    const float x, const float y, const float z) {
     float psi = 0.0f;
     for (std::uint32_t s = 0; s < shell_count; ++s) {
         const GpuShell shell = shells[s];
@@ -283,16 +274,181 @@ __global__ void orbital_kernel(
             psi = fmaf(coefficients[shell.basis_offset + c], basis, psi);
         }
     }
+    return psi;
+}
+
+__global__ void orbital_kernel(
+    cudaSurfaceObject_t surface,
+    const GpuShell* shells,
+    const std::uint32_t shell_count,
+    const GpuPrimitive* primitives,
+    const float* coefficients,
+    const GridBox box,
+    const int nx,
+    const int ny,
+    const int nz) {
+    const int ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const int iy = blockIdx.y * blockDim.y + threadIdx.y;
+    const int iz = blockIdx.z * blockDim.z + threadIdx.z;
+    if (ix >= nx || iy >= ny || iz >= nz) return;
+    const float tx = nx > 1 ? static_cast<float>(ix) / static_cast<float>(nx - 1) : 0.0f;
+    const float ty = ny > 1 ? static_cast<float>(iy) / static_cast<float>(ny - 1) : 0.0f;
+    const float tz = nz > 1 ? static_cast<float>(iz) / static_cast<float>(nz - 1) : 0.0f;
+    const float x = box.min_x + tx * (box.max_x - box.min_x);
+    const float y = box.min_y + ty * (box.max_y - box.min_y);
+    const float z = box.min_z + tz * (box.max_z - box.min_z);
+    const float psi = orbital_value(shells,shell_count,primitives,coefficients,x,y,z);
 
     surf3Dwrite(psi, surface,
                 static_cast<std::size_t>(ix) * sizeof(float),
                 iy, iz);
 }
 
+__global__ void orbital_linear_kernel(
+    float* output,
+    const GpuShell* shells,
+    const std::uint32_t shell_count,
+    const GpuPrimitive* primitives,
+    const float* coefficients,
+    const GridBox box,
+    const int nx, const int ny, const int nz,
+    const int first_z, const int slab_depth) {
+    const int ix = blockIdx.x * blockDim.x + threadIdx.x;
+    const int iy = blockIdx.y * blockDim.y + threadIdx.y;
+    const int local_z = blockIdx.z * blockDim.z + threadIdx.z;
+    const int iz = first_z + local_z;
+    if (ix >= nx || iy >= ny || local_z >= slab_depth || iz >= nz) return;
+    const float tx = nx > 1 ? static_cast<float>(ix) / static_cast<float>(nx - 1) : 0.0f;
+    const float ty = ny > 1 ? static_cast<float>(iy) / static_cast<float>(ny - 1) : 0.0f;
+    const float tz = nz > 1 ? static_cast<float>(iz) / static_cast<float>(nz - 1) : 0.0f;
+    const float x = box.min_x + tx * (box.max_x - box.min_x);
+    const float y = box.min_y + ty * (box.max_y - box.min_y);
+    const float z = box.min_z + tz * (box.max_z - box.min_z);
+    output[static_cast<std::size_t>(ix) + static_cast<std::size_t>(nx) *
+        (static_cast<std::size_t>(iy) + static_cast<std::size_t>(ny) * local_z)] =
+        orbital_value(shells,shell_count,primitives,coefficients,x,y,z);
+}
+
+struct InteropError : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
+
+void interop_check(cudaError_t status, const char* what) {
+    if (status != cudaSuccess)
+        throw InteropError(std::string(what) + ": " + cudaGetErrorString(status));
+}
+
+bool gl_uses_device(int device) {
+    unsigned int count = 0;
+    int devices[16]{};
+    const auto status = cudaGLGetDevices(&count,devices,16,cudaGLDeviceListAll);
+    if (status != cudaSuccess) {
+        (void)cudaGetLastError();
+        return false;
+    }
+    for (unsigned int i=0; i<count; ++i) if (devices[i] == device) return true;
+    return false;
+}
+
+struct MappedTexture {
+    cudaGraphicsResource* resource;
+    bool mapped = false;
+    explicit MappedTexture(cudaGraphicsResource* value) : resource(value) {
+        interop_check(cudaGraphicsMapResources(1,&resource,0),"cudaGraphicsMapResources");
+        mapped = true;
+    }
+    ~MappedTexture() { if (mapped) (void)cudaGraphicsUnmapResources(1,&resource,0); }
+    cudaArray_t array() const {
+        cudaArray_t result = nullptr;
+        interop_check(cudaGraphicsSubResourceGetMappedArray(&result,resource,0,0),
+                      "cudaGraphicsSubResourceGetMappedArray");
+        return result;
+    }
+    void unmap() {
+        interop_check(cudaGraphicsUnmapResources(1,&resource,0),"cudaGraphicsUnmapResources");
+        mapped = false;
+    }
+};
+
+struct Surface {
+    cudaSurfaceObject_t object = 0;
+    explicit Surface(cudaArray_t array) {
+        cudaResourceDesc desc{};
+        desc.resType = cudaResourceTypeArray;
+        desc.res.array.array = array;
+        const auto status = cudaCreateSurfaceObject(&object,&desc);
+        if (status != cudaSuccess) {
+            if (object) (void)cudaDestroySurfaceObject(object);
+            interop_check(status,"cudaCreateSurfaceObject");
+        }
+    }
+    ~Surface() { if (object) (void)cudaDestroySurfaceObject(object); }
+};
+
+struct Events {
+    cudaEvent_t start = nullptr;
+    cudaEvent_t stop = nullptr;
+    Events() {
+        const auto status = cudaEventCreate(&start);
+        if (status != cudaSuccess) {
+            if (start) (void)cudaEventDestroy(start);
+            cuda_check(status,"cudaEventCreate start");
+        }
+        try { cuda_check(cudaEventCreate(&stop),"cudaEventCreate stop"); }
+        catch (...) {
+            if (stop) (void)cudaEventDestroy(stop);
+            (void)cudaEventDestroy(start);
+            throw;
+        }
+    }
+    ~Events() {
+        if (stop) (void)cudaEventDestroy(stop);
+        if (start) (void)cudaEventDestroy(start);
+    }
+    void begin() { cuda_check(cudaEventRecord(start),"cudaEventRecord start"); }
+    double finish() {
+        cuda_check(cudaEventRecord(stop),"cudaEventRecord stop");
+        cuda_check(cudaEventSynchronize(stop),"cudaEventSynchronize stop");
+        float ms = 0.0f;
+        cuda_check(cudaEventElapsedTime(&ms,start,stop),"cudaEventElapsedTime");
+        return ms;
+    }
+};
+
+struct DeviceFloatBuffer {
+    float* data = nullptr;
+    explicit DeviceFloatBuffer(std::size_t count) {
+        const auto status = cudaMalloc(&data,count*sizeof(float));
+        if (status != cudaSuccess) {
+            if (data) (void)cudaFree(data);
+            cuda_check(status,"cudaMalloc grid buffer");
+        }
+    }
+    ~DeviceFloatBuffer() { if (data) (void)cudaFree(data); }
+};
+
+struct GlUploadState {
+    GLint old_binding = 0;
+    GLint old_alignment = 4;
+    explicit GlUploadState(unsigned int texture) {
+        if (!gl::TexSubImage3D) throw std::runtime_error("OpenGL 3D upload function is unavailable");
+        glGetIntegerv(GL_TEXTURE_BINDING_3D,&old_binding);
+        glGetIntegerv(GL_UNPACK_ALIGNMENT,&old_alignment);
+        glBindTexture(GL_TEXTURE_3D,texture);
+        glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+        while (glGetError() != GL_NO_ERROR) {}
+    }
+    ~GlUploadState() {
+        glPixelStorei(GL_UNPACK_ALIGNMENT,old_alignment);
+        glBindTexture(GL_TEXTURE_3D,static_cast<GLuint>(old_binding));
+    }
+};
+
 } // namespace
 
 struct CudaOrbitalEvaluator::Impl {
     const Wavefunction* wf = nullptr;
+    int device = -1;
     GpuShell* d_shells = nullptr;
     GpuPrimitive* d_primitives = nullptr;
     float* d_coefficients = nullptr;
@@ -301,9 +457,29 @@ struct CudaOrbitalEvaluator::Impl {
     std::string device_name_storage = "unknown";
     double last_ms = 0.0;
 
-    explicit Impl(const Wavefunction& wavefunction) : wf(&wavefunction) {
-        int device = 0;
-        cuda_check(cudaGetDevice(&device), "cudaGetDevice");
+    explicit Impl(const Wavefunction& wavefunction, int requested_device) : wf(&wavefunction) {
+        int device_count = 0;
+        cuda_check(cudaGetDeviceCount(&device_count),"cudaGetDeviceCount");
+        if (device_count <= 0) throw std::runtime_error("No CUDA device is available");
+        if (requested_device < -1 || requested_device >= device_count)
+            throw std::out_of_range("Requested CUDA device index is out of range");
+        if (requested_device >= 0) device = requested_device;
+        else {
+            unsigned int gl_count = 0;
+            int gl_devices[16]{};
+            const auto gl_status = cudaGLGetDevices(&gl_count,gl_devices,16,cudaGLDeviceListAll);
+            if (gl_status == cudaSuccess && gl_count > 0 &&
+                gl_devices[0] >= 0 && gl_devices[0] < device_count)
+                device = gl_devices[0];
+            else {
+                if (gl_status != cudaSuccess) (void)cudaGetLastError();
+                int current = -1;
+                if (cudaGetDevice(&current) == cudaSuccess &&
+                    current >= 0 && current < device_count) device = current;
+                else device = 0;
+            }
+        }
+        cuda_check(cudaSetDevice(device),"cudaSetDevice");
 
         cudaDeviceProp prop{};
         cuda_check(cudaGetDeviceProperties(&prop, device), "cudaGetDeviceProperties");
@@ -312,6 +488,12 @@ struct CudaOrbitalEvaluator::Impl {
         std::vector<GpuShell> shells;
         shells.reserve(wavefunction.shells.size());
         for (const Shell& shell : wavefunction.shells) {
+            if (shell.angular_momentum > 4 || shell.pure > 1 ||
+                shell.primitive_offset > wavefunction.primitives.size() ||
+                shell.primitive_count > wavefunction.primitives.size()-shell.primitive_offset ||
+                shell.basis_offset > wavefunction.basis_count ||
+                shell_basis_count(shell) > wavefunction.basis_count-shell.basis_offset)
+                throw std::invalid_argument("Invalid CUDA shell");
             const Atom& atom = wavefunction.atoms.at(shell.atom_index);
             GpuShell gpu{};
             gpu.cx = pack_gpu_scalar(atom.x,"atom x");
@@ -328,40 +510,46 @@ struct CudaOrbitalEvaluator::Impl {
         std::vector<GpuPrimitive> primitives;
         primitives.reserve(wavefunction.primitives.size());
         for (const Primitive& p : wavefunction.primitives) {
+            if (!std::isfinite(p.exponent) || p.exponent <= 0.0 ||
+                !std::isfinite(p.coefficient))
+                throw std::invalid_argument("Invalid CUDA Gaussian primitive");
             primitives.push_back({pack_gpu_scalar(p.exponent,"primitive exponent"),
                                   pack_gpu_scalar(p.coefficient,"contraction coefficient")});
         }
-
-        cuda_check(cudaMalloc(&d_shells, shells.size() * sizeof(GpuShell)),
-                   "cudaMalloc shells");
-        cuda_check(cudaMalloc(&d_primitives, primitives.size() * sizeof(GpuPrimitive)),
-                   "cudaMalloc primitives");
-        cuda_check(cudaMalloc(&d_coefficients,
-                              wavefunction.basis_count * sizeof(float)),
-                   "cudaMalloc MO coefficients");
-
-        cuda_check(cudaMemcpy(d_shells, shells.data(),
-                              shells.size() * sizeof(GpuShell),
-                              cudaMemcpyHostToDevice),
-                   "cudaMemcpy shells");
-        cuda_check(cudaMemcpy(d_primitives, primitives.data(),
-                              primitives.size() * sizeof(GpuPrimitive),
-                              cudaMemcpyHostToDevice),
-                   "cudaMemcpy primitives");
+        try {
+            if (!shells.empty()) {
+                cuda_check(cudaMalloc(&d_shells,shells.size()*sizeof(GpuShell)),"cudaMalloc shells");
+                cuda_check(cudaMemcpy(d_shells,shells.data(),shells.size()*sizeof(GpuShell),
+                                      cudaMemcpyHostToDevice),"cudaMemcpy shells");
+            }
+            if (!primitives.empty()) {
+                cuda_check(cudaMalloc(&d_primitives,primitives.size()*sizeof(GpuPrimitive)),
+                           "cudaMalloc primitives");
+                cuda_check(cudaMemcpy(d_primitives,primitives.data(),primitives.size()*sizeof(GpuPrimitive),
+                                      cudaMemcpyHostToDevice),"cudaMemcpy primitives");
+            }
+            if (wavefunction.basis_count)
+                cuda_check(cudaMalloc(&d_coefficients,
+                                      wavefunction.basis_count*sizeof(float)),
+                           "cudaMalloc MO coefficients");
+        } catch (...) { release(); throw; }
     }
 
-    ~Impl() {
-        if (texture_resource) {
-            cudaGraphicsUnregisterResource(texture_resource);
-        }
-        cudaFree(d_coefficients);
-        cudaFree(d_primitives);
-        cudaFree(d_shells);
+    void bind_device() const { cuda_check(cudaSetDevice(device),"cudaSetDevice"); }
+    void release() noexcept {
+        if (device < 0 || cudaSetDevice(device) != cudaSuccess) return;
+        if (texture_resource) (void)cudaGraphicsUnregisterResource(texture_resource);
+        texture_resource = nullptr;
+        if (d_coefficients) (void)cudaFree(d_coefficients);
+        if (d_primitives) (void)cudaFree(d_primitives);
+        if (d_shells) (void)cudaFree(d_shells);
+        d_coefficients = nullptr; d_primitives = nullptr; d_shells = nullptr;
     }
+    ~Impl() { release(); }
 };
 
-CudaOrbitalEvaluator::CudaOrbitalEvaluator(const Wavefunction& wavefunction)
-    : impl_(std::make_unique<Impl>(wavefunction)) {}
+CudaOrbitalEvaluator::CudaOrbitalEvaluator(const Wavefunction& wavefunction, int device_index)
+    : impl_(std::make_unique<Impl>(wavefunction,device_index)) {}
 
 CudaOrbitalEvaluator::~CudaOrbitalEvaluator() = default;
 CudaOrbitalEvaluator::CudaOrbitalEvaluator(CudaOrbitalEvaluator&&) noexcept = default;
@@ -369,23 +557,31 @@ CudaOrbitalEvaluator& CudaOrbitalEvaluator::operator=(CudaOrbitalEvaluator&&) no
 
 void CudaOrbitalEvaluator::attach_gl_texture(const unsigned int texture) {
     detach_gl_texture();
+    if (!texture) throw std::invalid_argument("CUDA evaluator requires a 3D texture");
+    impl_->bind_device();
     impl_->texture = texture;
-    cuda_check(cudaGraphicsGLRegisterImage(
-                   &impl_->texture_resource,
-                   texture,
-                   GL_TEXTURE_3D,
-                   cudaGraphicsRegisterFlagsSurfaceLoadStore |
-                       cudaGraphicsRegisterFlagsWriteDiscard),
-               "cudaGraphicsGLRegisterImage");
+    if (gl_uses_device(impl_->device)) {
+        cudaGraphicsResource* registered = nullptr;
+        const auto status = cudaGraphicsGLRegisterImage(
+            &registered,texture,GL_TEXTURE_3D,
+            cudaGraphicsRegisterFlagsSurfaceLoadStore |
+                cudaGraphicsRegisterFlagsWriteDiscard);
+        if (status == cudaSuccess) impl_->texture_resource = registered;
+        else {
+            if (registered) (void)cudaGraphicsUnregisterResource(registered);
+            (void)cudaGetLastError();
+        }
+    }
 }
 
 void CudaOrbitalEvaluator::detach_gl_texture() {
     if (impl_ && impl_->texture_resource) {
+        impl_->bind_device();
         cuda_check(cudaGraphicsUnregisterResource(impl_->texture_resource),
                    "cudaGraphicsUnregisterResource");
         impl_->texture_resource = nullptr;
-        impl_->texture = 0;
     }
+    if (impl_) impl_->texture = 0;
 }
 
 void CudaOrbitalEvaluator::evaluate(const std::size_t mo_index,
@@ -393,15 +589,24 @@ void CudaOrbitalEvaluator::evaluate(const std::size_t mo_index,
                                     const int nx,
                                     const int ny,
                                     const int nz) {
-    if (!impl_->texture_resource) {
+    if (!impl_->texture) {
         throw std::runtime_error("No OpenGL 3D texture attached to CUDA evaluator");
     }
     if (mo_index >= impl_->wf->orbitals.size()) {
         throw std::out_of_range("MO index out of range");
     }
-    if (nx <= 0 || ny <= 0 || nz <= 0) {
-        throw std::runtime_error("Invalid grid dimensions");
+    if (nx <= 0 || ny <= 0 || nz <= 0 || nx > 512 || ny > 512 || nz > 512) {
+        throw std::invalid_argument("CUDA grid dimensions must be between 1 and 512");
     }
+    const float bounds[] = {box.min_x,box.min_y,box.min_z,box.max_x,box.max_y,box.max_z};
+    for (float value : bounds) if (!std::isfinite(value))
+        throw std::invalid_argument("CUDA grid bounds are not finite");
+    if (box.min_x > box.max_x || box.min_y > box.max_y || box.min_z > box.max_z ||
+        !std::isfinite(box.max_x-box.min_x) ||
+        !std::isfinite(box.max_y-box.min_y) ||
+        !std::isfinite(box.max_z-box.min_z))
+        throw std::invalid_argument("CUDA grid bounds are invalid");
+    impl_->bind_device();
 
     const auto& mo = impl_->wf->orbitals[mo_index];
     if (mo.coefficients.size()!=impl_->wf->basis_count) {
@@ -414,60 +619,69 @@ void CudaOrbitalEvaluator::evaluate(const std::size_t mo_index,
     for (const double value:mo.coefficients) {
         gpu_coefficients.push_back(pack_gpu_scalar(value,"MO coefficient"));
     }
-    cuda_check(cudaMemcpy(impl_->d_coefficients, gpu_coefficients.data(),
-                          impl_->wf->basis_count * sizeof(float),
-                          cudaMemcpyHostToDevice),
-               "cudaMemcpy MO coefficients");
+    if (!gpu_coefficients.empty())
+        cuda_check(cudaMemcpy(impl_->d_coefficients,gpu_coefficients.data(),
+                              gpu_coefficients.size()*sizeof(float),cudaMemcpyHostToDevice),
+                   "cudaMemcpy MO coefficients");
 
-    cuda_check(cudaGraphicsMapResources(1, &impl_->texture_resource, 0),
-               "cudaGraphicsMapResources");
+    impl_->last_ms = 0.0;
+    const dim3 block(8,8,4);
+    if (impl_->texture_resource) {
+        try {
+            MappedTexture mapped(impl_->texture_resource);
+            {
+                Surface surface(mapped.array());
+                Events events;
+                const dim3 grid((nx+block.x-1)/block.x,
+                                (ny+block.y-1)/block.y,
+                                (nz+block.z-1)/block.z);
+                events.begin();
+                orbital_kernel<<<grid,block>>>(
+                    surface.object,impl_->d_shells,
+                    static_cast<std::uint32_t>(impl_->wf->shells.size()),
+                    impl_->d_primitives,impl_->d_coefficients,box,nx,ny,nz);
+                cuda_check(cudaGetLastError(),"orbital_kernel launch");
+                impl_->last_ms = events.finish();
+            }
+            mapped.unmap();
+            return;
+        } catch (const InteropError&) {
+            // The selected CUDA device can still calculate the grid when the
+            // display context cannot share its texture with that device.
+            (void)cudaGetLastError();
+            cuda_check(cudaGraphicsUnregisterResource(impl_->texture_resource),
+                       "cudaGraphicsUnregisterResource after interop failure");
+            impl_->texture_resource = nullptr;
+        }
+    }
 
-    cudaArray_t array = nullptr;
-    cuda_check(cudaGraphicsSubResourceGetMappedArray(
-                   &array, impl_->texture_resource, 0, 0),
-               "cudaGraphicsSubResourceGetMappedArray");
-
-    cudaResourceDesc resource_desc{};
-    resource_desc.resType = cudaResourceTypeArray;
-    resource_desc.res.array.array = array;
-
-    cudaSurfaceObject_t surface = 0;
-    cuda_check(cudaCreateSurfaceObject(&surface, &resource_desc),
-               "cudaCreateSurfaceObject");
-
-    cudaEvent_t start{}, stop{};
-    cuda_check(cudaEventCreate(&start), "cudaEventCreate start");
-    cuda_check(cudaEventCreate(&stop), "cudaEventCreate stop");
-
-    const dim3 block(8, 8, 4);
-    const dim3 grid(
-        static_cast<unsigned int>((nx + block.x - 1) / block.x),
-        static_cast<unsigned int>((ny + block.y - 1) / block.y),
-        static_cast<unsigned int>((nz + block.z - 1) / block.z));
-
-    cuda_check(cudaEventRecord(start), "cudaEventRecord start");
-    orbital_kernel<<<grid, block>>>(
-        surface,
-        impl_->d_shells,
-        static_cast<std::uint32_t>(impl_->wf->shells.size()),
-        impl_->d_primitives,
-        impl_->d_coefficients,
-        box,
-        nx, ny, nz);
-    cuda_check(cudaGetLastError(), "orbital_kernel launch");
-    cuda_check(cudaEventRecord(stop), "cudaEventRecord stop");
-    cuda_check(cudaEventSynchronize(stop), "cudaEventSynchronize");
-
-    float elapsed_ms = 0.0f;
-    cuda_check(cudaEventElapsedTime(&elapsed_ms, start, stop),
-               "cudaEventElapsedTime");
-    impl_->last_ms = elapsed_ms;
-
-    cudaEventDestroy(stop);
-    cudaEventDestroy(start);
-    cudaDestroySurfaceObject(surface);
-    cuda_check(cudaGraphicsUnmapResources(1, &impl_->texture_resource, 0),
-               "cudaGraphicsUnmapResources");
+    const std::size_t plane = static_cast<std::size_t>(nx)*ny;
+    const int slab_limit = static_cast<int>(std::min<std::size_t>(
+        nz,std::max<std::size_t>(1,(8u*1024u*1024u)/(plane*sizeof(float)))));
+    DeviceFloatBuffer device_output(plane*slab_limit);
+    std::vector<float> host_output(plane*slab_limit);
+    Events events;
+    GlUploadState upload(impl_->texture);
+    for (int first_z=0; first_z<nz; first_z+=slab_limit) {
+        const int depth = std::min(slab_limit,nz-first_z);
+        const dim3 grid((nx+block.x-1)/block.x,
+                        (ny+block.y-1)/block.y,
+                        (depth+block.z-1)/block.z);
+        events.begin();
+        orbital_linear_kernel<<<grid,block>>>(
+            device_output.data,impl_->d_shells,
+            static_cast<std::uint32_t>(impl_->wf->shells.size()),
+            impl_->d_primitives,impl_->d_coefficients,box,nx,ny,nz,first_z,depth);
+        cuda_check(cudaGetLastError(),"orbital_linear_kernel launch");
+        impl_->last_ms += events.finish();
+        cuda_check(cudaMemcpy(host_output.data(),device_output.data,
+                              plane*depth*sizeof(float),cudaMemcpyDeviceToHost),
+                   "cudaMemcpy grid to host");
+        gl::TexSubImage3D(GL_TEXTURE_3D,0,0,0,first_z,nx,ny,depth,
+                          GL_RED,GL_FLOAT,host_output.data());
+        if (glGetError() != GL_NO_ERROR)
+            throw std::runtime_error("Unable to upload CUDA grid to the display texture");
+    }
 }
 
 const char* CudaOrbitalEvaluator::device_name() const noexcept {

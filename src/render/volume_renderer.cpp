@@ -3,10 +3,6 @@
 
 #include "cov/gl_api.hpp"
 
-#ifdef _WIN32
-#include <Windows.h>
-#endif
-#include <GL/gl.h>
 
 #include <algorithm>
 #include <cmath>
@@ -567,14 +563,20 @@ void VolumeRenderer::resize_volume(const int nx, const int ny, const int nz) {
     if (nx <= 0 || ny <= 0 || nz <= 0) {
         throw std::runtime_error("Invalid 3D texture dimensions");
     }
+    GLint maximum = 0;
+    glGetIntegerv(0x8073 /* GL_MAX_3D_TEXTURE_SIZE */, &maximum);
+    if (nx > maximum || ny > maximum || nz > maximum)
+        throw std::runtime_error("The requested grid exceeds the display texture limit");
+    glBindTexture(GL_TEXTURE_3D, texture_);
+    while (glGetError() != GL_NO_ERROR) {}
+    gl::TexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
+                   nx, ny, nz, 0, GL_RED, GL_FLOAT, nullptr);
+    const auto error = glGetError();
+    glBindTexture(GL_TEXTURE_3D, 0);
+    if (error != GL_NO_ERROR) throw std::runtime_error("Unable to allocate the orbital display texture");
     nx_ = nx;
     ny_ = ny;
     nz_ = nz;
-
-    glBindTexture(GL_TEXTURE_3D, texture_);
-    gl::TexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
-                   nx_, ny_, nz_, 0, GL_RED, GL_FLOAT, nullptr);
-    glBindTexture(GL_TEXTURE_3D, 0);
 }
 
 void VolumeRenderer::render_volume(const int framebuffer_width,

@@ -10,7 +10,7 @@ namespace cov {
 
 class CudaOrbitalEvaluator {
 public:
-    explicit CudaOrbitalEvaluator(const Wavefunction& wavefunction);
+    explicit CudaOrbitalEvaluator(const Wavefunction& wavefunction, int device_index = -1);
     ~CudaOrbitalEvaluator();
 
     CudaOrbitalEvaluator(const CudaOrbitalEvaluator&) = delete;

@@ -1,0 +1,76 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "COV_BUILD_TESTS": "OFF",
+        "COV_BUILD_VIEWER": "ON",
+        "COV_ENABLE_CUDA": "OFF",
+        "COV_ENABLE_METAL": "OFF",
+        "COV_ENABLE_WEBGPU": "OFF"
+      }
+    },
+    {
+      "name": "cpu-core",
+      "displayName": "CPU libraries and tests",
+      "inherits": "base",
+      "cacheVariables": {
+        "COV_BUILD_VIEWER": "OFF",
+        "COV_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "portable",
+      "displayName": "Desktop viewer with CPU grid",
+      "inherits": "base"
+    },
+    {
+      "name": "cuda",
+      "displayName": "Desktop viewer with NVIDIA CUDA",
+      "inherits": "base",
+      "cacheVariables": {
+        "COV_ENABLE_CUDA": "ON"
+      }
+    },
+    {
+      "name": "metal",
+      "displayName": "macOS viewer with Metal",
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "COV_ENABLE_METAL": "ON"
+      }
+    },
+    {
+      "name": "webgpu",
+      "displayName": "Desktop viewer with optional WebGPU",
+      "inherits": "base",
+      "cacheVariables": {
+        "COV_ENABLE_WEBGPU": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "cpu-core", "configurePreset": "cpu-core" },
+    { "name": "portable", "configurePreset": "portable" },
+    { "name": "cuda", "configurePreset": "cuda" },
+    { "name": "metal", "configurePreset": "metal" },
+    { "name": "webgpu", "configurePreset": "webgpu" }
+  ],
+  "testPresets": [
+    {
+      "name": "cpu-core",
+      "configurePreset": "cpu-core",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

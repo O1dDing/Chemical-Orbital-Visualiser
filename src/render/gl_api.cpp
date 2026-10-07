@@ -26,6 +26,8 @@ void (APIENTRY* Uniform3f)(GLint, GLfloat, GLfloat, GLfloat) = nullptr;
 void (APIENTRY* ActiveTexture)(GLenum) = nullptr;
 void (APIENTRY* TexImage3D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLsizei,
                             GLint, GLenum, GLenum, const void*) = nullptr;
+void (APIENTRY* TexSubImage3D)(GLenum, GLint, GLint, GLint, GLint,
+                             GLsizei, GLsizei, GLsizei, GLenum, GLenum, const void*) = nullptr;
 
 template <typename T>
 bool load_one(T& target, const char* name) {
@@ -55,6 +57,7 @@ bool load() {
     ok &= load_one(Uniform3f, "glUniform3f");
     ok &= load_one(ActiveTexture, "glActiveTexture");
     ok &= load_one(TexImage3D, "glTexImage3D");
+    ok &= load_one(TexSubImage3D, "glTexSubImage3D");
     return ok;
 }
 

@@ -6,6 +6,7 @@
 namespace cov {
 
 struct FileDialogResult {
+    // False when no native picker is available; the caller may offer its own path input.
     bool supported = true;
     bool cancelled = false;
     std::filesystem::path path;

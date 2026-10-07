@@ -1,0 +1,97 @@
+name: Portable desktop viewer
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux display headers and software renderer
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev xvfb
+      - name: Configure portable viewer and native Metal on macOS
+        run: cmake -S . -B build -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_VIEWER=ON -DCOV_BUILD_TESTS=ON -DGLFW_BUILD_WAYLAND=OFF -DCMAKE_BUILD_TYPE=Release
+      - name: Enable software display integration tests
+        if: runner.os == 'Linux'
+        run: cmake -S . -B build -DCOV_TEST_VIEWER_COMPUTE=ON
+      - name: Compile desktop and device shaders
+        run: cmake --build build --config Release --parallel 3
+      - name: Test grid publication with software OpenGL
+        if: runner.os == 'Linux'
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run -a ctest --test-dir build -R viewer_compute --output-on-failure
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cov-portable-${{ matrix.os }}
+          path: |
+            build/cov
+            build/Release/cov.exe
+            build/libcov_compute_metal.dylib
+          if-no-files-found: error
+
+  debian:
+    runs-on: ubuntu-24.04
+    container: debian:13-slim
+    steps:
+      - name: Install Debian build dependencies
+        run: apt-get update && apt-get install -y git ca-certificates cmake g++ make libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+      - uses: actions/checkout@v4
+      - name: Build Debian desktop
+        run: |
+          cmake -S . -B build -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_TESTS=OFF -DGLFW_BUILD_WAYLAND=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 3
+
+  freebsd:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build FreeBSD CPU desktop from source
+        uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          prepare: pkg install -y cmake ninja eigen libX11 libXrandr libXinerama libXcursor libXi mesa-libs
+          run: |
+            cmake -S . -B build -G Ninja -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_TESTS=OFF -DGLFW_BUILD_WAYLAND=OFF -DCMAKE_BUILD_TYPE=Release
+            cmake --build build --parallel 3
+
+  webgpu:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned wgpu-native C ABI
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/gfx-rs/wgpu-native/releases/download/v29.0.1.1/wgpu-windows-x86_64-msvc-release.zip'
+          Invoke-WebRequest $url -OutFile wgpu.zip
+          if ((Get-FileHash wgpu.zip -Algorithm SHA256).Hash -ne '7E67D7445C42AEB85E30F88930FD8D7D83EE769E3390AEB1ADA75EBF3CF78132') { throw 'wgpu-native archive checksum mismatch' }
+          Expand-Archive wgpu.zip -DestinationPath wgpu
+      - name: Build optional WebGPU viewer
+        shell: pwsh
+        run: |
+          cmake -S . -B build -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_TESTS=OFF -DCOV_ENABLE_WEBGPU=ON "-DCOV_WGPU_NATIVE_ROOT=$pwd/wgpu"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build --config Release --parallel 3
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($file in 'cov.exe','cov_compute_webgpu.dll','wgpu_native.dll') {
+            if (-not (Test-Path "build/Release/$file")) { throw "Missing $file" }
+          }
+      - name: Compile and validate WGSL without a GPU
+        run: |
+          cargo install naga-cli --version 29.0.1 --locked
+          naga src/compute/webgpu/orbital.wgsl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cov-windows-webgpu
+          path: build/Release/
+          if-no-files-found: error

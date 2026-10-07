@@ -1,0 +1,113 @@
+name: Native compute modules
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/native-compute.yml
+      - include/cov/compute_abi.h
+      - src/compute/hip/**
+      - src/compute/sycl/**
+  push:
+    paths:
+      - .github/workflows/native-compute.yml
+      - include/cov/compute_abi.h
+      - src/compute/hip/**
+      - src/compute/sycl/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hip-linux:
+    runs-on: ubuntu-22.04
+    container: rocm/dev-ubuntu-22.04:7.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned CMake
+        shell: bash
+        run: |
+          curl -fsSL https://github.com/Kitware/CMake/releases/download/v3.31.10/cmake-3.31.10-linux-x86_64.tar.gz -o /tmp/cmake.tar.gz
+          tar -xzf /tmp/cmake.tar.gz -C /tmp
+      - name: Compile HIP host and gfx1100 device code
+        shell: bash
+        run: |
+          /tmp/cmake-3.31.10-linux-x86_64/bin/cmake -S src/compute/hip -B build/native-hip -G 'Unix Makefiles' \
+            -DCOV_ROOT="$GITHUB_WORKSPACE" \
+            -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
+            -DCMAKE_HIP_COMPILER_ROCM_ROOT=/opt/rocm \
+            -DCMAKE_HIP_ARCHITECTURES=gfx1100
+          /tmp/cmake-3.31.10-linux-x86_64/bin/cmake --build build/native-hip --parallel 2
+
+  sycl-linux:
+    runs-on: ubuntu-22.04
+    container: intel/oneapi:2026.1.0-devel-ubuntu22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned CMake
+        shell: bash
+        run: |
+          curl -fsSL https://github.com/Kitware/CMake/releases/download/v3.31.10/cmake-3.31.10-linux-x86_64.tar.gz -o /tmp/cmake.tar.gz
+          tar -xzf /tmp/cmake.tar.gz -C /tmp
+      - name: Compile SYCL host and SPIR-V device code
+        shell: bash
+        run: |
+          source /opt/intel/oneapi/setvars.sh --force
+          /tmp/cmake-3.31.10-linux-x86_64/bin/cmake -S src/compute/sycl -B build/native-sycl -G 'Unix Makefiles' \
+            -DCOV_ROOT="$GITHUB_WORKSPACE" -DCMAKE_CXX_COMPILER="$(command -v icpx)"
+          /tmp/cmake-3.31.10-linux-x86_64/bin/cmake --build build/native-sycl --parallel 2
+
+  sycl-windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Intel DPC++ 2026.1 compiler
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'intel-oneapi-toolkit-2026.1.0.191_offline.exe'
+          curl.exe -fL --retry 3 --output $installer 'https://registrationcenter-download.intel.com/akdlm/IRC_NAS/4144bec3-82ce-4672-bd71-5c93a79cd5e7/intel-oneapi-toolkit-2026.1.0.191_offline.exe'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $process = Start-Process -FilePath $installer -ArgumentList '-s','-a','--silent','--eula','accept','--components','intel.oneapi.win.cpp-dpcpp-common','-p=NEED_VS2022_INTEGRATION=0' -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+      - name: Compile SYCL host and SPIR-V device code
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          if errorlevel 1 exit /b 1
+          call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64
+          if errorlevel 1 exit /b 1
+          cmake -S src/compute/sycl -B build/native-sycl -G Ninja -DCOV_ROOT="%GITHUB_WORKSPACE%" -DCMAKE_CXX_COMPILER=icx-cl
+          if errorlevel 1 exit /b 1
+          cmake --build build/native-sycl --parallel 2
+          if errorlevel 1 exit /b 1
+
+  hip-windows:
+    if: vars.COV_HIP_SDK_7_2_URL != '' && vars.COV_HIP_SDK_7_2_SHA256 != ''
+    runs-on: windows-2022
+    env:
+      HIP_SDK_URL: ${{ vars.COV_HIP_SDK_7_2_URL }}
+      HIP_SDK_SHA256: ${{ vars.COV_HIP_SDK_7_2_SHA256 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install AMD HIP SDK 7.2
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'amd-hip-sdk-7.2.exe'
+          curl.exe -fL --retry 3 --output $installer $env:HIP_SDK_URL
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $actual = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
+          if ($actual -ne $env:HIP_SDK_SHA256) { throw 'HIP SDK installer checksum mismatch' }
+          $log = Join-Path $env:RUNNER_TEMP 'hip-sdk-install.log'
+          $process = Start-Process -FilePath $installer -ArgumentList '-install','-log',$log -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+      - name: Compile HIP host and gfx1100 device code
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          if errorlevel 1 exit /b 1
+          set "HIP_PATH=C:\Program Files\AMD\ROCm\7.2"
+          if not exist "%HIP_PATH%\bin\hipcc.exe" exit /b 1
+          cmake -S src/compute/hip -B build/native-hip -G Ninja -DCOV_ROOT="%GITHUB_WORKSPACE%" -DCMAKE_CXX_COMPILER="%HIP_PATH%\bin\hipcc.exe" -DCOV_HIP_ARCHITECTURES=gfx1100
+          if errorlevel 1 exit /b 1
+          cmake --build build/native-hip --parallel 2
+          if errorlevel 1 exit /b 1

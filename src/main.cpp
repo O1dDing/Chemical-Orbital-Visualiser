@@ -1,4 +1,4 @@
-#include "cov/cuda_orbital.hpp"
+#include "cov/orbital_evaluator.hpp"
 #include "cov/numerical_diagnostics.hpp"
 #include "cov/pi_topology_evidence.hpp"
 #include <sstream>
@@ -41,6 +41,7 @@ enum class StatusKind {
     Parsing,
     Loaded,
     GridUpdated,
+    Computing,
     Exported,
     Error,
 };
@@ -87,6 +88,13 @@ std::size_t initial_orbital(const cov::Wavefunction& wf) {
 const char* status_label(const StatusKind status, const cov::ui::Language language) {
     using cov::ui::Text;
     switch (status) {
+        case StatusKind::Computing:
+            switch (language) {
+                case cov::ui::Language::ChineseSimplified: return "正在计算轨道网格";
+                case cov::ui::Language::Japanese: return "軌道グリッドを計算中";
+                case cov::ui::Language::French: return "Calcul de la grille orbitale";
+                default: return "Computing orbital grid";
+            }
         case StatusKind::Parsing: return cov::ui::tr(Text::Parsing, language);
         case StatusKind::Loaded: return cov::ui::tr(Text::Loaded, language);
         case StatusKind::GridUpdated: return cov::ui::tr(Text::GridUpdated, language);
@@ -200,9 +208,81 @@ const char* orbital_surface_name(const cov::OrbitalSurfaceMode mode,
     }
 }
 
+std::optional<std::filesystem::path> file_browser(cov::ui::Language language) {
+    std::optional<std::filesystem::path> selected;
+    ImGui::SetNextWindowSize(ImVec2(640, 420), ImGuiCond_FirstUseEver);
+    if (!ImGui::BeginPopupModal("##file_browser", nullptr, ImGuiWindowFlags_NoSavedSettings)) return selected;
+    static auto directory = std::filesystem::current_path();
+    static std::array<char, 2048> location{};
+    static std::string error;
+    ImGui::TextUnformatted(cov::ui::tr(cov::ui::Text::OpenFile, language));
+    ImGui::TextWrapped("%s", path_to_utf8(directory).c_str());
+    if (ImGui::Button("..") && directory.has_parent_path()) directory = directory.parent_path();
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1);
+    if (ImGui::InputText("##directory", location.data(), location.size(), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        std::error_code ec;
+        auto next = path_from_utf8(location.data());
+        if (std::filesystem::is_directory(next, ec)) { directory = next; error.clear(); }
+        else if (std::filesystem::is_regular_file(next, ec)) { selected = next; ImGui::CloseCurrentPopup(); }
+        else error = ec ? ec.message() : path_to_utf8(next);
+    }
+    if (!error.empty()) ImGui::TextWrapped("%s", error.c_str());
+    if (ImGui::BeginChild("##entries", ImVec2(0, -36), true)) {
+        std::error_code ec;
+        std::vector<std::pair<bool, std::filesystem::path>> entries;
+        for (std::filesystem::directory_iterator it(directory, std::filesystem::directory_options::skip_permission_denied, ec), end;
+             !ec && it != end; it.increment(ec)) {
+            const bool folder = it->is_directory(ec);
+            if (ec) break;
+            entries.emplace_back(folder, it->path());
+        }
+        if (ec) error = ec.message();
+        std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) {
+            return a.first != b.first ? a.first > b.first : a.second.filename() < b.second.filename();
+        });
+        for (const auto& [folder, path] : entries) {
+            const auto label = path_to_utf8(path.filename()) + (folder ? "/" : "");
+            if (ImGui::Selectable(label.c_str())) {
+                if (folder) { directory = path; error.clear(); break; }
+                selected = path;
+                ImGui::CloseCurrentPopup();
+                break;
+            }
+        }
+    }
+    ImGui::EndChild();
+    const char* close = "Close";
+    switch (language) {
+        case cov::ui::Language::ChineseSimplified: close = "关闭"; break;
+        case cov::ui::Language::Japanese: close = "閉じる"; break;
+        case cov::ui::Language::French: close = "Fermer"; break;
+        default: break;
+    }
+    if (ImGui::Button(close)) ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+    return selected;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
+    cov::ComputeOptions compute_options;
+    std::string input_path;
+    try {
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg.starts_with("--compute-backend=")) compute_options.backend = arg.substr(18);
+            else if (arg.starts_with("--compute-device=")) {
+                const auto value = arg.substr(17);
+                std::size_t end = 0;
+                compute_options.device_index = std::stoi(value, &end);
+                if (end != value.size() || compute_options.device_index < 0)
+                    throw std::invalid_argument("Compute device index must be nonnegative");
+            } else if (arg == "--validation-plan" || arg == "--validation-output") ++i;
+            else if (!arg.starts_with("--") && input_path.empty()) input_path = arg;
+        }
+    } catch (const std::exception& e) { std::fprintf(stderr, "%s\n", e.what()); return 2; }
     try { cov::validation::configure(argc, argv); }
     catch (const std::exception& e) { std::fprintf(stderr,"Validation: %s\n",e.what()); return 2; }
     if (!glfwInit()) {
@@ -262,7 +342,7 @@ int main(int argc, char** argv) {
 
         std::optional<cov::Wavefunction> wavefunction;
         std::optional<cov::OrbitalTrackingResult> frame_tracking;
-        std::unique_ptr<cov::CudaOrbitalEvaluator> evaluator;
+        std::unique_ptr<cov::OrbitalEvaluator> evaluator;
         cov::GridBox grid_box;
 
         cov::ui::Language language = cov::ui::Language::English;
@@ -292,10 +372,10 @@ int main(int argc, char** argv) {
                 evaluator->attach_gl_texture(renderer.volume_texture());
                 resize_and_recompute = false;
             }
-            evaluator->evaluate(mo_index, grid_box,
-                                resolution, resolution, resolution);
-            cov::validation::evaluated(mo_index,"selection-or-grid",evaluator->last_kernel_ms());
-            status = StatusKind::GridUpdated;
+            if (cov::validation::active()) evaluator->evaluate(mo_index, grid_box, resolution, resolution, resolution);
+            else evaluator->begin_evaluate(mo_index, grid_box, resolution, resolution, resolution);
+            if (evaluator->ready()) cov::validation::evaluated(mo_index,"selection-or-grid",evaluator->last_kernel_ms());
+            status = evaluator->busy() ? StatusKind::Computing : StatusKind::GridUpdated;
             status_detail = evaluator->device_name();
             recompute = false;
         };
@@ -335,7 +415,7 @@ int main(int argc, char** argv) {
                 wavefunction = std::move(wf);
                 frame_tracking = std::move(new_tracking);
                 renderer.invalidate_geometry_cache();
-                evaluator = std::make_unique<cov::CudaOrbitalEvaluator>(*wavefunction);
+                evaluator = std::make_unique<cov::OrbitalEvaluator>(*wavefunction, compute_options);
                 mo_index = new_mo;
                 pending_mo_index.reset();
                 orbital_ui.browser_cache={};
@@ -344,13 +424,13 @@ int main(int argc, char** argv) {
 
                 renderer.resize_volume(resolution, resolution, resolution);
                 evaluator->attach_gl_texture(renderer.volume_texture());
-                evaluator->evaluate(mo_index, grid_box,
-                                    resolution, resolution, resolution);
-                cov::validation::evaluated(mo_index,"input-load",evaluator->last_kernel_ms());
+                if (cov::validation::active()) evaluator->evaluate(mo_index, grid_box, resolution, resolution, resolution);
+                else evaluator->begin_evaluate(mo_index, grid_box, resolution, resolution, resolution);
+                if (evaluator->ready()) cov::validation::evaluated(mo_index,"input-load",evaluator->last_kernel_ms());
                 current_file = path;
                 copy_path_to_buffer(path, path_buffer);
                 push_recent(recent_files, path);
-                status = StatusKind::Loaded;
+                status = evaluator->busy() ? StatusKind::Computing : StatusKind::Loaded;
                 status_detail = path_to_utf8(path.filename());
             } catch (const std::exception& e) {
                 status = StatusKind::Error;
@@ -358,8 +438,8 @@ int main(int argc, char** argv) {
             }
         };
 
-        if (argc >= 2) {
-            const std::string p = argv[1];
+        if (!input_path.empty()) {
+            const std::string p = input_path;
             std::snprintf(path_buffer.data(), path_buffer.size(), "%s", p.c_str());
             load_file(path_from_utf8(p));
         }
@@ -371,6 +451,17 @@ int main(int argc, char** argv) {
 
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
+            if (evaluator) {
+                try {
+                    if (evaluator->poll()) {
+                        status = StatusKind::GridUpdated;
+                        status_detail = evaluator->device_name();
+                    }
+                } catch (const std::exception& e) {
+                    status = StatusKind::Error;
+                    status_detail = e.what();
+                }
+            }
             cov::validation::begin_frame(camera,molecule_render,isovalue,resolution,resize_and_recompute);
             if (resize_and_recompute) recompute = true;
 
@@ -428,7 +519,7 @@ int main(int argc, char** argv) {
                 // projection and depth buffer, outside the control panel.
                 renderer.render_geometry(*wavefunction, grid_box, viewport.width, viewport.height,
                                          camera, molecule_render);
-                renderer.render_volume(viewport.width, viewport.height, isovalue, camera,
+                if (evaluator && evaluator->ready()) renderer.render_volume(viewport.width, viewport.height, isovalue, camera,
                                        molecule_render.orbital_opacity,
                                        orbital_material, orbital_surface_mode);
                 cov::validation::after_scene(renderer, grid_box, mo_index);
@@ -499,7 +590,6 @@ int main(int argc, char** argv) {
             } else {
                 disabled_wrapped(cov::ui::tr(cov::ui::Text::IdleHint, language));
             }
-            disabled_wrapped(cov::ui::tr(cov::ui::Text::ExperimentalNote, language));
             ImGui::Separator();
             ImGui::Spacing();
 
@@ -511,6 +601,8 @@ int main(int argc, char** argv) {
                 const cov::FileDialogResult dialog = cov::open_molden_file_dialog();
                 if (dialog.selected()) {
                     load_file(dialog.path);
+                } else if (!dialog.supported) {
+                    ImGui::OpenPopup("##file_browser");
                 } else if (!dialog.cancelled && !dialog.error.empty()) {
                     status = StatusKind::Error;
                     status_detail = dialog.supported
@@ -518,6 +610,7 @@ int main(int argc, char** argv) {
                                         : cov::ui::tr(cov::ui::Text::OpenDialogUnsupported, language);
                 }
             }
+            if (const auto selected = file_browser(language)) load_file(*selected);
             if (!current_file.empty()) {
                 const std::string file_label = std::string(
                     cov::ui::tr(cov::ui::Text::CurrentFile, language)) + ": " +
@@ -871,10 +964,10 @@ int main(int argc, char** argv) {
                 ImGui::TextUnformatted(evaluator->device_name());
                 ImGui::TextDisabled("%s", cov::ui::tr(cov::ui::Text::LastKernel, language));
                 ImGui::Text("%.3f ms", evaluator->last_kernel_ms());
-                cov::ui::status_badge(cov::ui::tr(cov::ui::Text::GPUResident, language),
-                                      cov::ui::Tone::Success);
+                if (evaluator->ready()) cov::ui::status_badge(cov::ui::tr(cov::ui::Text::GPUResident, language), cov::ui::Tone::Success);
+                else if (evaluator->busy()) disabled_wrapped(status_label(StatusKind::Computing, language));
             } else {
-                ImGui::TextDisabled("CUDA —");
+                ImGui::TextDisabled("%s —", cov::ui::tr(cov::ui::Text::CUDADevice, language));
             }
             ImGui::TextDisabled("%s: %s",
                                 cov::ui::tr(cov::ui::Text::FontStatus, language),
@@ -889,7 +982,7 @@ int main(int argc, char** argv) {
             cov::validation::ui_frame(mo_index,pending_mo_index.value_or(mo_index));
 
             // Selection debounce: at most the latest requested orbital is evaluated
-            // once at the end of this frame. Browser hover/filtering never launches CUDA.
+            // once at the end of this frame. Browser hover/filtering does not recompute the grid.
             if (pending_mo_index && wavefunction &&
                 *pending_mo_index < wavefunction->orbitals.size()) {
                 if (*pending_mo_index != mo_index) {
