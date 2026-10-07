@@ -43,9 +43,12 @@ kernel void cov_orbital(
     float sum = 0.0f;
     for (uint j = 0; j < term_count; ++j) {
         const CovGaussianTerm t = terms[j];
+        if (t.coefficient == 0.0f) continue;
         const float dx = x - t.cx, dy = y - t.cy, dz = z - t.cz;
+        const float radial = exp(-t.exponent * (dx * dx + dy * dy + dz * dz));
+        if (radial == 0.0f) continue;
         sum += t.coefficient * power4(dx, t.ax) * power4(dy, t.ay) *
-            power4(dz, t.az) * exp(-t.exponent * (dx * dx + dy * dy + dz * dz));
+            power4(dz, t.az) * radial;
     }
     output[i] = sum;
 }

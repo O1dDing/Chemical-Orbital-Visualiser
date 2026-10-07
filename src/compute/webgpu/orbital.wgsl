@@ -39,12 +39,15 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     var sum = 0.0;
     for (var t = 0u; t < params.dims.w; t = t + 1u) {
         let term = terms[t];
+        if (term.coefficient == 0.0) { continue; }
         let dx = xyz.x - term.cx;
         let dy = xyz.y - term.cy;
         let dz = xyz.z - term.cz;
+        let radial = exp(-term.exponent * (dx * dx + dy * dy + dz * dz));
+        if (radial == 0.0) { continue; }
         sum = sum + term.coefficient * power4(dx, term.ax) *
               power4(dy, term.ay) * power4(dz, term.az) *
-              exp(-term.exponent * (dx * dx + dy * dy + dz * dz));
+              radial;
     }
     result[i] = sum;
 }

@@ -102,12 +102,15 @@ __global__ void evaluate_kernel(CovGridRequest request, const CovGaussianTerm* t
     float sum = 0.0f;
     for (uint32_t i = 0; i < term_count; ++i) {
         const CovGaussianTerm t = terms[i];
+        if (t.coefficient == 0.0f) continue;
         const float dx = x - t.cx;
         const float dy = y - t.cy;
         const float dz = z - t.cz;
         const float r2 = dx * dx + dy * dy + dz * dz;
+        const float radial = expf(-t.exponent * r2);
+        if (radial == 0.0f) continue;
         sum += t.coefficient * integer_power(dx, t.ax) * integer_power(dy, t.ay) *
-               integer_power(dz, t.az) * expf(-t.exponent * r2);
+               integer_power(dz, t.az) * radial;
     }
     output[local] = sum;
 }

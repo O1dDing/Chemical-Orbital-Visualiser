@@ -174,10 +174,13 @@ int evaluate(void* opaque, const CovGridRequest* request, float* output,
             float sum = 0.0f;
             for (uint32_t i = 0; i < term_count; ++i) {
                 const CovGaussianTerm t = terms[i];
+                if (t.coefficient == 0.0f) continue;
                 const float dx = x - t.cx;
                 const float dy = y - t.cy;
                 const float dz = z - t.cz;
                 const float r2 = dx * dx + dy * dy + dz * dz;
+                const float radial = sycl::exp(-t.exponent * r2);
+                if (radial == 0.0f) continue;
                 auto power = [](float base, uint32_t exponent) {
                     float result = 1.0f;
                     while (exponent) {
@@ -188,7 +191,7 @@ int evaluate(void* opaque, const CovGridRequest* request, float* output,
                     return result;
                 };
                 sum += t.coefficient * power(dx, t.ax) * power(dy, t.ay) *
-                       power(dz, t.az) * sycl::exp(-t.exponent * r2);
+                       power(dz, t.az) * radial;
             }
             values[local] = sum;
         });

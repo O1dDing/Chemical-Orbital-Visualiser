@@ -31,6 +31,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#ifdef _WIN32
+#include <shellapi.h>
+#endif
 
 namespace {
 
@@ -267,6 +270,28 @@ std::optional<std::filesystem::path> file_browser(cov::ui::Language language) {
 } // namespace
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    // Match the UTF-8 path contract used by the file picker and GLFW drops.
+    // Narrow CRT argv can otherwise replace non-ANSI characters before parsing.
+    std::vector<std::string> utf8_arguments;
+    std::vector<char*> argument_pointers;
+    int wide_argc = 0;
+    if (auto** wide_argv = CommandLineToArgvW(GetCommandLineW(), &wide_argc)) {
+        utf8_arguments.reserve(wide_argc);
+        for (int i = 0; i < wide_argc; ++i) {
+            const int length = WideCharToMultiByte(CP_UTF8, 0, wide_argv[i], -1, nullptr, 0, nullptr, nullptr);
+            std::string value(static_cast<std::size_t>(std::max(1, length)), '\0');
+            WideCharToMultiByte(CP_UTF8, 0, wide_argv[i], -1, value.data(), length, nullptr, nullptr);
+            value.resize(value.size() - 1);
+            utf8_arguments.push_back(std::move(value));
+        }
+        LocalFree(wide_argv);
+        for (auto& value : utf8_arguments) argument_pointers.push_back(value.data());
+        argument_pointers.push_back(nullptr);
+        argc = wide_argc;
+        argv = argument_pointers.data();
+    }
+#endif
     cov::ComputeOptions compute_options;
     std::string input_path;
     try {

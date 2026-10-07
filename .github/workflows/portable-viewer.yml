@@ -46,6 +46,8 @@ jobs:
         run: cmake -S . -B build -DCOV_TEST_VIEWER_COMPUTE=ON
       - name: Compile desktop and device shaders
         run: cmake --build build --config Release --parallel 3
+      - name: Test portable grid, threading and literal formchk arguments
+        run: ctest --test-dir build -C Release -R "(orbital_grid|threading_.*|formchk_spawn)_smoke" --output-on-failure
       - name: Test grid publication with software OpenGL
         if: runner.os == 'Linux'
         env:

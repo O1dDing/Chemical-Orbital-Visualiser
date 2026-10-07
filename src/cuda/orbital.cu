@@ -231,25 +231,31 @@ __device__ float evaluate_shell_component(
         float radial = 0.0f;
         for (std::uint32_t p = 0; p < shell.primitive_count; ++p) {
             const GpuPrimitive primitive = primitives[shell.primitive_offset + p];
+            if (primitive.coefficient == 0.0f) continue;
+            const float decay = __expf(-primitive.exponent * r2);
+            if (decay == 0.0f) continue;
             const float norm = spherical_primitive_norm(
                 primitive.exponent, static_cast<int>(shell.l));
-            radial += primitive.coefficient * norm *
-                      __expf(-primitive.exponent * r2);
+            radial += primitive.coefficient * norm * decay;
         }
+        if (radial == 0.0f) return 0.0f;
         return radial * real_solid_harmonic(
             static_cast<int>(shell.l), component, dx, dy, dz);
     }
 
     int ax, ay, az;
     cartesian_exponents(static_cast<int>(shell.l), component, ax, ay, az);
-    const float monomial = powi(dx, ax) * powi(dy, ay) * powi(dz, az);
     float contracted = 0.0f;
     for (std::uint32_t p = 0; p < shell.primitive_count; ++p) {
         const GpuPrimitive primitive = primitives[shell.primitive_offset + p];
+        if (primitive.coefficient == 0.0f) continue;
+        const float decay = __expf(-primitive.exponent * r2);
+        if (decay == 0.0f) continue;
         const float norm = cartesian_primitive_norm(primitive.exponent, ax, ay, az);
-        contracted += primitive.coefficient * norm *
-                      __expf(-primitive.exponent * r2);
+        contracted += primitive.coefficient * norm * decay;
     }
+    if (contracted == 0.0f) return 0.0f;
+    const float monomial = powi(dx, ax) * powi(dy, ay) * powi(dz, az);
     return contracted * monomial;
 }
 
@@ -269,9 +275,11 @@ __device__ float orbital_value(
 
         const int n = shell_basis_count_device(shell);
         for (int c = 0; c < n; ++c) {
+            const float coefficient = coefficients[shell.basis_offset + c];
+            if (coefficient == 0.0f) continue;
             const float basis = evaluate_shell_component(
                 shell, primitives, c, dx, dy, dz, r2);
-            psi = fmaf(coefficients[shell.basis_offset + c], basis, psi);
+            psi = fmaf(coefficient, basis, psi);
         }
     }
     return psi;

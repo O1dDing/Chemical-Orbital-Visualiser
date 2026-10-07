@@ -89,3 +89,19 @@ COV 读取 Gaussian FCHK/FCH 和 Molden 波函数。打开 CHK 需要单独安�
 每个输入最多 100 个原子。支持 Cartesian 和实球谐 `s/p/d/f/g` 基函数。Molden 展开后的基函数数目须与轨道系数一致。
 
 Gaussian/NBO 文件准备见[单次作业模板](NBO_ONE_JOB.zh-CN.md)。
+
+## 计算验证
+
+启用 `COV_BUILD_TESTS=ON` 后运行 CTest，检查解析、CPU 网格和科学／界面回归。`COV_TEST_VIEWER_COMPUTE=ON` 还要求不含 CUDA 的查看器构建及可用显示环境（可用 Xvfb 软件 OpenGL），检查纹理更新、取消、切换请求及自动回退与显式失败。
+
+实际 GPU 验证独立于编译和 CTest。以下命令在模块或设备不可用时失败，不会把 CPU 回退计作 GPU 通过：
+
+```text
+cov_compute_module_probe /absolute/path/to/cov_compute_webgpu.dll
+cov_viewer_compute_smoke webgpu
+cov_cuda_grid_smoke
+```
+
+Linux/macOS 使用相应 `.so`／`.dylib` 路径。第一个探针接受任意原生计算模块，对照 CPU 检查 Cartesian/pure s～g 分量、收缩函数、网格分块和数值尾部。第二个需启用 `COV_TEST_VIEWER_COMPUTE`，也接受 `hip`、`sycl`、`metal`，检查实际显示纹理及模块创建、释放前后的 OpenGL 上下文。WebGPU 只使用 Vulkan／DX12／Metal，排除可能干扰查看器上下文的 GL 后端。第三个只在同时启用 CUDA 和查看器时构建，通过生产 CUDA/OpenGL 纹理对照 CPU。
+
+HIP、SYCL、Metal 的 CI 编译通过不等于对应硬件运行认证。2026-10-07 审计已在本地 Windows／RTX 5090 上验证 CPU、CUDA、WebGPU；其他厂商 GPU 仍需对应实机检查。Windows GUI 启动不附带控制台，接受 Unicode 输入路径；`formchk` 直接接收原样 Unicode 参数，不经过命令解释器。取证构建可同时使用计算后端参数与取证计划。

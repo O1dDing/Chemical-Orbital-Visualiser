@@ -8,7 +8,12 @@
 #include <stdexcept>
 #include <string>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#else
 #include <cerrno>
 #include <cstring>
 #include <spawn.h>
@@ -22,14 +27,49 @@ namespace cov {
 namespace {
 
 #ifdef _WIN32
-std::string quoted_shell_argument(const std::string& value, const char* label) {
-    if (value.find('"') != std::string::npos ||
-        value.find('\r') != std::string::npos ||
-        value.find('\n') != std::string::npos) {
-        throw std::runtime_error(std::string(label) +
-                                 " contains characters unsafe for formchk invocation");
+std::wstring quote_windows_argument(const std::wstring& value) {
+    std::wstring quoted = L"\"";
+    std::size_t backslashes = 0;
+    for (const wchar_t character : value) {
+        if (character == L'\\') {
+            ++backslashes;
+            continue;
+        }
+        quoted.append(backslashes * (character == L'"' ? 2 : 1), L'\\');
+        backslashes = 0;
+        if (character == L'"') quoted += L'\\';
+        quoted += character;
     }
-    return '"' + value + '"';
+    quoted.append(backslashes * 2, L'\\');
+    quoted += L'"';
+    return quoted;
+}
+
+DWORD run_formchk(const std::wstring& executable, const std::filesystem::path& input,
+                  const std::filesystem::path& output) {
+    // CreateProcessW receives literal arguments: cmd.exe would expand %NAME%
+    // even inside quotes, changing valid checkpoint and executable paths.
+    std::wstring command = quote_windows_argument(executable) + L" " +
+                           quote_windows_argument(input.wstring()) + L" " +
+                           quote_windows_argument(output.wstring());
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION process{};
+    if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE,
+                        CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process)) {
+        throw std::runtime_error("Could not start Gaussian formchk: Windows error " +
+                                 std::to_string(GetLastError()) +
+                                 ". Install Gaussian formchk or set COV_FORMCHK to its executable path.");
+    }
+    CloseHandle(process.hThread);
+    const DWORD wait_result = WaitForSingleObject(process.hProcess, INFINITE);
+    DWORD exit_code = 0;
+    const bool obtained = wait_result == WAIT_OBJECT_0 &&
+                          GetExitCodeProcess(process.hProcess, &exit_code) != FALSE;
+    CloseHandle(process.hProcess);
+    if (!obtained)
+        throw std::runtime_error("Could not obtain Gaussian formchk exit status");
+    return exit_code;
 }
 #else
 int run_formchk(const std::string& executable, const std::string& input,
@@ -82,16 +122,17 @@ Wavefunction parse_gaussian_chk_via_formchk(const std::filesystem::path& chk_pat
         throw std::runtime_error("Gaussian CHK file does not exist: " + chk_path.string());
     }
 
-    std::string executable;
-    if (const char* configured = std::getenv("COV_FORMCHK"); configured && *configured) {
-        executable = configured;
-    } else {
 #ifdef _WIN32
-        executable = "formchk.exe";
+    // std::getenv and path(string) can lose characters outside the active
+    // Windows code page; the executable path must stay wide through launch.
+    const wchar_t* configured = _wgetenv(L"COV_FORMCHK");
+    const std::wstring executable = configured && *configured
+        ? std::wstring(configured) : L"formchk.exe";
 #else
-        executable = "formchk";
+    const char* configured = std::getenv("COV_FORMCHK");
+    const std::string executable = configured && *configured
+        ? std::string(configured) : "formchk";
 #endif
-    }
 
     const auto stamp = std::chrono::high_resolution_clock::now()
                            .time_since_epoch().count();
@@ -105,12 +146,7 @@ Wavefunction parse_gaussian_chk_via_formchk(const std::filesystem::path& chk_pat
     };
 
 #ifdef _WIN32
-    const std::string command =
-        quoted_shell_argument(executable, "formchk executable") + " " +
-        quoted_shell_argument(chk_path.string(), "CHK path") + " " +
-        quoted_shell_argument(output.path.string(), "temporary FCHK path");
-
-    const int code = std::system(command.c_str());
+    const DWORD code = run_formchk(executable, chk_path, output.path);
 #else
     const int code = run_formchk(executable, chk_path.string(), output.path.string());
 #endif

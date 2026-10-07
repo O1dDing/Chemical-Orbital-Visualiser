@@ -101,3 +101,19 @@ For each grid point, the evaluator computes
 It does not allocate a full grid-points-by-basis-functions matrix. Available grid resolutions are 64³, 128³, 256³ and 512³.
 
 For Gaussian/NBO file preparation, see the [one-job template](NBO_ONE_JOB.md).
+
+## Compute validation
+
+With `COV_BUILD_TESTS=ON`, run CTest for the parser, CPU grid and scientific/UI regressions. `COV_TEST_VIEWER_COMPUTE=ON` additionally requires a portable viewer build without CUDA and a working display (software OpenGL under Xvfb is sufficient). It checks texture publication, cancellation, replacement requests and explicit failure versus automatic CPU fallback.
+
+Hardware validation is separate from compilation and CTest. These commands fail when the requested module or device is absent; a CPU fallback is not counted as a GPU pass:
+
+```text
+cov_compute_module_probe /absolute/path/to/cov_compute_webgpu.dll
+cov_viewer_compute_smoke webgpu
+cov_cuda_grid_smoke
+```
+
+Use the relevant `.so`/`.dylib` module path on Linux/macOS. The first probe accepts any native compute module and compares Cartesian/pure s-through-g components, contracted functions, grid chunks and numerical tails against the CPU evaluator. The second needs `COV_TEST_VIEWER_COMPUTE=ON`; `hip`, `sycl` and `metal` are also accepted. It checks the real display texture and preserves the caller's OpenGL context across module creation and destruction. WebGPU deliberately uses Vulkan/DX12/Metal, excluding its GL backend to avoid interfering with the viewer's context. `cov_cuda_grid_smoke` is built only with CUDA and the viewer enabled and checks the production CUDA/OpenGL texture against the CPU evaluator.
+
+CI compilation of HIP, SYCL or Metal is not a hardware-runtime certification. As of the 2026-10-07 PR audit, local Windows/RTX 5090 runtime checks passed for CPU, CUDA and WebGPU; other GPU vendors still need their corresponding hardware checks. The Windows GUI starts without an extra console, accepts Unicode input paths and launches `formchk` with literal Unicode arguments without a command shell. Validation builds accept compute-backend options alongside the validation plan.

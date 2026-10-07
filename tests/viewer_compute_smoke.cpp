@@ -84,7 +84,7 @@ void expected_volume(const std::vector<float>& values, const cov::GridBox& box,
             std::exp(-1.25 * (dx*dx + dy*dy + dz*dz));
         const float actual = values[std::size_t(x) + std::size_t(nx) * (y + ny*z)];
         const double tolerance = 3.0e-5 * std::max(1.0, std::abs(reference));
-        if (std::abs(actual - reference) > tolerance)
+        if (!std::isfinite(actual) || std::abs(actual - reference) > tolerance)
             throw std::runtime_error("OpenGL volume differs from analytic s orbital");
     }
 }
@@ -157,16 +157,46 @@ void auto_and_explicit(const cov::Wavefunction& wf, cov::VolumeRenderer& rendere
     }
     require(failed, "Explicit HIP error was lost or silently fell back");
 }
+
+void native_texture(const cov::Wavefunction& wf, cov::VolumeRenderer& renderer,
+                    const std::string& backend) {
+    const auto* original_version = glGetString(GL_VERSION);
+    require(original_version != nullptr, "No current OpenGL context before module creation");
+    const std::string version(reinterpret_cast<const char*>(original_version));
+    const cov::GridBox box{-1.0f, -0.5f, -0.75f, 1.0f, 0.5f, 0.75f};
+    {
+        cov::OrbitalEvaluator evaluator(wf, {backend, -1});
+        const auto* current_version = glGetString(GL_VERSION);
+        require(current_version && version == reinterpret_cast<const char*>(current_version),
+                "Compute module replaced or cleared the viewer OpenGL context");
+        require(std::string(evaluator.device_name()).starts_with(backend),
+                "Explicit native test did not use the requested backend");
+        std::cout << "device=" << evaluator.device_name() << '\n';
+        renderer.resize_volume(3, 1, 2);
+        evaluator.attach_gl_texture(renderer.volume_texture());
+        evaluator.evaluate(0, box, 3, 1, 2);
+        expected_volume(read_volume(renderer), box, 3, 1, 2, 1.0);
+        evaluator.begin_evaluate(1, box, 3, 1, 2);
+        finish(evaluator);
+        expected_volume(read_volume(renderer), box, 3, 1, 2, -1.0);
+    }
+    require(glGetString(GL_VERSION) != nullptr, "Module teardown cleared the viewer OpenGL context");
+    expected_volume(read_volume(renderer), box, 3, 1, 2, -1.0);
+}
 }
 
 int main(int argc, char** argv) {
     try {
-        require(argc == 2, "Expected missing or failing mode");
+        require(argc == 2, "Expected missing, failing or native backend (webgpu/hip/sycl/metal) mode");
         Window window;
         cov::VolumeRenderer renderer;
         const auto wf = sample();
         cpu_texture_and_cancel(wf, renderer);
-        auto_and_explicit(wf, renderer, argv[1]);
+        const std::string mode = argv[1];
+        if (mode == "webgpu" || mode == "hip" || mode == "sycl" || mode == "metal")
+            native_texture(wf, renderer, mode);
+        else
+            auto_and_explicit(wf, renderer, mode);
         return 0;
     } catch (const std::exception& ex) {
         std::cerr << "viewer_compute_smoke: " << ex.what() << '\n';

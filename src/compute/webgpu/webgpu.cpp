@@ -176,6 +176,18 @@ void* create_impl(int index, char* error, size_t capacity) {
     }
     auto ctx = std::make_unique<Context>();
     WGPUInstanceDescriptor instance_desc = WGPU_INSTANCE_DESCRIPTOR_INIT;
+    WGPUInstanceExtras instance_extras{};
+    instance_extras.chain.sType = static_cast<WGPUSType>(WGPUSType_InstanceExtras);
+#if defined(_WIN32)
+    instance_extras.backends = WGPUInstanceBackend_Vulkan | WGPUInstanceBackend_DX12;
+#elif defined(__APPLE__)
+    instance_extras.backends = WGPUInstanceBackend_Metal | WGPUInstanceBackend_Vulkan;
+#else
+    instance_extras.backends = WGPUInstanceBackend_Vulkan;
+#endif
+    // The caller owns a current OpenGL context for its viewer. Initializing
+    // wgpu-native's GL backend can replace that context during enumeration.
+    instance_desc.nextInChain = &instance_extras.chain;
     ctx->instance = wgpuCreateInstance(&instance_desc);
     if (!ctx->instance) { error_text(error, capacity, "Could not create WebGPU instance"); return nullptr; }
     const size_t count = wgpuInstanceEnumerateAdapters(ctx->instance, nullptr, nullptr);
@@ -185,8 +197,12 @@ void* create_impl(int index, char* error, size_t capacity) {
     for (auto adapter : adapters) {
         WGPUAdapterInfo info = WGPU_ADAPTER_INFO_INIT;
         if (wgpuAdapterGetInfo(adapter, &info) != WGPUStatus_Success) { wgpuAdapterRelease(adapter); continue; }
-        const bool gpu = info.adapterType == WGPUAdapterType_DiscreteGPU ||
-                         info.adapterType == WGPUAdapterType_IntegratedGPU;
+        const bool native_backend = info.backendType == WGPUBackendType_Vulkan ||
+                                    info.backendType == WGPUBackendType_D3D12 ||
+                                    info.backendType == WGPUBackendType_Metal;
+        const bool gpu = native_backend &&
+                         (info.adapterType == WGPUAdapterType_DiscreteGPU ||
+                          info.adapterType == WGPUAdapterType_IntegratedGPU);
         if (gpu && ((index == -1 && !ctx->adapter) || index == gpu_index)) {
             ctx->adapter = adapter;
             ctx->name = str(info.device);
