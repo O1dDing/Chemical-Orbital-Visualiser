@@ -309,6 +309,26 @@ class ScientificDisplayContractTests(unittest.TestCase):
         self.assertEqual(f.display_semantics({"draw_trace": [
             {"kind": "details.energy-gap", "data": {"mode": mode}}]})["status"], "failed")
 
+    def test_joined_backbond_requires_occupied_metal_and_applicable_group(self):
+        assessment = dict(available=True, applicable=True, members=[51, 52, 53],
+                          occupied_metal_backbond_supported=False)
+        view = {"draw_trace": [{"kind": "details.pi.joined-summary",
+                               "data": {"label": "π 回馈", "assessment": assessment}}]}
+        self.assertEqual(f.display_semantics(view)["status"], "failed")
+        assessment["occupied_metal_backbond_supported"] = True
+        self.assertEqual(f.display_semantics(view)["status"], "passed")
+        assessment["applicable"] = False
+        self.assertEqual(f.display_semantics(view)["status"], "failed")
+
+    def test_disconnected_atom_bucket_closes_without_relabelling_as_ligand(self):
+        ledger = dict.fromkeys(f.COMPOSITION_BUCKETS, 0.0)
+        ledger.update(available=True, complete=True, weight_sum=1.0,
+                      centre_current_s=.3, ligand_valence=.4, other_atoms=.3)
+        view = {"draw_trace": [{"kind": "details.composition", "data": ledger}]}
+        self.assertEqual(f.display_semantics(view)["status"], "passed")
+        ledger["ligand_valence"] += .3
+        self.assertEqual(f.display_semantics(view)["status"], "failed")
+
     def test_explicit_source_roundoff_is_not_double_counted_by_checker(self):
         ledger = dict.fromkeys(f.COMPOSITION_BUCKETS, 0.0)
         ledger.update(available=True, complete=True, weight_sum=1-2.34e-8,

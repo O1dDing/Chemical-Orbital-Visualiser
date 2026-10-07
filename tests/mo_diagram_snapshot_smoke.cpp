@@ -317,13 +317,24 @@ int main() {
     // the exported attention list must equal the real visible canonical set.
     const auto no_counterpart=std::numeric_limits<std::size_t>::max();
     auto sentinel_data=snapshot.data;
+    wf.orbitals[3].occupation=1.0;
+    // This fixture declares source-energy mode. Its selected energy metadata
+    // must describe the wavefunction actually drawn, rather than the unrelated
+    // early snapshot energies. Spin metadata deliberately remains stale to
+    // exercise the separate immutable canonical-spin identity contract.
+    for(std::size_t i=0;i<sentinel_data.metadata.size();++i) {
+        sentinel_data.metadata[i].energy_hartree=wf.orbitals[i].energy_hartree;
+        sentinel_data.metadata[i].occupation=wf.orbitals[i].occupation;
+    }
     auto single=level;single.metadata=sentinel_data.metadata[0];
     single.member_indices={0};single.member_spin_counterparts={no_counterpart};
+    single.layout_energy_hartree=wf.orbitals[0].energy_hartree;
     auto pair=level;pair.metadata=sentinel_data.metadata[1];
     pair.member_indices={1,2};pair.member_spin_counterparts={no_counterpart,no_counterpart};
+    pair.layout_energy_hartree=(wf.orbitals[1].energy_hartree+wf.orbitals[2].energy_hartree)*0.5;
     auto matched=level;matched.metadata=sentinel_data.metadata[3];
     matched.member_indices={3};matched.member_spin_counterparts={4};
-    wf.orbitals[3].occupation=1.0;
+    matched.layout_energy_hartree=wf.orbitals[3].energy_hartree;
     auto invalid_row=level;invalid_row.member_indices={wf.orbitals.size()};
     invalid_row.member_spin_counterparts={no_counterpart};
     sentinel_data.levels={single,pair,matched,invalid_row};
@@ -421,6 +432,60 @@ int main() {
         central_node(4).display_energy_hartree==central_node(4).energy_hartree &&
         central_node(3).display_group_id!=central_node(4).display_group_id,
         "a matched opposite-spin spatial counterpart is not an energy-degenerate partner");
+    // A second display-contract fixture explicitly selects common-operator
+    // expectations. These synthetic values are not an electronic-state or
+    // operator-qualification reference; those have separate scientific tests.
+    // Here their difference from the source energies proves that AOMO uses
+    // the selected snapshot values throughout layout, semantics and exports.
+    auto common_data=sentinel_snapshot.data;
+    common_data.using_ro_common_energy=true;
+    common_data.ro_common_energy.available=true;
+    common_data.ro_common_energy.status="display_contract_fixture";
+    common_data.ro_common_energy.restricted_open_shell.verified=true;
+    common_data.ro_common_energy.restricted_open_shell.method="ROHF";
+    const double selected_energies[]={.4,.15,.25,.5,.7};
+    for(std::size_t i=0;i<5;++i)common_data.metadata[i].energy_hartree=selected_energies[i];
+    const auto common_graph=cov::make_mo_diagram_view_snapshot(
+        common_data,sentinel_snapshot.options,1,"common-operator-display-fixture");
+    const auto common_view=draw_aomo(cov::NboOrbitalKind::NAO,common_graph);
+    const auto common_node=[&](std::size_t index)->const cov::ui::NboAomoNode& {
+        for(const auto& node:common_view->nodes)if(node.canonical_index==index)return node;
+        std::abort();
+    };
+    const auto& common_a=common_node(1);const auto& common_b=common_node(2);
+    const double selected_mean=(selected_energies[1]+selected_energies[2])*0.5;
+    require(common_view->using_ro_common_energy&&
+        common_view->display_energy_definition==common_data.ro_common_energy.operator_semantics&&
+        common_a.energy_hartree==wf.orbitals[1].energy_hartree&&
+        common_b.energy_hartree==wf.orbitals[2].energy_hartree&&
+        common_a.occupation==wf.orbitals[1].occupation&&
+        std::abs(*common_a.display_energy_hartree-selected_mean)<1e-12&&
+        common_a.display_energy_hartree==common_b.display_energy_hartree&&common_a.y==common_b.y&&
+        common_a.energy_semantics=="source RO effective energy"&&
+        common_a.display_energy_semantics.find("spin-average operator expectations")!=std::string::npos&&
+        common_a.display_energy_semantics.find("not canonical eigenvalues")!=std::string::npos,
+        "common display mode must use selected expectations while retaining actual source values and occupations");
+    const double selected_coordinate=cov::energy_display_coordinate(selected_mean,common_view->energy_transform);
+    const double selected_y=common_view->numeric_top+(1-(selected_coordinate-common_view->axis_coordinate_min)/
+        (common_view->axis_coordinate_max-common_view->axis_coordinate_min))*common_view->numeric_span;
+    require(std::abs(common_a.y-selected_y)<1e-4&&common_view->energy_transform.knots.front().energy_hartree>=.15,
+        "common-mode node positions and axis knots must use the selected expectation definition");
+    const auto common_export=cov::ui::export_nbo_aomo_bundle(*common_view,integration,
+        root/"common-energy-contract",cov::DiagramExportContent::AnalysisData);
+    const auto common_json=read(common_export.json_path);
+    require(common_export.json&&common_export.csv&&
+        common_json.find("\"using_ro_common_energy\":true")!=std::string::npos&&
+        common_json.find("\"display_energy_definition\":\""+common_view->display_energy_definition+"\"")!=std::string::npos&&
+        common_json.find("source RO effective energy")!=std::string::npos&&
+        common_json.find("spin-average operator expectations")!=std::string::npos,
+        "common-energy exports must retain source and selected energy definitions");
+    const auto restored_view=draw_aomo(cov::NboOrbitalKind::NAO,sentinel_snapshot);
+    const auto restored_a=std::find_if(restored_view->nodes.begin(),restored_view->nodes.end(),
+        [](const auto& node){return node.canonical_index==1;});
+    require(!restored_view->using_ro_common_energy&&restored_view->id!=common_view->id&&
+        restored_a!=restored_view->nodes.end()&&restored_a->display_energy_hartree==mean_a.display_energy_hartree&&
+        common_a.display_energy_hartree==selected_mean&&mean_a.energy_hartree==wf.orbitals[1].energy_hartree,
+        "switching energy definitions must rebuild the view while preserving both frozen snapshots and source energies");
     for(const auto& node:sentinel_view->nodes)if(node.canonical_index && node.occupation && *node.occupation>0) {
         const float line=node.y+node.height*0.5f;
         require(node.occupation_on_bar && node.occupation_y<line &&

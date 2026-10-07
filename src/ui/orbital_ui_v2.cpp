@@ -6,6 +6,7 @@
 #include "cov/ui_forensic_helpers.hpp"
 
 #include "cov/mo_diagram.hpp"
+#include "cov/composition_display_policy.hpp"
 #include "cov/mo_group_display_json.hpp"
 #include "cov/mo_diagram_layout.hpp"
 #include "cov/orbital_ui_text.hpp"
@@ -428,7 +429,8 @@ std::string symmetry_members(const std::vector<std::size_t>& members,const Wavef
 }
 
 void draw_symmetry_scope_details(const OrbitalSymmetryExplanation& e,const Wavefunction& wf,
-                                Language language,const std::string& prefix) {
+                                Language language,const std::string& prefix,
+                                const bool show_reference_shell_traces) {
     // Scores, coordinate frames and residuals remain in the evidence export.
     if(!orbital_symmetry_is_local(e) || orbital_symmetry_is_candidate(e))return;
     labelled_value(aomo_text(language,"Local coordination symmetry"),
@@ -440,7 +442,8 @@ void draw_symmetry_scope_details(const OrbitalSymmetryExplanation& e,const Wavef
     if(!e.orbital_indices.empty())
         labelled_value(orbital_tr(OrbitalText::SymmetryTargetMembers,language),
                        symmetry_members(e.orbital_indices,wf),kNumericColour);
-    if(e.local_decomposition && e.local_decomposition->status==MetricSubspaceStatus::Available) {
+    if(show_reference_shell_traces && e.local_decomposition &&
+       e.local_decomposition->status==MetricSubspaceStatus::Available) {
         const auto& projection=*e.local_decomposition;
         if(projection.represented_spin_orbital_rank>0) {
             constexpr const char* shells[]={"s","p","d","f","g"};
@@ -601,18 +604,26 @@ void draw_level_details(const MODiagramData& data,
     const auto* verified_name=canonical_name_for(wavefunction,orbital_index,state);
     const std::string displayed_symmetry=canonical_mo_current_irrep(wavefunction,orbital_index,verified_name);
     const auto* actual=orbital_index<wavefunction.orbitals.size()?&wavefunction.orbitals[orbital_index]:nullptr;
+    const auto ml=metal_ligand_detail_availability(wavefunction,data,level);
+    const auto composition_policy=composition_display_policy(level.composition,ml);
     const auto& selected_annotation=orbital_index<data.annotations.size()
         ?data.annotations[orbital_index]:OrbitalAnnotation{};
     ImGui::TextUnformatted(displayed_canonical_name(wavefunction,orbital_index,state).c_str());
     ImGui::Separator();
     labelled_number(tr(Text::RawMO, language), canonical_mo_source_label(wavefunction,orbital_index));
 
-    labelled_number(tr(Text::ExactEnergy, language),
+    labelled_number(data.using_ro_common_energy?aomo_text(language,"Common expectation energy"):
+                    tr(Text::ExactEnergy, language),
                     format_energy(metadata.energy_hartree, state.energy_unit, 6));
+    if(data.using_ro_common_energy && actual)
+        labelled_number(aomo_text(language,"Source orbital energy"),
+                        format_energy(actual->energy_hartree,state.energy_unit,6));
     labelled_number(tr(Text::Occupation, language),
         actual && actual->occupation_provenance!=DataProvenance::Unavailable && std::isfinite(actual->occupation)
             ?fixed_number(actual->occupation,6):"N/A");
-    ImGui::Text("%s: %s", tr(Text::Spin, language),
+    if(data.ro_common_energy.restricted_open_shell.verified)
+        ImGui::TextUnformatted(aomo_text(language,"Shared orbital space"));
+    else ImGui::Text("%s: %s", tr(Text::Spin, language),
         actual && actual->spin_provenance!=DataProvenance::Unavailable?spin_name_ui(actual->spin,language):"N/A");
 
     if(usable_symmetry_text(displayed_symmetry)) {
@@ -626,7 +637,8 @@ void draw_level_details(const MODiagramData& data,
     // The row may additionally have a local coordination interpretation.
     draw_symmetry_composition(wavefunction,verified_name,state,language,metadata.orbital_index);
     // It is retained as a separate scope, never substituted for the full MO.
-    draw_symmetry_scope_details(level.metadata.symmetry_view,wavefunction,language,"details.local-symmetry");
+    draw_symmetry_scope_details(level.metadata.symmetry_view,wavefunction,language,
+        "details.local-symmetry",composition_policy.reference_shell_traces);
     ImGui::Separator();
     ImGui::TextWrapped(orbital_tr(OrbitalText::GroupRepresentativeData,language),
         displayed_canonical_name(wavefunction,level.metadata.orbital_index,state).c_str());
@@ -728,32 +740,46 @@ void draw_level_details(const MODiagramData& data,
 
     labelled_number(orbital_tr(OrbitalText::GroupOccupation, language),
                     fixed_number(level.total_occupation,3));
-    const auto ml=metal_ligand_detail_availability(wavefunction,data,level);
-    if ((level.composition.available && level.composition.complete) ||
-        (ml.scope!=ChemistryStatus::NotApplicable && ml.scope!=ChemistryStatus::Unavailable)) {
+    if (composition_policy.metal_ligand) {
         ImGui::TextDisabled("%s",orbital_tr(OrbitalText::MetalLigandGroupAnalysis,language));
         cov::validation::item("details.metal-ligand.scope");
-        if(level.composition.available && level.composition.complete) {
+        if(composition_policy.complete_metal_composition && ImGui::IsItemHovered()) {
+            const auto atoms=[&](const std::vector<std::size_t>& indices) {
+                std::string result;
+                for(const auto index:indices) {
+                    if(index>=wavefunction.atoms.size())continue;
+                    if(!result.empty())result+=", ";
+                    result+=wavefunction.atoms[index].symbol+std::to_string(index+1);
+                }
+                return result;
+            };
+            ImGui::SetTooltip("%s\n%s: %s\n%s: %s",
+                aomo_text(language,"Percentages use the complete MO; group values are averages per member."),
+                aomo_text(language,"Metal atoms"),
+                atoms(data.composition_scope.centre_atoms).c_str(),
+                aomo_text(language,"Ligand atoms"),
+                atoms(data.composition_scope.ligand_atoms).c_str());
+        }
+        if(composition_policy.complete_metal_composition) {
             const auto& c=level.composition;
-            ImGui::TextDisabled("%s",aomo_text(language,"Full orbital composition (NAO)"));
-            labelled_number(aomo_text(language,"Current metal s / p / d"),
-                fixed_number(100*c.centre_current_s,2)+"% / "+
-                fixed_number(100*c.centre_current_p,2)+"% / "+fixed_number(100*c.centre_current_d,2)+"%");
+            const double current_weights[]={c.centre_current_s,c.centre_current_p,
+                c.centre_current_d,c.centre_current_f};
+            for(int l=0;l<4;++l) {
+                if(l==3 && current_weights[l]<0.00005)continue;
+                const auto caption=current_composition_shell_caption(wavefunction,
+                    data.current_radial_shells,l);
+                labelled_number(caption.c_str(),fixed_number(100*current_weights[l],2)+"%");
+            }
             cov::validation::item("details.composition.current-metal");
             for(const auto& [label,weight]:std::initializer_list<std::pair<const char*,double>>{
-                {"Current metal f",c.centre_current_f},{"Other metal shells",c.centre_other},
+                {"Other metal shells",c.centre_other},
                 {"Ligand valence",c.ligand_valence},{"Other ligand space",c.ligand_other},
                 {"Core composition",c.core},{"Uncovered composition",c.unresolved}}) {
                 if(weight>=0.00005)labelled_number(aomo_text(language,label),fixed_number(100*weight,2)+"%");
             }
-            const double metal=c.centre_current_s+c.centre_current_p+c.centre_current_d+c.centre_current_f;
-            const char* dominance=metal>0.5?"Metal valence dominated":
-                c.ligand_valence>0.5?"Ligand valence dominated":
-                c.centre_other+c.ligand_other>0.5?"Additional space dominated":"Mixed composition";
-            labelled_value(aomo_text(language,"Main composition"),aomo_text(language,dominance),kNumericColour);
-            cov::validation::item("details.composition.dominance");
-        } else if(ml.populations){
-        ImGui::TextDisabled("%s",aomo_text(language,"Local reference projection"));
+            if(c.other_atoms>1e-8)
+                labelled_number(aomo_text(language,"Other atom space"),fixed_number(100*c.other_atoms,2)+"%");
+        } else if(composition_policy.reference_populations){
         labelled_number(orbital_tr(OrbitalText::MetalSPD, language),fixed_number(100.0*level.metal_s_weight,1)+"% / "+
              fixed_number(100.0*level.metal_p_weight,1)+"% / "+
              fixed_number(100.0*level.metal_d_weight,1)+"%");
@@ -771,17 +797,6 @@ void draw_level_details(const MODiagramData& data,
         validation::record("details.display-decision",mo_group_display_decision_json(level.display_decision));
     }
     cov::validation::item("details.metal-ligand.end");
-    if (level.raw_data_fallback) {
-        labelled_value(orbital_tr(OrbitalText::Selection, language),
-                       orbital_tr(OrbitalText::RecoveredFromRawMOBlock, language),
-                       kNumericColour);
-    }
-    if (level.approximate_nonbonding) {
-        labelled_value(orbital_tr(OrbitalText::WeakFieldTreatment, language),
-                       orbital_tr(OrbitalText::ApproximatelyNonbonding, language),
-                       kUnavailableColour);
-    }
-
     const auto level_index=static_cast<std::size_t>(&level-data.levels.data());
     const bool brief=state.nbo_ui && state.nbo_ui->aomo.preset==NboAomoPreset::Teaching;
     const auto pi_label=[&](const PiInteractionDescriptor& relation)->std::string {
@@ -805,18 +820,32 @@ void draw_level_details(const MODiagramData& data,
         if(pi_network_visible(network,brief,orbital_index) && !pi_network_has_visible_pair(data,network,brief,orbital_index)) {
             selected_networks.push_back(&network);has_pi=true;
         }
-    if(brief) {
-        // Distinct qualified physical channels may have different directions.
-        // Report the directions present, never vote by duplicate record count.
-        std::set<std::string> shown_directions;
-        for(const auto& [identity,relation]:primary_channels)
-            if(shown_directions.insert(pi_label(*relation)).second)
-                labelled_value(aomo_text(language,"Valence d-pi channel"),
-                    pi_label(*relation),pi_interaction_colour(relation->kind));
-        for(const auto* network:selected_networks) {
-            const std::string label=aomo_text(language,pi_network_direction_key(*network));
-            if(shown_directions.insert(label).second)
-                labelled_value(aomo_text(language,"Valence d-pi channel"),label,kPiColour);
+    // A physical spin channel is evidence, never an independent whole-ligand
+    // verdict. The shared spatial, total-occupation response owns the summary.
+    std::vector<PiFieldGroupAssessment> joined_assessments;
+    if(ml.composition)for(const auto& response:data.pi_field_response.responses) {
+        if(std::none_of(response.centre_atoms.begin(),response.centre_atoms.end(),[&](auto atom){
+            return std::find(data.composition_scope.centre_atoms.begin(),
+                data.composition_scope.centre_atoms.end(),atom)!=data.composition_scope.centre_atoms.end();}))continue;
+        const auto assessment=assess_pi_field_group(response,level.member_indices);
+        if(!assessment.available || !assessment.applicable)continue;
+        const char* key=nullptr;
+        switch(assessment.role) {
+            case PiFieldRole::AcceptorDominant:key=assessment.occupied_metal_backbond_supported?
+                "Pi back-donation":"Pi acceptor field";break;
+            case PiFieldRole::DonorDominant:key="Pi donor field";break;
+            case PiFieldRole::Mixed:key="Mixed pi response";break;
+            case PiFieldRole::Negligible:key="Pi field below display resolution";break;
+            default:break;
+        }
+        if(key) {
+            has_pi=true;
+            joined_assessments.push_back(assessment);
+            labelled_value(aomo_text(language,"Joined d-pi response"),aomo_text(language,key),kPiColour);
+            validation::item("details.pi.joined-summary");
+            if(validation::forensic_mode())validation::record("details.pi.joined-summary",
+                "{\"label\":"+validation::quote(aomo_text(language,key))+
+                ",\"assessment\":"+pi_field_group_assessment_json(assessment)+"}");
         }
     }
     bool show_pi_details=!brief;
@@ -825,13 +854,27 @@ void draw_level_details(const MODiagramData& data,
         validation::item("details.pi.toggle");
         validation::item(show_pi_details?"details.pi.toggle.open":"details.pi.toggle.closed");
     }
+    bool show_local_sources=false;
+    if(show_pi_details && has_pi) {
+        for(const auto& assessment:joined_assessments) {
+            labelled_number(aomo_text(language,"Frozen d-pi field response"),
+                format_energy(assessment.mean_shift_hartree,state.energy_unit,6));
+            validation::item("details.pi.joined-response");
+        }
+        // Source records can contain opposite physical spin channels. They
+        // remain inspectable, but never compete with the shared-space result
+        // as two unqualified whole-ligand conclusions.
+        show_local_sources=ImGui::CollapsingHeader(aomo_text(language,"Local channel sources"));
+        validation::item("details.pi.sources.toggle");
+        validation::item(show_local_sources?"details.pi.sources.open":"details.pi.sources.closed");
+    }
     std::set<std::tuple<std::size_t,std::size_t,PiInteractionKind,OrbitalEnergyGapKind,std::string>> shown_relations;
     std::size_t gap_index=0;
     for (const auto* gap:orbital_energy_gaps(data)) {
         const auto& interaction=*gap;
         const bool cf=interaction.gap_kind==OrbitalEnergyGapKind::CrystalField;
         if(!cf && !pi_relation_visible(interaction,brief))continue;
-        if(!cf && !show_pi_details)continue;
+        if(!cf && !show_local_sources)continue;
         const auto prefix="details.energy-gap."+std::to_string(gap_index++);
         if (interaction.lower_level!=level_index &&
             interaction.upper_level!=level_index &&
@@ -853,12 +896,13 @@ void draw_level_details(const MODiagramData& data,
             ImGui::TextDisabled("%s%s%s",scope.c_str(),multiple?" · ":"",
                 multiple?aomo_text(language,"Shared orbital space"):"");
         }
-        labelled_value(orbital_tr(cf?OrbitalText::CrystalFieldGap:OrbitalText::PiInteraction, language),
+        labelled_value(cf?orbital_tr(OrbitalText::CrystalFieldGap,language):aomo_text(language,"Local channel character"),
                        cf?interaction.symmetry:((interaction.orbital_evidence&&interaction.orbital_evidence->weak)?
                            std::string(aomo_text(language,"Weak interaction"))+" · ":std::string{})+pi_label(interaction),
                        pi_interaction_colour(interaction.kind));
         cov::validation::item(prefix+".kind");
-        labelled_number(orbital_tr(cf?OrbitalText::CrystalFieldGap:OrbitalText::PiSplitting, language),
+        labelled_number(data.using_ro_common_energy?aomo_text(language,"Common expectation energy gap"):
+                            orbital_tr(cf?OrbitalText::CrystalFieldGap:OrbitalText::PiSplitting, language),
                         format_energy(interaction.splitting_hartree,
                                       state.energy_unit,6));
         cov::validation::item(prefix+".splitting");
@@ -879,7 +923,7 @@ void draw_level_details(const MODiagramData& data,
         ImGui::PopID();
     }
 
-    if(show_pi_details)for(const auto* network:selected_networks) {
+    if(show_local_sources)for(const auto* network:selected_networks) {
         ImGui::PushID(network->mode_id.c_str());
         const std::string heading=pi_network_scope(*network,language)+" · "+
             aomo_text(language,"Multi-group mixing")+"##mode-network";
@@ -893,7 +937,7 @@ void draw_level_details(const MODiagramData& data,
             // A mode with several participating groups is one network. It has
             // no unique pairwise MO gap and must not be expanded into all pairs.
             const bool physical=network->ligand_space_kind!="transverse-p-basis";
-            if(physical)labelled_value(orbital_tr(OrbitalText::PiInteraction,language),
+            if(physical)labelled_value(aomo_text(language,"Local channel character"),
                 aomo_text(language,pi_network_direction_key(*network)),kPiColour);
             for(const auto& node:network->nodes) {
                 if(node.members.empty() || (brief&&!node.primary))continue;
@@ -1261,6 +1305,8 @@ bool same_filter_settings(const OrbitalFilterSettings& left,
 bool same_diagram_options(const MODiagramOptions& left,
                           const MODiagramOptions& right) noexcept {
     return left.routed_identity==right.routed_identity && left.nbo_source==right.nbo_source &&
+        left.use_ro_common_energy==right.use_ro_common_energy &&
+        left.ro_common_energy==right.ro_common_energy &&
         left.mode==right.mode &&
         left.aomo_scope==right.aomo_scope &&
         left.show_core_background==right.show_core_background &&
@@ -1766,6 +1812,14 @@ void draw_energy_diagram(const Wavefunction& wavefunction,
         state.hide_ligand_centred_intermediates;
     if(aomo_ready) {
         const auto& aomo=state.nbo_ui->aomo;
+        options.source_salc_model=aomo.source_salc_model.get();
+        options.ro_common_energy=aomo.common_energy_model.get();
+        if(options.ro_common_energy && options.ro_common_energy->available) {
+            ImGui::Checkbox(aomo_text(language,"Compare RO energies with a common operator"),
+                            &state.use_ro_common_energy);
+            validation::item("diagram.ro-common-energy");
+        }
+        options.use_ro_common_energy=state.use_ro_common_energy;
         options.aomo_scope=1+static_cast<unsigned>(aomo.preset);
         options.show_core_background=aomo.show_core;
         options.show_fragment_background=aomo.show_fragment_background;
@@ -1795,12 +1849,17 @@ void draw_energy_diagram(const Wavefunction& wavefunction,
     options.nonlinear_minimum_gap_weight = 0.055;
     if (!diagram_cache_matches(state.diagram_cache,wavefunction,options)) {
         cov::validation::record("diagram.cache","{\"hit\":false,\"reason\":\"input-or-options-changed\"}");
+        if(diagram_cache_wavefunction_matches(state.diagram_cache,wavefunction) &&
+           state.diagram_cache.data && state.diagram_cache.options->routed_identity==options.routed_identity &&
+           state.diagram_cache.options->nbo_source==options.nbo_source)
+            options.pi_field_response=&state.diagram_cache.data->pi_field_response;
         state.diagram_cache.wavefunction=&wavefunction;
         state.diagram_cache.orbital_data=wavefunction.orbitals.data();
         state.diagram_cache.atom_count=wavefunction.atoms.size();
         state.diagram_cache.orbital_count=wavefunction.orbitals.size();
-        state.diagram_cache.options=options;
         state.diagram_cache.data=build_mo_diagram_data(wavefunction,options);
+        options.pi_field_response=nullptr; // do not retain a pointer into replaced data
+        state.diagram_cache.options=options;
         state.diagram_cache.snapshot.reset();
     } else {
         cov::validation::record("diagram.cache","{\"hit\":true}");

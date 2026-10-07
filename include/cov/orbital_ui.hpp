@@ -44,6 +44,7 @@ struct OrbitalUIState {
     NboUIState* nbo_ui = nullptr; // owned by the application; same lifetime as this UI state
     EnergyUnit energy_unit = EnergyUnit::Hartree;
     EnergyAxisMode energy_axis_mode = EnergyAxisMode::NonlinearFocus;
+    bool use_ro_common_energy=true;
     DegeneracySettings degeneracy{};
     OrbitalFilterSettings filter{};
     bool grouped_labels = true;

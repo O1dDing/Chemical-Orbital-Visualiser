@@ -85,11 +85,14 @@ std::shared_ptr<const NboAomoNames> canonical_mo_names(const Wavefunction&);
 void invalidate_canonical_mo_names_cache();
 // Display ordinals count every visible certified occurrence, including partial
 // views; the energy ordering key always uses its full certified partner block.
+// An explicit display-energy list uses immutable canonical indices and must
+// cover the entire block. Missing/nonfinite entries never fall back to a
+// different energy definition. Omitting the list retains source-energy order.
 // Source IDs, complete-set ordinals, evidence and unresolved copies are retained.
 NboAomoNames nbo_aomo_names_for_view(const Wavefunction&,const NboAomoNames&,
     const std::vector<std::size_t>& canonical_indices,
     const std::vector<std::size_t>& salc_indices,const NboSalcModel*,
-    const std::string& scope);
+    const std::string& scope,const std::vector<double>* display_energies=nullptr);
 // Source identity is spin-block based; unavailable source indices are explicitly
 // identified as list positions. Internal indices remain the selection addresses.
 std::string canonical_mo_source_label(const Wavefunction&,std::size_t);

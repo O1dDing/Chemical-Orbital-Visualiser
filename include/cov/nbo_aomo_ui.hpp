@@ -44,11 +44,11 @@ struct NboAomoNode {
     std::string subspace_id;
     std::vector<std::size_t> atoms;
     std::vector<std::size_t> member_canonical_indices;
-    std::vector<double> member_energies_hartree,member_occupations;
+    std::vector<double> member_energies_hartree,member_display_energies_hartree,member_occupations;
     bool weak_display_container=false;
     std::optional<double> energy_hartree,occupation;
-    // Raw energies above remain scientific data. These are diagram-only means
-    // and symmetric shell-stack offsets, never inputs to selection or fields.
+    // Source energies above remain unchanged. Display energies use the selected
+    // operator definition, then group means and symmetric shell-stack offsets.
     std::optional<double> display_energy_hartree;
     std::string display_energy_semantics="individual",display_group_id;
     std::string individual_label,shell_label;
@@ -85,6 +85,10 @@ struct NboAomoCaption {
     float x=0,y=0,width=0,height=0;
 };
 struct NboAomoViewSnapshot {
+    NboRoCommonEnergyModel ro_common_energy;
+    bool using_ro_common_energy=false;
+    std::string display_energy_definition="source_canonical_energy";
+    PiFieldResponseAnalysis pi_field_response;
     MOSigmaFramework sigma_framework;
     std::vector<MOCurrentRadialShell> current_radial_shells;
     std::vector<MODiagramGroupAudit> group_audit;
@@ -197,12 +201,14 @@ struct NboAomoUIState {
     std::shared_ptr<const NboAomoViewSnapshot> drawn_snapshot;
     std::shared_ptr<const NboSalcModel> salc_model;
     std::shared_ptr<const NboSalcModel> source_salc_model,spin_averaged_salc_model;
+    std::shared_ptr<const NboRoCommonEnergyModel> common_energy_model;
     std::shared_ptr<const NboAomoNames> source_names,spin_averaged_names;
     std::uint64_t revision=0;
     std::shared_ptr<const NboAomoNames> names;
     const NboSalcModel* names_model=nullptr;
     std::shared_ptr<const NboAomoNames> filtered_names,filtered_names_source;
     std::vector<std::size_t> filtered_canonical_indices,filtered_salc_indices;
+    std::vector<double> filtered_canonical_display_energies;
     std::string filtered_name_scope;
 };
 

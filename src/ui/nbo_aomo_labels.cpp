@@ -848,13 +848,19 @@ NboAomoNames build_nbo_aomo_names(const Wavefunction& w,const NboIntegration& da
 
 NboAomoNames nbo_aomo_names_for_view(const Wavefunction& w,const NboAomoNames& source,
     const std::vector<std::size_t>& canonical_indices,const std::vector<std::size_t>& salc_indices,
-    const NboSalcModel* model,const std::string& scope){
+    const NboSalcModel* model,const std::string& scope,
+    const std::vector<double>* display_energies){
     auto out=source;
     const auto number=[&](std::vector<NboAomoName>& names,const std::vector<std::size_t>& indices,bool side){
         struct Occurrence {std::string family,block;std::vector<std::size_t> members,visible;double energy=0;bool available=true;};
         std::map<std::string,Occurrence> groups;std::set<std::size_t> selected(indices.begin(),indices.end());
         const auto valid=[&](std::size_t i){return i<names.size()&&(side?model&&i<model->orbitals.size():i<w.orbitals.size());};
-        const auto energy=[&](std::size_t i){return side?model->orbitals[i].energy_hartree:std::optional<double>(w.orbitals[i].energy_hartree);};
+        const auto energy=[&](std::size_t i)->std::optional<double> {
+            if(side)return model->orbitals[i].energy_hartree;
+            if(display_energies)return i<display_energies->size()?
+                std::optional<double>((*display_energies)[i]):std::nullopt;
+            return w.orbitals[i].energy_hartree;
+        };
         const auto family=[&](std::size_t i){return side?model->orbitals[i].fragment_id+":"+nbo_spin_name(model->orbitals[i].spin):
             w.orbitals[i].spin==Spin::Beta?std::string("canonical beta"):std::string("canonical alpha");};
         std::vector<std::size_t> rows;for(auto i:selected)if(valid(i)){

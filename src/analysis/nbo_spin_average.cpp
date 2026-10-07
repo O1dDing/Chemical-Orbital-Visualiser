@@ -1,4 +1,4 @@
-#include "cov/nbo_salc.hpp"
+#include "cov/nbo_spin_average.hpp"
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cctype>
@@ -151,6 +151,146 @@ NboRestrictedOpenShellEvidence verify_nbo_restricted_open_shell(const Wavefuncti
     out.verified=true;out.status="verified_restricted_open_shell";
     out.detail="Producer RO method, integer occupations and electron counts agree; associated alpha/beta canonical spatial columns match up to phase, and both spin densities are verified";
     return out;
+}
+
+NboRoCommonEnergyModel build_nbo_ro_common_energy(const Wavefunction& w,const NboIntegration& d,const NboSalcModel& raw){
+    NboRoCommonEnergyModel out;out.dataset_id=d.id;out.canonical_fingerprint=nbo_canonical_fingerprint(w);
+    out.provenance_status=d.dataset.association.provenance_status;
+    out.restricted_open_shell=verify_nbo_restricted_open_shell(w,d);
+    for(std::size_t i=0;i<w.orbitals.size();++i){const auto& mo=w.orbitals[i];NboRoCommonEnergyOrbital row;
+        row.canonical_index=i;row.source_orbital_index=mo.source_orbital_index;row.spin=mo.spin;
+        row.source_energy_hartree=mo.energy_hartree;row.occupation=mo.occupation;out.orbitals.push_back(row);}
+    const auto reject=[&](const std::string& status,const std::string& detail){out.status=status;out.detail=detail;
+        for(auto& row:out.orbitals)row.status=status;return out;};
+    if(!out.restricted_open_shell.verified)return reject(out.restricted_open_shell.status,out.restricted_open_shell.detail);
+    if(!raw.available||raw.dataset_id!=d.id||raw.canonical_fingerprint!=out.canonical_fingerprint)
+        return reject("stale_or_unavailable_operator_model","Raw operator model is unavailable or belongs to another canonical wavefunction");
+    const auto n=std::size_t(w.basis_count),count=w.orbitals.size();const auto& archive=*d.dataset.archive;
+    const M s=dense(w.ao_overlap,n);const auto* sm=matrix(archive,"OVERLAP",NboSpin::Total);
+    const M as=sm?dense(sm->values,n):M{};
+    if(!s.size()||!as.size()||error(s-s.transpose())>2e-5||error(as-as.transpose())>2e-5)
+        return reject("invalid_common_metric","Complete symmetric source and archive AO metrics are required");
+    // Explicit AO convention linkage prevents a compatible flag or fingerprint
+    // from substituting for the actual source columns used by this evaluation.
+    const auto& assoc=d.dataset.association;
+    if(assoc.gaussian_row.size()!=n||assoc.coefficient_scale.size()!=n||w.gaussian_ao_transform.size()!=n)
+        return reject("ao_mapping_unavailable","Complete source/archive AO convention mapping is required");
+    std::vector<std::size_t> inverse(n,n);std::set<std::size_t> rows;
+    for(std::size_t i=0;i<n;++i){const auto j=w.gaussian_ao_transform[i].source_index;
+        if(j>=n||inverse[j]!=n)return reject("invalid_ao_mapping","Source AO mapping is not a bijection");inverse[j]=i;}
+    M transform=M::Zero(n,n);
+    for(std::size_t k=0;k<n;++k){if(assoc.gaussian_row[k]>=n||!rows.insert(assoc.gaussian_row[k]).second)
+            return reject("invalid_ao_mapping","Archive AO mapping is not a bijection");
+        const auto i=inverse[assoc.gaussian_row[k]];const double scale=assoc.coefficient_scale[k]*w.gaussian_ao_transform[i].coefficient_scale;
+        if(!std::isfinite(scale)||std::abs(scale)<1e-20)return reject("invalid_ao_mapping","Nonfinite or zero AO conversion scale");
+        transform(k,i)=1/scale;}
+    out.metric_error=error(transform.transpose()*as*transform-s);
+    if(out.metric_error>metric_tolerance)return reject("ao_metric_mismatch","Source and archive AO metrics disagree under the declared convention mapping");
+    M c(n,count);std::vector<bool> active(count,false);
+    for(std::size_t i=0;i<count;++i){const auto& mo=w.orbitals[i];
+        if(mo.coefficients.size()!=n)return reject("canonical_columns_incomplete","Source canonical coefficient column is incomplete");
+        c.col(i)=Eigen::Map<const V>(mo.coefficients.data(),n);}
+    if(!c.allFinite())return reject("canonical_columns_nonfinite","Source canonical coefficients are nonfinite");
+    const M ac=transform*c;
+    const auto* archive_alpha=matrix(archive,"LCAOMO",NboSpin::Alpha);
+    const auto* archive_beta=matrix(archive,"LCAOMO",NboSpin::Beta);
+    const M alpha_columns=archive_alpha?dense(archive_alpha->values,n):M{};
+    const M beta_columns=archive_beta?dense(archive_beta->values,n):M{};
+    for(std::size_t i=0;i<count;++i){const auto& mo=w.orbitals[i];
+        const M& source=mo.spin==Spin::Beta?beta_columns:alpha_columns;
+        if(!source.size()||mo.source_orbital_index>=n)return reject("canonical_linkage_unavailable","Complete same-spin archive canonical columns are required");
+        const double norm=(c.col(i).transpose()*s*c.col(i))(0,0);
+        const V archived=source.col(mo.source_orbital_index);
+        const double phase=(ac.col(i).transpose()*as*archived)(0,0)<0?-1:1;
+        const V delta=ac.col(i)-phase*archived;
+        out.canonical_linkage_error=std::max(out.canonical_linkage_error,delta.cwiseAbs().maxCoeff());
+        if(out.canonical_linkage_error>3e-6)return reject("canonical_linkage_mismatch","Actual source coefficients disagree with the associated archive columns");
+        if(norm<1e-18&&mo.occupation==0){continue;}
+        out.metric_error=std::max(out.metric_error,std::abs(norm-1));
+        if(std::abs(norm-1)>metric_tolerance)return reject("canonical_norm_mismatch","Source canonical orbital is not normalized in the verified common metric");
+        active[i]=true;
+    }
+    std::vector<std::size_t> unique;for(std::size_t i=0;i<count;++i)if(active[i]&&w.orbitals[i].spin==Spin::Alpha)unique.push_back(i);
+    if(unique.empty())return reject("no_active_canonical_columns","No active shared source orbitals");
+    M uc(n,unique.size());for(std::size_t i=0;i<unique.size();++i)uc.col(i)=c.col(unique[i]);
+    out.metric_error=std::max(out.metric_error,error(uc.transpose()*s*uc-M::Identity(uc.cols(),uc.cols())));
+    if(out.metric_error>metric_tolerance)return reject("canonical_metric_mismatch","Active source canonical space is not orthonormal");
+    M fa,fb;std::string archive_path;std::size_t segment=0;
+    for(const auto spin:{NboSpin::Alpha,NboSpin::Beta}){
+        const auto* f=matrix(archive,"FOCK",spin);
+        if(!f||f->rows!=n||f->columns!=n||!dense(f->values,n).size())
+            return reject("complete_spin_fock_missing","Both complete finite same-basis archive spin Fock matrices are required");
+        if(f->source.path.empty())return reject("operator_source_missing","Archive Fock source metadata is missing");
+        if(spin==NboSpin::Alpha){archive_path=f->source.path;segment=f->source.analysis_segment;}
+        else if(f->source.path!=archive_path||f->source.analysis_segment!=segment)
+            return reject("operator_source_mismatch","Alpha and beta Fock matrices do not identify the same archive analysis");
+        const NboSalcEnergyEvidence* ev=nullptr;
+        for(const auto& item:raw.energies)if(item.spin==spin){if(ev)return reject("ambiguous_spin_evidence","Multiple same-spin operator qualification records");ev=&item;}
+        if(ev)out.spin_evidence.push_back(*ev);
+        if(!ev||!ev->available||(!ev->canonical_same_operator&&!ev->printed_operator_verified))
+            return reject("spin_operator_unverified",ev?ev->status+": "+ev->detail:"Missing independently verified spin operator evidence");
+        if(ev->source.path!=f->source.path||ev->source.analysis_segment!=f->source.analysis_segment)
+            return reject("operator_evidence_source_mismatch","Operator qualification does not refer to the selected archive Fock source");
+        if(ev->printed_operator_verified&&(ev->printed_nao_checked!=n||ev->printed_nbo_checked!=n))
+            return reject("printed_operator_evidence_incomplete","Physical spin-Fock qualification requires both complete printed local energy tables");
+        const M fock=dense(f->values,n);
+        out.hermiticity_error=std::max(out.hermiticity_error,error(fock-fock.transpose()));
+        if(out.hermiticity_error>2e-5)return reject("nonhermitian_spin_fock","Archive spin Fock is not Hermitian within tolerance");
+        const M expected=ac.transpose()*fock*ac;
+        if(!expected.allFinite())return reject("nonfinite_operator_expectation","Archive operator projection produced nonfinite values");
+        const NboSalcSpinOperator* op=nullptr;
+        for(const auto& item:raw.spin_operators)if(item.spin==spin){if(op)return reject("ambiguous_spin_operator","Multiple same-spin operator matrices");op=&item;}
+        if(!op||op->basis.size()!=n)return reject("incomplete_spin_operator_basis","Complete spin NAO operator basis is required");
+        std::set<std::size_t> basis_indices;
+        for(const auto& ref:op->basis)if(ref.kind!=NboOrbitalKind::NAO||ref.spin!=spin||ref.index>=n||!basis_indices.insert(ref.index).second)
+            return reject("invalid_spin_operator_basis","Spin operator basis must contain each same-spin NAO exactly once");
+        const auto projected=project_operators(w,d,raw,spin,c,s);
+        if(!projected.fock.size()||!projected.density.size())
+            return reject("canonical_projection_unavailable","Canonical orbitals are outside a complete verified spin operator/density space");
+        out.projection_residual=std::max(out.projection_residual,error(expected-projected.fock));
+        if(out.projection_residual>2e-5)return reject("operator_projection_mismatch","NAO operator projection and direct archive AO expectation disagree");
+        M occupation=M::Zero(count,count);
+        const auto occupied=spin==NboSpin::Alpha?w.alpha_electrons:w.beta_electrons;
+        // Explicit-spin RO rows duplicate spatial directions. Use the overlap
+        // to retain their harmless phase changes rather than assuming identity.
+        for(std::size_t j=0;j<count;++j)for(std::size_t k=0;k<count;++k)
+            if(w.orbitals[j].source_orbital_index==w.orbitals[k].source_orbital_index&&w.orbitals[j].source_orbital_index<occupied)
+                occupation(j,k)=(c.col(j).transpose()*s*c.col(k))(0,0);
+        out.density_error=std::max(out.density_error,error(occupation-projected.density));
+        if(out.density_error>5e-5)return reject("canonical_spin_density_mismatch","Projected physical spin density does not reproduce the shared source integer occupations");
+        if(spin==NboSpin::Alpha)fa=expected;else fb=expected;
+    }
+    const M common=(fa+fb)/2;
+    for(auto i:unique)for(auto j:unique)if(i!=j)out.maximum_offdiagonal_hartree=std::max(out.maximum_offdiagonal_hartree,std::abs(common(i,j)));
+    for(std::size_t i=0;i<count;++i){auto& row=out.orbitals[i];
+        if(!active[i]){row.status="null_unoccupied_source_column";continue;}
+        row.available=true;row.status="verified_common_operator_expectation";
+        row.alpha_energy_hartree=fa(i,i);row.beta_energy_hartree=fb(i,i);row.common_energy_hartree=common(i,i);}
+    out.available=true;out.status="verified_associated_archive_common_expectations";
+    out.detail="Source spatial orbitals and both integer spin densities match the archive; complete verified alpha/beta Fock matrices are evaluated in the unchanged source orbitals. Values are expectations of the associated archive (F_alpha+F_beta)/2, not eigenvalues or proof of the original SCF job/operator identity";
+    return out;
+}
+
+std::string serialize_nbo_ro_common_energy_json(const NboRoCommonEnergyModel& model){
+    std::ostringstream out;out<<std::setprecision(17)<<std::boolalpha;
+    out<<"{\"available\":"<<model.available<<",\"status\":"<<quote(model.status)<<",\"detail\":"<<quote(model.detail)
+       <<",\"dataset_id\":"<<quote(model.dataset_id)<<",\"canonical_fingerprint\":"<<quote(model.canonical_fingerprint)
+       <<",\"operator_semantics\":"<<quote(model.operator_semantics)<<",\"provenance_status\":"<<quote(model.provenance_status)
+       <<",\"source_step_identity_verified\":"<<model.source_step_identity_verified
+       <<",\"ro_status\":"<<quote(model.restricted_open_shell.status)<<",\"ro_method\":"<<quote(model.restricted_open_shell.method)
+       <<",\"canonical_linkage_error\":"<<model.canonical_linkage_error<<",\"metric_error\":"<<model.metric_error
+       <<",\"projection_residual\":"<<model.projection_residual<<",\"hermiticity_error\":"<<model.hermiticity_error
+       <<",\"density_error\":"<<model.density_error<<",\"maximum_offdiagonal_hartree\":"<<model.maximum_offdiagonal_hartree<<",\"spin_evidence\":";
+    array(out,model.spin_evidence,[&](const auto& e){out<<"{\"spin\":"<<quote(nbo_spin_name(e.spin))<<",\"status\":"<<quote(e.status)
+        <<",\"available\":"<<e.available<<",\"canonical_same_operator\":"<<e.canonical_same_operator<<",\"printed_operator_verified\":"<<e.printed_operator_verified
+        <<",\"printed_nao_checked\":"<<e.printed_nao_checked<<",\"printed_nbo_checked\":"<<e.printed_nbo_checked
+        <<",\"source_path\":"<<quote(e.source.path)<<",\"source_block\":"<<quote(e.source.block)<<",\"analysis_segment\":"<<e.source.analysis_segment<<'}';});
+    out<<",\"orbitals\":";array(out,model.orbitals,[&](const auto& row){out<<"{\"canonical_index\":"<<row.canonical_index
+        <<",\"source_orbital_index\":"<<row.source_orbital_index<<",\"spin\":"<<quote(row.spin==Spin::Beta?"beta":"alpha")
+        <<",\"available\":"<<row.available<<",\"status\":"<<quote(row.status)<<",\"source_energy_hartree\":";
+        optional(out,row.source_energy_hartree);out<<",\"occupation\":"<<row.occupation<<",\"alpha_energy_hartree\":";optional(out,row.alpha_energy_hartree);
+        out<<",\"beta_energy_hartree\":";optional(out,row.beta_energy_hartree);out<<",\"common_energy_hartree\":";optional(out,row.common_energy_hartree);out<<'}';});
+    out<<'}';return out.str();
 }
 
 NboSalcModel build_nbo_spin_averaged_model(const Wavefunction& w,const NboIntegration& d,const NboSalcModel& raw){

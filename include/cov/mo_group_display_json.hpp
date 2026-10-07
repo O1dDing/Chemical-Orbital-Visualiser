@@ -51,7 +51,7 @@ inline std::string mo_group_composition_json(const MOGroupCompositionLedger& c) 
         {"centre_current_s",c.centre_current_s},{"centre_current_p",c.centre_current_p},
         {"centre_current_d",c.centre_current_d},{"centre_current_f",c.centre_current_f},
         {"centre_other",c.centre_other},{"ligand_valence",c.ligand_valence},
-        {"ligand_other",c.ligand_other},{"core",c.core},{"unresolved",c.unresolved},
+        {"ligand_other",c.ligand_other},{"other_atoms",c.other_atoms},{"core",c.core},{"unresolved",c.unresolved},
         {"ligand_valence_s",c.ligand_valence_s},{"ligand_valence_p",c.ligand_valence_p}}) {
         out << ',' << quote(key) << ':'; number(out,value);
     }

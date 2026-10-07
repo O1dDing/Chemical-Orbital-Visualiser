@@ -371,6 +371,28 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
     const NboIntegration& data,const Wavefunction& canonical,
     const MODiagramViewSnapshot& diagram,float available_width) {
     NboAomoViewSnapshot view;
+    view.ro_common_energy=diagram.data.ro_common_energy;
+    view.using_ro_common_energy=diagram.data.using_ro_common_energy;
+    view.pi_field_response=diagram.data.pi_field_response;
+    const bool restricted_open_shell=view.ro_common_energy.restricted_open_shell.verified ||
+        (canonical.source==WavefunctionSource::Fchk &&
+         view.ro_common_energy.restricted_open_shell.method.rfind("RO",0)==0);
+    view.display_energy_definition=view.using_ro_common_energy?
+        view.ro_common_energy.operator_semantics:restricted_open_shell?
+            "source_RO_effective_energy":"source_canonical_energy";
+    // build_orbital_metadata preserves immutable canonical indexing. Energy
+    // modes update only metadata; the source wavefunction remains unchanged.
+    std::vector<double> display_energies(canonical.orbitals.size(),
+        std::numeric_limits<double>::quiet_NaN());
+    for(std::size_t i=0;i<display_energies.size();++i) {
+        if(i<diagram.data.metadata.size() && diagram.data.metadata[i].orbital_index==i)
+            display_energies[i]=diagram.data.metadata[i].energy_hartree;
+        else if(!view.using_ro_common_energy)display_energies[i]=canonical.orbitals[i].energy_hartree;
+    }
+    // A merged RO shape can remain visible in the source-energy mode, but its
+    // spin-average side expectations cannot share that mode's effective axis.
+    const bool same_operator_sides=!restricted_open_shell ||
+        (view.using_ro_common_energy && state.salc_model && state.salc_model->spin_averaged);
     view.integration_id=data.id;
     view.language=state.language;
     view.pi_partner_candidates=diagram.data.pi_partner_candidates;
@@ -379,7 +401,8 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
         view.bonding_groups.insert(view.bonding_groups.end(),level.bonding_scopes.begin(),level.bonding_scopes.end());
     view.mo_snapshot_id=diagram.data.view?diagram.data.view->id:"no-mo-snapshot";
     view.id=view.mo_snapshot_id+":unified:"+std::to_string(state.revision)+
-        ":lang:"+std::to_string(static_cast<int>(state.language));
+        ":lang:"+std::to_string(static_cast<int>(state.language))+
+        ":energy:"+view.display_energy_definition;
     view.basis_kind=state.basis_kind;
     view.preset=state.preset;view.overview=state.overview;view.all_connections=state.all_connections;
     view.illustrative_side_layout=state.preset==NboAomoPreset::Teaching &&
@@ -390,9 +413,13 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
     view.mo_energy_axis_mode=energy_axis_mode_name(diagram.options.energy_axis_mode);
     view.display_energy_unit=energy_unit_symbol(diagram.options.energy_unit);
     view.energy_unit=diagram.options.energy_unit;
-    view.mo_energy_axis_detail=view.illustrative_side_layout?
-        "Canonical eigenvalues use the numeric transform; all side positions are explicitly illustrative, including sides with verified raw expectation energies":
-        "Canonical eigenvalues and verified same-operator side expectations use the declared transform; other side levels are in a non-quantitative band";
+    view.mo_energy_axis_detail=view.using_ro_common_energy?
+        "Source MO shapes and occupations retained; central values are spin-average operator expectations, not new canonical eigenvalues":
+        restricted_open_shell?"Source RO effective MO energies; different-operator side energies are non-quantitative":
+        "Source canonical energies and verified same-operator side expectations";
+    view.mo_energy_axis_detail+=view.illustrative_side_layout?
+        "; all side positions are explicitly illustrative":
+        "; verified same-operator values use the declared transform; remaining sides occupy a non-quantitative band";
     view.zoom=state.zoom;view.pan_x=state.pan_x;view.pan_y=state.pan_y;
     view.show_core=state.show_core;view.show_rydberg=state.show_rydberg;
     view.show_fragment_background=state.show_fragment_background;
@@ -524,9 +551,9 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
     };
     for(const auto& level:diagram.data.levels)
         for(const auto index:level_members(level,canonical.orbitals.size()))
-            if(index<canonical.orbitals.size())include_energy(canonical.orbitals[index].energy_hartree);
+            if(index<display_energies.size())include_energy(display_energies[index]);
     if(!view.illustrative_side_layout && state.basis_kind==NboOrbitalKind::NAO &&
-        state.salc_model && state.salc_model->available)
+        state.salc_model && state.salc_model->available && same_operator_sides)
         for(const auto& orbital:state.salc_model->orbitals) {
             if(background_hidden_subspaces.contains(orbital.subspace_id) || is_h_only(orbital.atoms) ||
                 (contains_nocase(orbital.type,"cor")&&!state.show_core) ||
@@ -583,8 +610,9 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
             double first=std::numeric_limits<double>::infinity();
             double last=-first;
             for(const auto index:level_members(level,canonical.orbitals.size()))if(index<canonical.orbitals.size()) {
-                first=std::min(first,canonical.orbitals[index].energy_hartree);
-                last=std::max(last,canonical.orbitals[index].energy_hartree);
+                if(!std::isfinite(display_energies[index]))continue;
+                first=std::min(first,display_energies[index]);
+                last=std::max(last,display_energies[index]);
             }
             if(std::isfinite(first))central_bands.emplace_back(first,last);
         }
@@ -623,8 +651,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
     view.mo_energy_axis_detail+=
         "; shared piecewise-linear interpolation of exported energy_transform knots; "
         "knot neighbourhood tolerance 1e-7 Ha, raw node energies unchanged; "
-        "same-spin canonical groups use mean display energy; atomic shells use mean display energy plus a symmetric compact stack; "
-        "side values are molecular operator expectations, central values are canonical eigenvalues";
+        "same-spin canonical groups use means of the selected energy definition; atomic shells use same-operator mean expectations plus a symmetric compact stack";
     view.axis_coordinate_min=low;view.axis_coordinate_max=high;
     view.numeric_top=numeric_top;view.numeric_span=numeric_span;
     view.qualitative_band_y=numeric_top+numeric_span+66.0f;
@@ -663,7 +690,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
         std::map<Spin,std::pair<double,std::size_t>> spin_means;
         for(const auto index:members) {
             auto& mean=spin_means[canonical.orbitals[index].spin];
-            mean.first+=canonical.orbitals[index].energy_hartree;++mean.second;
+            mean.first+=display_energies[index];++mean.second;
         }
         // Every real member stays visible and independently selectable. The
         // frozen layout later centres this complete row around the canvas.
@@ -675,7 +702,8 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
             node.id="canonical_mo:"+std::to_string(index);
             node.label=canonical_label(index);
             node.individual_label=node.label;
-            node.detail="Gaussian canonical eigenvalue; occupation="+number(mo.occupation);
+            node.detail=std::string(restricted_open_shell?"Source RO effective energy":"Source canonical energy")+
+                "; occupation="+number(mo.occupation);
             if(const auto pair=spatial_pairs.find(index);pair!=spatial_pairs.end()) {
                 const auto other=pair->second.first;
                 node.spatial_pair_id="spatial-pair:"+
@@ -718,7 +746,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
                 node.symmetry_name_verified=name.verified;node.name_detail=name.detail;
                 node.detail+="; original MO "+std::to_string(index+1)+"; "+name.detail;
             }
-            node.energy_semantics="canonical eigenvalue";
+            node.energy_semantics=restricted_open_shell?"source RO effective energy":"source canonical eigenvalue";
             node.orbital=canonical_ref(data,index);
             node.available=node.orbital.has_value();
             node.canonical_index=index;node.energy_hartree=mo.energy_hartree;
@@ -726,17 +754,25 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
             for(const auto& scope:level.bonding_scopes)
                 if(in(scope.source_members,index))node.bonding_scope_status=orbital_group_bonding_status_name(scope.status);
             const auto mean=spin_means.at(mo.spin);
-            node.display_energy_hartree=mean.first/static_cast<double>(mean.second);
-            node.display_energy_semantics=mean.second>1?"same-spin canonical group mean":"individual canonical eigenvalue";
+            const double display_mean=mean.first/static_cast<double>(mean.second);
+            if(std::isfinite(display_mean))node.display_energy_hartree=display_mean;
+            node.display_energy_semantics=view.using_ro_common_energy?
+                (mean.second>1?"group mean of spin-average operator expectations; not canonical eigenvalues":
+                    "spin-average operator expectation; not a canonical eigenvalue"):
+                restricted_open_shell?(mean.second>1?"group mean of source RO effective energies":
+                    "individual source RO effective energy"):
+                (mean.second>1?"same-spin canonical group mean":"individual canonical eigenvalue");
             node.display_group_id="canonical-level:"+std::to_string(li)+
                 (mo.spin==Spin::Beta?":beta":":alpha");
-            node.detail+="; diagram energy="+number(*node.display_energy_hartree)+
-                " Ha ("+node.display_energy_semantics+"); original eigenvalue retained";
+            node.detail+="; diagram energy="+(node.display_energy_hartree?
+                number(*node.display_energy_hartree):std::string("unavailable"))+
+                " Ha ("+node.display_energy_semantics+"); original source energy retained";
             node.subspace_id="canonical-level:"+std::to_string(li);
-            node.occupation=mo.occupation;node.quantitative_energy=true;
+            node.occupation=mo.occupation;node.quantitative_energy=node.display_energy_hartree.has_value();
             node.lane=NboAomoLane::Centre;
             node.x=centre_x+static_cast<float>(mi++);
-            node.y=energy_y(*node.display_energy_hartree);node.width=62;node.height=22;
+            node.y=node.display_energy_hartree?energy_y(*node.display_energy_hartree):view.qualitative_band_y;
+            node.width=62;node.height=22;
             mo_nodes[index]=view.nodes.size();
             view.nodes.push_back(std::move(node));
         }
@@ -766,24 +802,28 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
                 if(member>=canonical.orbitals.size())continue;
                 valid=valid && canonical.orbitals[member].spin==spin;
                 if(mo_nodes.contains(member))valid=valid && view.nodes[mo_nodes.at(member)].spatial_pair_id.empty();
-                sum+=canonical.orbitals[member].energy_hartree;occ+=canonical.orbitals[member].occupation;
+                valid=valid && std::isfinite(display_energies[member]);
+                sum+=display_energies[member];occ+=canonical.orbitals[member].occupation;
                 id+=":"+std::to_string(member);
             }
             if(!valid||state.expanded_weak_groups.contains(id))continue;
             const double mean=sum/double(members.size());
             const double budget=relation.orbital_evidence->channel.display_calibration.energy_budget_ev/27.211386245988;
-            for(auto member:members)valid=valid && std::abs(canonical.orbitals[member].energy_hartree-mean)<=budget;
+            for(auto member:members)valid=valid && std::abs(display_energies[member]-mean)<=budget;
             if(!valid)continue;
             NboAomoNode container;container.id=id;container.display_group_id=id;
             container.label=std::string(aomo_text(state.language,"Folded MOs"))+" ("+std::to_string(members.size())+")";
             container.detail=aomo_text(state.language,"Click to expand real members");
             container.member_canonical_indices=members;container.occupation=occ;
-            container.display_energy_hartree=mean;container.display_energy_semantics="arithmetic mean of all actual same-spin members; source energies and occupations retained";
+            container.display_energy_hartree=mean;
+            container.display_energy_semantics="arithmetic mean of all actual members in "+view.display_energy_definition+
+                "; source energies and occupations retained";
             container.quantitative_energy=true;container.lane=NboAomoLane::Centre;
             container.group_header=true;container.weak_display_container=true;container.available=true;
             container.y=energy_y(mean);container.width=120;container.height=24;
             for(auto member:members) {
                 container.member_energies_hartree.push_back(canonical.orbitals[member].energy_hartree);
+                container.member_display_energies_hartree.push_back(display_energies[member]);
                 container.member_occupations.push_back(canonical.orbitals[member].occupation);
                 used_members.insert(member);
             }
@@ -919,8 +959,11 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
             node.spatial_spin=orbital.spatial_spin;
             node.atoms=orbital.atoms;
             node.energy_hartree=orbital.energy_hartree;node.occupation=orbital.occupation;
-            node.quantitative_energy=orbital.energy_hartree.has_value() &&
+            node.quantitative_energy=orbital.energy_hartree.has_value() && same_operator_sides &&
                 !view.illustrative_side_layout;
+            node.display_energy_semantics=same_operator_sides?orbital.energy_semantics:
+                "different operator from central energy definition; non-quantitative side position";
+            if(!same_operator_sides)node.detail+="; "+node.display_energy_semantics;
             node.lane=fragment!=state.salc_model->fragments.end() && fragment->side?
                 NboAomoLane::Right:NboAomoLane::Left;
             node.x=node.lane==NboAomoLane::Right?right_x:left_x;
@@ -1328,11 +1371,14 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
     if(base_names){std::vector<std::size_t> visible_salc;
         for(const auto& node:view.nodes)if(!node.group_header&&node.salc_index)visible_salc.push_back(*node.salc_index);
         view.name_ordinal_scope="filtered view: preset="+std::to_string(int(state.preset))+"; core="+std::to_string(state.show_core)+"; rydberg="+std::to_string(state.show_rydberg)+"; background="+std::to_string(state.show_fragment_background)+"; hide_h="+std::to_string(state.hide_h_orbitals);
+        view.name_ordinal_scope+="; energy_definition="+view.display_energy_definition;
         if(!state.filtered_names||state.filtered_names_source!=base_names||state.filtered_name_scope!=view.name_ordinal_scope||
-           state.filtered_canonical_indices!=view.central_mo_indices||state.filtered_salc_indices!=visible_salc){
-            state.filtered_names=std::make_shared<const NboAomoNames>(nbo_aomo_names_for_view(canonical,*base_names,view.central_mo_indices,visible_salc,state.salc_model.get(),view.name_ordinal_scope));
+           state.filtered_canonical_indices!=view.central_mo_indices||state.filtered_salc_indices!=visible_salc||
+           state.filtered_canonical_display_energies!=display_energies){
+            state.filtered_names=std::make_shared<const NboAomoNames>(nbo_aomo_names_for_view(canonical,*base_names,view.central_mo_indices,visible_salc,state.salc_model.get(),view.name_ordinal_scope,&display_energies));
             state.filtered_names_source=base_names;state.filtered_name_scope=view.name_ordinal_scope;
             state.filtered_canonical_indices=view.central_mo_indices;state.filtered_salc_indices=visible_salc;
+            state.filtered_canonical_display_energies=display_energies;
         }
         view.names=state.filtered_names;
         for(auto& node:view.nodes){if(node.group_header)continue;const NboAomoName* name=nullptr;
@@ -1628,8 +1674,9 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
             node.display_energy_semantics=all_quantitative?
                 (salc_group?"verified SALC partner mean with symmetric display stack":
                     "same-atom same-shell same-spin mean with symmetric display stack"):
-                (salc_group?"verified SALC partner stack; no verified energy":
-                    "non-quantitative atomic shell stack; no verified energy");
+                (salc_group?"verified SALC partner stack; energy not comparable on selected axis":
+                    "non-quantitative atomic shell stack; energy not comparable on selected axis");
+            if(all_quantitative)node.display_energy_semantics+="; "+node.energy_semantics;
             node.y=centre_y+node.display_offset_y;
             node.label=j==0?node.shell_label:"";
             node.detail+="; "+node.display_energy_semantics+
@@ -1952,6 +1999,8 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
     caption("heading","SALC / AO",view.lane_x[2],7);
     float header_y=30;
     wrapped("axis","E ("+view.display_energy_unit+"): "+
+        (view.using_ro_common_energy?std::string(aomo_text(state.language,"Spin-average expectation energy"))+" · ":
+            restricted_open_shell?std::string(aomo_text(state.language,"Source RO effective energy"))+" · ":std::string{})+
         (diagram.options.energy_axis_mode==EnergyAxisMode::NonlinearFocus?
             aomo_text(state.language,"Nonlinear energy axis"):
             aomo_text(state.language,"Energy axis")),12,header_y);
@@ -2082,6 +2131,7 @@ bool prepare_nbo_aomo_state(NboAomoUIState& state,const NboIntegration& data,
        state.salc_model!=state.source_salc_model && state.salc_model!=state.spin_averaged_salc_model){
         source_replaced=true;
         state.source_salc_model.reset();state.spin_averaged_salc_model.reset();
+        state.common_energy_model.reset();
         state.source_names.reset();state.spin_averaged_names.reset();
     }
     if(!state.source_salc_model) {
@@ -2095,7 +2145,15 @@ bool prepare_nbo_aomo_state(NboAomoUIState& state,const NboIntegration& data,
         else state.spin_averaged_salc_model=state.source_salc_model;
         profile.stage("spatial-spin-correspondence");
     }
-    const auto desired=state.preset==NboAomoPreset::Teaching && state.basis_kind==NboOrbitalKind::NAO?
+    if(!state.common_energy_model) {
+        OpenProfile profile;
+        state.common_energy_model=std::make_shared<const NboRoCommonEnergyModel>(
+            build_nbo_ro_common_energy(canonical,data,*state.source_salc_model));
+        profile.stage("ro-common-energy");
+    }
+    // RO is one spatial state in every NAO view. Source spin channels remain
+    // in the raw model and on-demand evidence, not separate default diagrams.
+    const auto desired=state.basis_kind==NboOrbitalKind::NAO?
         state.spin_averaged_salc_model:state.source_salc_model;
     if(source_replaced || (state.salc_model && state.salc_model!=desired)){
         // A mode change cannot leave an invisible spin identity selected.
@@ -2591,7 +2649,14 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
         if(hover && (bar_hover || label_hover) && distance<best){clicked=i;best=distance;
             ImGui::BeginTooltip();
             ImGui::PushTextWrapPos(ImGui::GetFontSize()*38.0f);
-            const auto lines=nbo_aomo_hover_lines(node,canonical,data,state.salc_model.get(),language);
+            auto lines=nbo_aomo_hover_lines(node,canonical,data,state.salc_model.get(),language);
+            if(node.lane==NboAomoLane::Centre && node.display_energy_hartree) {
+                const char* key=snapshot->using_ro_common_energy?"Common expectation energy":
+                    snapshot->display_energy_definition=="source_RO_effective_energy"?
+                        "Source RO effective energy":"Source orbital energy";
+                lines.push_back(std::string(aomo_text(language,key))+": "+
+                    format_energy(*node.display_energy_hartree,snapshot->energy_unit,8));
+            }
             std::string hover_text;
             for(const auto& line:lines) {
                 ImGui::TextUnformatted(line.c_str());
@@ -2603,6 +2668,10 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
     if(capture_forensic) {
         validation::record("forensic.aomo","{\"schema\":1,\"snapshot_id\":"+validation::quote(snapshot->id)+
             ",\"mo_snapshot_id\":"+validation::quote(snapshot->mo_snapshot_id)+
+            ",\"using_ro_common_energy\":"+forensic::boolean(snapshot->using_ro_common_energy)+
+            ",\"display_energy_definition\":"+validation::quote(snapshot->display_energy_definition)+
+            ",\"ro_common_energy\":"+serialize_nbo_ro_common_energy_json(snapshot->ro_common_energy)+
+            ",\"pi_field_response\":"+pi_field_response_analysis_json(snapshot->pi_field_response,false)+
             ",\"view\":{\"preset\":"+std::to_string(static_cast<int>(snapshot->preset))+
             ",\"preset_name\":"+validation::quote(preset_names[static_cast<int>(snapshot->preset)])+
             ",\"basis\":"+validation::quote(nbo_orbital_kind_name(snapshot->basis_kind))+
@@ -3036,7 +3105,7 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
             std::ofstream out(result.csv_path,std::ios::binary);
             if(!out)throw std::runtime_error(aomo_text(view.language,"Could not save the diagram data."));
             out<<std::setprecision(17);
-            out<<"snapshot_id,object_id,display_name,object_kind,lane,display_group_id,canonical_index,salc_index,source_energy_hartree,source_display_energy_hartree,occupation,energy_definition,occupation_definition,source_members_json,source_spatial_spin_json,name_evidence_ref_json,object_evidence_ref_json\n";
+            out<<"snapshot_id,object_id,display_name,object_kind,lane,display_group_id,canonical_index,salc_index,source_energy_hartree,source_display_energy_hartree,occupation,energy_definition,occupation_definition,source_members_json,source_spatial_spin_json,name_evidence_ref_json,object_evidence_ref_json,source_energy_definition,selected_energy_definition\n";
             for(std::size_t i=0;i<view.nodes.size();++i) {
                 const auto& node=view.nodes[i];
                 const auto number=[](std::optional<double> v){if(!v)return std::string{};std::ostringstream n;n<<std::setprecision(17)<<*v;return n.str();};
@@ -3050,7 +3119,8 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
                     number(node.energy_hartree),number(node.display_energy_hartree),number(node.occupation),
                     node.display_energy_semantics,node.spatial_spin?"sum of verified alpha and beta occupations":node.weak_display_container?"sum of actual source members":"actual source occupation",
                     members(),node.spatial_spin?serialize_nbo_spatial_spin_json(*node.spatial_spin):"",
-                    node_name_ref(&node,true),"{\"file\":"+quote(json_filename)+",\"pointer\":\"/nodes/"+std::to_string(i)+"\"}"};
+                    node_name_ref(&node,true),"{\"file\":"+quote(json_filename)+",\"pointer\":\"/nodes/"+std::to_string(i)+"\"}",
+                    node.energy_semantics,view.display_energy_definition};
                 for(std::size_t j=0;j<row.size();++j){if(j)out<<',';out<<csv(row[j]);}out<<'\n';
             }
             if(!out)throw std::runtime_error(aomo_text(view.language,"Could not save the diagram data."));
@@ -3068,6 +3138,10 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
                 <<",\"mo_energy_axis_mode\":"<<quote(view.mo_energy_axis_mode)
                 <<",\"display_energy_unit\":"<<quote(view.display_energy_unit)
                 <<",\"mo_energy_axis_detail\":"<<quote(view.mo_energy_axis_detail)
+                <<",\"using_ro_common_energy\":"<<(view.using_ro_common_energy?"true":"false")
+                <<",\"display_energy_definition\":"<<quote(view.display_energy_definition)
+                <<",\"ro_common_energy\":"<<serialize_nbo_ro_common_energy_json(view.ro_common_energy)
+                <<",\"pi_field_response\":"<<pi_field_response_analysis_json(view.pi_field_response,false)
                 <<",\"pi_partner_candidates\":"<<pi_partner_candidates_json(view.pi_partner_candidates)
                 <<",\"bonding_groups\":"<<bonding_groups_json(view.bonding_groups)
                 <<",\"pi_interactions\":"<<orbital_energy_gap_array_json(view.pi_interactions,view.energy_unit)
@@ -3235,6 +3309,8 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
                 }
                 out<<"],\"member_energies_hartree\":[";
                 for(std::size_t j=0;j<node.member_energies_hartree.size();++j){if(j)out<<',';out<<node.member_energies_hartree[j];}
+                out<<"],\"member_display_energies_hartree\":[";
+                for(std::size_t j=0;j<node.member_display_energies_hartree.size();++j){if(j)out<<',';out<<node.member_display_energies_hartree[j];}
                 out<<"],\"member_occupations\":[";
                 for(std::size_t j=0;j<node.member_occupations.size();++j){if(j)out<<',';out<<node.member_occupations[j];}
                 out<<"],\"orbital\":";
@@ -3307,7 +3383,8 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
             if(!out)throw std::runtime_error(aomo_text(view.language,"Could not save the diagram image."));
             out<<std::setprecision(9);
             out<<"<svg xmlns=\"http://www.w3.org/2000/svg\" font-family=\"Segoe UI, Arial, sans-serif\" width=\""<<width
-               <<"\" height=\""<<height<<"\" viewBox=\"0 0 "<<width<<' '<<height<<"\">\n";
+               <<"\" height=\""<<height<<"\" viewBox=\"0 0 "<<width<<' '<<height
+               <<"\" data-energy-definition=\""<<xml(view.display_energy_definition)<<"\">\n";
             out<<"<rect width=\"100%\" height=\"100%\" fill=\""
                <<(paper?"#ffffff":"#18202d")<<"\"/>\n";
             const bool has_nonquant=std::any_of(view.nodes.begin(),view.nodes.end(),
@@ -3380,6 +3457,8 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
                    <<"\" data-spatial-pair=\""<<xml(node.spatial_pair_id)
                    <<"\" data-energy-hartree=\""<<(node.energy_hartree?number(*node.energy_hartree):"")
                    <<"\" data-display-energy-hartree=\""<<(node.display_energy_hartree?number(*node.display_energy_hartree):"")
+                   <<"\" data-source-energy-semantics=\""<<xml(node.energy_semantics)
+                   <<"\" data-display-energy-semantics=\""<<xml(node.display_energy_semantics)
                    <<"\" data-display-offset-y=\""<<node.display_offset_y<<"\"><title>"<<xml(node.individual_label.empty()?node.label:node.individual_label)
                    <<"</title>";
                 if(folded_group)

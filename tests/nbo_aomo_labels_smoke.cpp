@@ -367,6 +367,39 @@ int main(){try{
     const auto partial_view=cov::ui::nbo_aomo_names_for_view(equal_copies.w,equal_names,{0},{},nullptr,"partial pair");
     require(partial_view.canonical[0].ordinal==1&&partial_view.canonical[0].ordinal_status=="display_order_convention"&&partial_view.canonical[0].visible_partner_count==1,
         "filtered-out partners do not erase certified occurrence identity");
+    // Switching the energy definition changes view ordinals, not source MO
+    // identity or complete-set evidence. Hidden certified partners still
+    // participate in the copy mean: the lowest visible member need not name
+    // the lowest-energy complete copy.
+    std::vector<double> common_energies;
+    for(const auto& mo:equal_copies.w.orbitals)common_energies.push_back(mo.energy_hartree);
+    common_energies[0]=.1;common_energies[1]=1.1;
+    common_energies[3]=common_energies[4]=.2;
+    common_energies[7]=common_energies[8]=.4;
+    const auto common_view=cov::ui::nbo_aomo_names_for_view(equal_copies.w,equal_names,
+        {0,3,7},{},nullptr,"filtered common-operator expectation",&common_energies);
+    require(common_view.canonical[0].ordinal==3&&common_view.canonical[3].ordinal==1&&
+        common_view.canonical[7].ordinal==2&&common_view.canonical[0].view_row_ordinal==1,
+        "selected energy must order full certified copies, including hidden partners");
+    require(common_view.canonical[0].partner_block_id==equal_names.canonical[0].partner_block_id&&
+        common_view.canonical[0].complete_set_ordinal_status==equal_names.canonical[0].complete_set_ordinal_status&&
+        common_view.canonical[0].complete_set_ordinal_lower==equal_names.canonical[0].complete_set_ordinal_lower&&
+        common_view.canonical[0].complete_set_ordinal_upper==equal_names.canonical[0].complete_set_ordinal_upper&&
+        equal_copies.w.orbitals[0].energy_hartree==-.4&&equal_copies.w.orbitals[1].energy_hartree==-.4,
+        "view energy mode must preserve source energies, block identity and source-order uncertainty");
+    common_energies[1]=std::numeric_limits<double>::quiet_NaN();
+    const auto missing_common_partner=cov::ui::nbo_aomo_names_for_view(equal_copies.w,equal_names,
+        {0},{},nullptr,"incomplete common-operator expectation",&common_energies);
+    require(missing_common_partner.canonical[0].ordinal==0&&
+        missing_common_partner.canonical[0].ordinal_status=="nonquantitative_copy_entry"&&
+        missing_common_partner.canonical[0].visible_partner_count==1,
+        "missing selected energy on hidden partner must not borrow source energy to invent a rank");
+    const std::vector<double> truncated_common={.1};
+    const auto truncated_common_view=cov::ui::nbo_aomo_names_for_view(equal_copies.w,equal_names,
+        {0},{},nullptr,"truncated common-operator expectation",&truncated_common);
+    require(truncated_common_view.canonical[0].ordinal==0&&
+        truncated_common_view.canonical[0].ordinal_status=="nonquantitative_copy_entry",
+        "short selected energy list must not complete partner means from another definition");
     auto no_energy=equal_copies.w;no_energy.orbitals[1].energy_hartree=std::numeric_limits<double>::quiet_NaN();
     const auto nonquantitative=cov::ui::nbo_aomo_names_for_view(no_energy,equal_names,{0},{},nullptr,"nonquantitative partial");
     require(nonquantitative.canonical[0].ordinal==0&&nonquantitative.canonical[0].view_row_ordinal==1&&nonquantitative.canonical[0].visible_partner_count==1&&nonquantitative.canonical[0].ordinal_status=="nonquantitative_copy_entry","missing hidden partner energy must prevent a quantitative copy rank but retain the entry and partner identity");

@@ -5,6 +5,8 @@
 #include "cov/orbital_view.hpp"
 #include "cov/pi_pair_evidence.hpp"
 #include "cov/mo_sigma_framework.hpp"
+#include "cov/nbo_spin_average.hpp"
+#include "cov/pi_field_response.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -199,6 +201,12 @@ struct MODiagramOptions {
     std::function<int(const std::string&,int)> raster_text_width;
     const RoutedAnalysis* routed = nullptr; // immutable, same canonical fingerprint
     const NboIntegration* nbo_source=nullptr; // immutable same-source sigma projector
+    const NboSalcModel* source_salc_model=nullptr; // verified unaveraged source
+    const NboRoCommonEnergyModel* ro_common_energy=nullptr; // immutable prepared cache
+    const PiFieldResponseAnalysis* pi_field_response=nullptr; // same wavefunction/attachment
+    bool use_ro_common_energy=true;
+    // Internal view override. Source wavefunction and its fingerprint never change.
+    std::vector<double> canonical_display_energies;
     std::string routed_identity; // cache generation; changes on every reattachment
     MODiagramMode mode = MODiagramMode::ValenceCentral;
     EnergyUnit energy_unit = EnergyUnit::Hartree;
@@ -294,7 +302,7 @@ struct MOGroupCompositionLedger {
     double weight_sum=0, normalization_error=0;
     double centre_current_s=0, centre_current_p=0, centre_current_d=0,
            centre_current_f=0, centre_other=0;
-    double ligand_valence=0, ligand_other=0, core=0, unresolved=0;
+    double ligand_valence=0, ligand_other=0, other_atoms=0, core=0, unresolved=0;
     // Subtotals of ligand_valence, not additional exclusive buckets.
     double ligand_valence_s=0, ligand_valence_p=0;
 };
@@ -303,6 +311,16 @@ struct MOCurrentRadialShell {
     int n=0, l=0;
     std::string evidence;
 };
+// Chemical scope is independent of whether a numerical NAO partition exists.
+// A user-selected nonmetal centre never becomes a metal, and disconnected
+// counterions never become ligands merely by being outside the centre bucket.
+struct MOCompositionScope {
+    bool applicable=false;
+    std::vector<std::size_t> centre_atoms,ligand_atoms,other_atoms;
+    std::string detail;
+};
+[[nodiscard]] MOCompositionScope mo_composition_scope(
+    const Wavefunction&,const RoutedAnalysis*,const std::vector<std::size_t>& centres);
 struct MOGroupDisplayDecision {
     bool included=false, energy_window=false, major_relation=false, frontier=false;
     double coverage=0; // complete-norm current-centre coverage, not conditional
@@ -447,6 +465,10 @@ struct MODiagramData {
     // an arbitrary Cartesian product of purported two-level counterparts.
     std::vector<PiModeNetworkAssessment> pi_mode_networks;
     MOSigmaFramework sigma_framework;
+    NboRoCommonEnergyModel ro_common_energy;
+    bool using_ro_common_energy=false;
+    PiFieldResponseAnalysis pi_field_response;
+    MOCompositionScope composition_scope;
     std::vector<MOCurrentRadialShell> current_radial_shells;
     // Complete source groups, including folded and opposite-spin groups.
     std::vector<MODiagramGroupAudit> group_audit;
@@ -525,6 +547,7 @@ struct MODiagramMemberView {
 // representative members. A default numeric zero is not availability evidence.
 struct MetalLigandDetailAvailability {
     ChemistryStatus scope = ChemistryStatus::Unavailable;
+    bool composition = false;
     bool populations = false;
     bool overlap = false;
     bool channels = false;

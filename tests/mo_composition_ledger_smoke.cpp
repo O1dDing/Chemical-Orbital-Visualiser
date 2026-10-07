@@ -48,7 +48,37 @@ int main() {try {
     close(ledger.weight_sum,1,"Complete norm must close");
     close(ledger.centre_current_s+ledger.centre_current_p+ledger.centre_current_d+
         ledger.centre_current_f+ledger.centre_other+ledger.ligand_valence+
-        ledger.ligand_other+ledger.core+ledger.unresolved,1,"Exclusive buckets do not close");
+        ledger.ligand_other+ledger.other_atoms+ledger.core+ledger.unresolved,1,"Exclusive buckets do not close");
+
+    // Chemical applicability is independent of composition percentages. A
+    // disconnected ion is not a ligand, and ordinary organic centres are not metals.
+    cov::Wavefunction scope_w;scope_w.atoms.resize(5);scope_w.orbitals.resize(1);
+    scope_w.atoms[0].atomic_number=11;scope_w.atoms[1].atomic_number=8;
+    scope_w.atoms[2].atomic_number=1;scope_w.atoms[3].atomic_number=17;
+    scope_w.atoms[4].atomic_number=24;
+    auto scope_r=route(scope_w,{{row(1,"Val(3s)",3,0,.3),row(2,"Val(2p)",2,1,.4),
+                              row(4,"Val(3p)",3,1,.3)}});
+    scope_r.interaction_graph.status=cov::RoutedStatus::Available;
+    scope_r.interaction_graph.value=cov::InteractionGraph{};
+    for(const auto pair:std::vector<std::pair<std::size_t,std::size_t>>{{0,1},{1,2},{1,4}}) {
+        cov::InteractionEdge e;e.atom_a=pair.first;e.atom_b=pair.second;
+        e.kind=pair.first==0?cov::InteractionKind::CoordinationContact:cov::InteractionKind::CovalentConnectivity;
+        e.strength=cov::InteractionStrength::StrongConnectivity;
+        scope_r.interaction_graph.value->edges.push_back(e);
+    }
+    const auto scope=cov::mo_composition_scope(scope_w,&scope_r,{0});
+    require(scope.applicable && scope.ligand_atoms==std::vector<std::size_t>{1,2},
+        "General-metal composition must include connected ligand fragment, stop at other metals");
+    require(scope.other_atoms==std::vector<std::size_t>{3,4},"Other ions/metals must not become ligand space");
+    const auto scoped=cov::mo_group_composition_ledger(scope_w,&scope_r,{0},{0},{{0,3,0}});
+    close(scoped.other_atoms,.3,"Disconnected counterion must retain its own denominator share");
+    close(scoped.ligand_valence,.4,"Ligand cannot absorb counterion contribution");
+    for(const int z:{1,6,7,8,15,16}) {
+        scope_w.atoms[0].atomic_number=z;
+        scope_r.canonical_fingerprint=cov::nbo_canonical_fingerprint(scope_w);
+        require(!cov::mo_composition_scope(scope_w,&scope_r,{0}).applicable,
+            "Nonmetal centre must never activate a metal-ligand composition panel");
+    }
 
     // Rotate an orthonormal two-member NAO subspace. Individual weights change,
     // but the complete group trace and its shared denominator remain invariant.

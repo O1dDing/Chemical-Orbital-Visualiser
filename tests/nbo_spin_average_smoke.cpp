@@ -1,4 +1,4 @@
-#include "cov/nbo_salc.hpp"
+#include "cov/nbo_spin_average.hpp"
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cmath>
@@ -48,11 +48,44 @@ Fixture fixture(){Fixture f;auto& w=f.w;auto& data=f.data;auto& raw=f.raw;
             if(spin==cov::NboSpin::Alpha)for(int mo=0;mo<4;++mo){double c=basis(mo,i);raw.links.push_back({raw.orbitals.size(),std::size_t(mo),c,c*c});}
             raw.orbitals.push_back(o);}
         raw.subspaces.push_back(sub);raw.spin_operators.push_back(op);}
+    for(std::size_t i=0;i<4;++i){w.gaussian_ao_transform.push_back({i,1,1});
+        data.dataset.association.gaussian_row.push_back(i);data.dataset.association.coefficient_scale.push_back(1);}
+    for(auto spin:{cov::NboSpin::Alpha,cov::NboSpin::Beta}){
+        cov::NboMatrix m;m.kind="FOCK";m.spin=spin;m.rows=m.columns=4;
+        m.values=flat(spin==cov::NboSpin::Alpha?f.fa:f.fb);m.source.path="fixture/FILE.47";m.source.block="FOCK";
+        data.dataset.archive->matrices.push_back(m);
+        cov::NboSalcEnergyEvidence ev;ev.spin=spin;ev.available=true;ev.printed_operator_verified=true;
+        ev.printed_nao_checked=ev.printed_nbo_checked=4;ev.source=m.source;raw.energies.push_back(ev);}
+    data.canonical_fingerprint=cov::nbo_canonical_fingerprint(w);raw.canonical_fingerprint=data.canonical_fingerprint;
     return f;
 }
 }
 int main(){try{
     auto f=fixture();const auto before=cov::serialize_nbo_salc_json(f.raw),fingerprint=f.data.canonical_fingerprint;
+    const auto common=cov::build_nbo_ro_common_energy(f.w,f.data,f.raw);
+    require(common.available&&common.orbitals.size()==4,"Common source energy qualification failed");
+    require(!common.source_step_identity_verified,"Numerical equivalence incorrectly claimed original SCF identity");
+    for(std::size_t i=0;i<4;++i){near(*common.orbitals[i].common_energy_hartree,(f.fa(i,i)+f.fb(i,i))/2,"Wrong source-MO common expectation");
+        near(common.orbitals[i].source_energy_hartree,f.w.orbitals[i].energy_hartree,"Original source energy lost");}
+    near(common.maximum_offdiagonal_hartree,.315,"Off-diagonal evidence lost; expectations mislabeled eigenvalues");
+    require(cov::serialize_nbo_ro_common_energy_json(common).find("associated_archive_spin_average_expectation")!=std::string::npos,"Common operator semantics absent");
+    auto bad_common=f;bad_common.raw.spin_operators[1].fock[0]+=.1;
+    require(cov::build_nbo_ro_common_energy(bad_common.w,bad_common.data,bad_common.raw).status=="operator_projection_mismatch","Stale same-fingerprint operator accepted");
+    bad_common=f;bad_common.raw.energies[1].printed_nbo_checked=3;
+    require(!cov::build_nbo_ro_common_energy(bad_common.w,bad_common.data,bad_common.raw).available,"Incomplete printed qualification accepted");
+    bad_common=f;bad_common.data.dataset.archive->matrices.back().source.path="other/FILE.47";
+    require(cov::build_nbo_ro_common_energy(bad_common.w,bad_common.data,bad_common.raw).status=="operator_source_mismatch","Different analysis Focks averaged");
+    bad_common=f;bad_common.data.dataset.association.gaussian_row[1]=0;
+    require(cov::build_nbo_ro_common_energy(bad_common.w,bad_common.data,bad_common.raw).status=="invalid_ao_mapping","Nonbijective mapping accepted");
+    bad_common=f;bad_common.w.orbitals[0].coefficients[0]=.99;
+    bad_common.data.canonical_fingerprint=cov::nbo_canonical_fingerprint(bad_common.w);bad_common.raw.canonical_fingerprint=bad_common.data.canonical_fingerprint;
+    require(cov::build_nbo_ro_common_energy(bad_common.w,bad_common.data,bad_common.raw).status=="canonical_linkage_mismatch","Compatible flag replaced source coefficient proof");
+    bad_common=f;bad_common.raw.spin_operators[1].density[0]+=.1;
+    require(cov::build_nbo_ro_common_energy(bad_common.w,bad_common.data,bad_common.raw).status=="canonical_spin_density_mismatch","Projected density mismatch accepted");
+    bad_common=f;bad_common.data.dataset.archive->matrices.back().values[1]+=.1;
+    require(cov::build_nbo_ro_common_energy(bad_common.w,bad_common.data,bad_common.raw).status=="nonhermitian_spin_fock","Non-Hermitian archive Fock accepted");
+    bad_common=f;bad_common.data.dataset.archive->matrices.back().values.pop_back();
+    require(cov::build_nbo_ro_common_energy(bad_common.w,bad_common.data,bad_common.raw).status=="complete_spin_fock_missing","Partial beta Fock accepted");
     auto averaged=cov::build_nbo_spin_averaged_model(f.w,f.data,f.raw);
     require(averaged.restricted_open_shell.verified&&averaged.spin_averaged&&averaged.orbitals.size()==4,"RO spatial merge missing members");
     require(averaged.merged_spatial_count==4&&averaged.separate_spin_count==0,"partial rotated space not completed");
@@ -81,6 +114,7 @@ int main(){try{
     for(const auto& sub:unavailable.subspaces)require(sub.fock.empty()&&!sub.energy_degeneracy_verified&&!sub.density.empty(),"Missing beta operator must clear quantitative common-Fock matrix without erasing density");
     for(const auto& o:unavailable.orbitals)require(!o.energy_hartree&&o.occupation&&o.spatial_spin->energy_status.find("missing beta Fock")!=std::string::npos,"Fabricated missing spin mean");
     for(const auto* method:{"UPBE1PBE","UHF","UKS","RHF","PBE0"}){auto wrong=f;wrong.w.source_route=std::string("SP ")+method+" synthetic";wrong.data.canonical_fingerprint=cov::nbo_canonical_fingerprint(wrong.w);
+        require(!cov::build_nbo_ro_common_energy(wrong.w,wrong.data,wrong.raw).available,"Non-RO source given common RO energies");
         require(!cov::build_nbo_spin_averaged_model(wrong.w,wrong.data,wrong.raw).spin_averaged,"Unverified/U/closed-shell method merged");}
     auto invalid=f;invalid.data.dataset.association.compatible=false;require(!cov::verify_nbo_restricted_open_shell(invalid.w,invalid.data).verified,"Rejected association accepted");
     invalid=f;invalid.w.orbitals[2].occupation=.5;invalid.data.canonical_fingerprint=cov::nbo_canonical_fingerprint(invalid.w);require(!cov::verify_nbo_restricted_open_shell(invalid.w,invalid.data).verified,"Wrong integer occupation accepted");
@@ -126,6 +160,9 @@ int main(){try{
     for(int i=0;i<4;++i){const auto& descriptor=explicit_ro.data.orbitals[4+i];for(int mo=0;mo<4;++mo){double c=descriptor.coefficients[mo];explicit_ro.raw.links.push_back({std::size_t(4+i),std::size_t(4+mo),c,c*c});}}
     const auto explicit_average=cov::build_nbo_spin_averaged_model(explicit_ro.w,explicit_ro.data,explicit_ro.raw);
     require(explicit_average.spin_averaged,"Explicit-spin RO not recognized");bool beta_component=false;
+    const auto explicit_common=cov::build_nbo_ro_common_energy(explicit_ro.w,explicit_ro.data,explicit_ro.raw);
+    require(explicit_common.available&&explicit_common.orbitals.size()==8,"Verified explicit-spin RO source energies unavailable");
+    for(std::size_t i=0;i<4;++i)near(*explicit_common.orbitals[i].common_energy_hartree,*explicit_common.orbitals[i+4].common_energy_hartree,"Explicit RO channels do not share common operator");
     for(const auto& link:explicit_average.links)if(link.canonical_index>=4&&link.weight>.01){
         auto selection=cov::nbo_salc_component_selection(explicit_average,link);
         auto view=cov::make_nbo_selection_view(explicit_ro.data,explicit_ro.w,selection);

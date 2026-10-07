@@ -437,7 +437,7 @@ def duplicate_gap_pairs(view: dict) -> list[dict]:
 
 COMPOSITION_BUCKETS = ("centre_current_s", "centre_current_p", "centre_current_d",
                        "centre_current_f", "centre_other", "ligand_valence",
-                       "ligand_other", "core", "unresolved")
+                       "ligand_other", "other_atoms", "core", "unresolved")
 
 
 def display_semantics(view: dict, require_pi_expanded: bool = False) -> dict:
@@ -455,7 +455,9 @@ def display_semantics(view: dict, require_pi_expanded: bool = False) -> dict:
         if not ledger or not ledger.get("available") or not ledger.get("complete"):
             continue
         checked.add("complete-nao-normalization")
-        values = [ledger.get(k) for k in COMPOSITION_BUCKETS]
+        # Older snapshots predate the explicit disconnected-atom bucket.
+        values = [ledger.get(k, 0) if k == "other_atoms" else ledger.get(k)
+                  for k in COMPOSITION_BUCKETS]
         if any(not isinstance(v, (int, float)) or not math.isfinite(v) or v < -1e-10 for v in values):
             failures.append("A complete NAO composition has an invalid exclusive bucket")
         else:
@@ -522,6 +524,15 @@ def display_semantics(view: dict, require_pi_expanded: bool = False) -> dict:
                 not network.get("direction_verified") or not network.get("matched_edge_ids")):
             failures.append("A displayed network direction lacks linked ordered source evidence")
     target_ids = {t.get("id") for t in view.get("targets", [])}
+    for record in draw_records(view, "details.pi.joined-summary"):
+        assessment = record.get("assessment", {})
+        checked.add("joined-occupied-pi-summary")
+        if not assessment.get("available") or not assessment.get("applicable"):
+            failures.append("A joined pi summary has no applicable group response")
+        if "回馈" in record.get("label", "") and not assessment.get("occupied_metal_backbond_supported"):
+            failures.append("A displayed back-donation claim has no occupied metal donor")
+        if not assessment.get("members"):
+            failures.append("A joined pi summary is detached from source group members")
     if require_pi_expanded and "details.pi.toggle.closed" in target_ids:
         failures.append("Applicable pi details remain closed; their text was not inspected")
     return {"checked": sorted(checked), "failures": sorted(set(failures)),

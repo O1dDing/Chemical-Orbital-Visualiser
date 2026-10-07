@@ -34,6 +34,7 @@ add_library(cov_parser
     src/analysis/nbo_salc.cpp
     src/analysis/nbo_spin_average.cpp
     src/analysis/pi_coupling.cpp
+    src/analysis/pi_field_response.cpp
     src/analysis/density.cpp
     src/analysis/overlap.cpp
     src/analysis/overlap_basis.cpp
@@ -376,6 +377,15 @@ if(COV_BUILD_TESTS)
     add_test(NAME nbo_spin_average_smoke COMMAND cov_nbo_spin_average_smoke)
     add_executable(cov_nbo_spin_average_probe tests/nbo_spin_average_probe.cpp)
     target_link_libraries(cov_nbo_spin_average_probe PRIVATE cov_parser)
+    add_executable(cov_pi_field_response_smoke tests/pi_field_response_smoke.cpp)
+    target_link_libraries(cov_pi_field_response_smoke PRIVATE cov_parser)
+    target_include_directories(cov_pi_field_response_smoke SYSTEM PRIVATE ${cov_eigen_SOURCE_DIR})
+    add_test(NAME pi_field_response_smoke COMMAND cov_pi_field_response_smoke)
+    add_executable(cov_pi_field_response_probe tests/pi_field_response_probe.cpp)
+    target_link_libraries(cov_pi_field_response_probe PRIVATE cov_parser cov_orbitals cov_molecule)
+    add_executable(cov_composition_display_policy_smoke tests/composition_display_policy_smoke.cpp)
+    target_link_libraries(cov_composition_display_policy_smoke PRIVATE cov_parser cov_orbitals)
+    add_test(NAME composition_display_policy_smoke COMMAND cov_composition_display_policy_smoke)
     target_link_libraries(cov_nbo_salc_smoke PRIVATE cov_parser)
     add_test(NAME nbo_salc_smoke COMMAND cov_nbo_salc_smoke)
     add_executable(cov_nbo_pi_evidence_smoke tests/test_nbo_pi_evidence.cpp)

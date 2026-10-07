@@ -303,6 +303,15 @@ bool write_mo_diagram_json(const MODiagramData& data,
     out << "  ],\n";
     out << "  \"pi_partner_candidates\": " << pi_partner_candidates_json(data.pi_partner_candidates) << ",\n";
     out << "  \"sigma_framework\": " << mo_sigma_framework_json(data.sigma_framework) << ",\n";
+    out << "  \"using_ro_common_energy\": " << (data.using_ro_common_energy?"true":"false") << ",\n";
+    out << "  \"ro_common_energy\": " << serialize_nbo_ro_common_energy_json(data.ro_common_energy) << ",\n";
+    out << "  \"pi_field_response\": " << pi_field_response_analysis_json(data.pi_field_response) << ",\n";
+    out << "  \"composition_scope\": {\"applicable\":" << (data.composition_scope.applicable?"true":"false")
+        << ",\"centres\":";
+    write_json_index_array(out,data.composition_scope.centre_atoms);
+    out << ",\"ligands\":";write_json_index_array(out,data.composition_scope.ligand_atoms);
+    out << ",\"other_atoms\":";write_json_index_array(out,data.composition_scope.other_atoms);
+    out << ",\"reason\":\"" << json_escape(data.composition_scope.detail) << "\"},\n";
     out << "  \"pi_mode_networks\": [";
     for(std::size_t i=0;i<data.pi_mode_networks.size();++i) {
         if(i)out << ',';

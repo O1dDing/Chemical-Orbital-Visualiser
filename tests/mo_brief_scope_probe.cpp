@@ -76,7 +76,7 @@ int main(int argc,char** argv) {try {
             if(i)out<<',';const auto& group=data.group_audit[i];
             if(group.composition.complete) {
                 const auto& c=group.composition;
-                require(std::abs(current(c)+c.centre_other+c.ligand_valence+c.ligand_other+c.core+c.unresolved-1)<1e-5,
+                require(std::abs(current(c)+c.centre_other+c.ligand_valence+c.ligand_other+c.other_atoms+c.core+c.unresolved-1)<1e-5,
                     "Complete source ledger does not close");
             }
             out<<"{\"members\":";indices(out,group.member_indices);

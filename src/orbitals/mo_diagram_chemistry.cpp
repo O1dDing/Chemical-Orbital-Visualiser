@@ -21,6 +21,62 @@
 
 namespace cov {
 
+namespace {
+double diagram_orbital_energy(const Wavefunction& w,const MODiagramOptions& options,std::size_t index) {
+    return options.canonical_display_energies.size()==w.orbitals.size()
+        ?options.canonical_display_energies[index]:w.orbitals[index].energy_hartree;
+}
+bool composition_metal(int z) noexcept {
+    if((z>=21 && z<=30)||(z>=39 && z<=48)||(z>=57 && z<=80)||
+       (z>=89 && z<=112))return true;
+    switch(z) {
+        case 3:case 4:case 11:case 12:case 13:case 19:case 20:
+        case 31:case 37:case 38:case 49:case 50:case 55:case 56:
+        case 81:case 82:case 83:case 87:case 88:case 113:case 114:
+        case 115:case 116:return true;
+        default:return false;
+    }
+}
+}
+
+MOCompositionScope mo_composition_scope(const Wavefunction& w,const RoutedAnalysis* routed,
+                                        const std::vector<std::size_t>& centres) {
+    MOCompositionScope result;
+    if(centres.empty()){result.detail="no-explicit-composition-centre";return result;}
+    for(auto a:centres) {
+        if(a>=w.atoms.size() || !composition_metal(w.atoms[a].atomic_number)) {
+            result.detail="composition-centre-is-not-a-metal";return result;
+        }
+        if(std::find(result.centre_atoms.begin(),result.centre_atoms.end(),a)==result.centre_atoms.end())
+            result.centre_atoms.push_back(a);
+    }
+    const bool linked=routed && routed->canonical_fingerprint==nbo_canonical_fingerprint(w) &&
+        routed->interaction_graph.available();
+    const auto graph=linked?make_fixed_bonding_scope(w,*routed->interaction_graph.value):
+        make_fixed_bonding_scope(w);
+    std::vector<std::vector<std::size_t>> adjacency(w.atoms.size());
+    for(const auto& [a,b]:graph.edges)if(a<w.atoms.size() && b<w.atoms.size()) {
+        adjacency[a].push_back(b);adjacency[b].push_back(a);
+    }
+    std::vector<bool> visited(w.atoms.size(),false);
+    std::queue<std::size_t> pending;
+    for(auto a:result.centre_atoms){visited[a]=true;pending.push(a);}
+    // Walk only verified skeletal/coordination connectivity. Other metals are
+    // boundaries, not ligand atoms; connected ligand fragments retain all atoms.
+    while(!pending.empty()) {
+        const auto a=pending.front();pending.pop();
+        for(auto b:adjacency[a])if(!visited[b] && !composition_metal(w.atoms[b].atomic_number)) {
+            visited[b]=true;pending.push(b);result.ligand_atoms.push_back(b);
+        }
+    }
+    for(std::size_t a=0;a<w.atoms.size();++a)if(!visited[a])result.other_atoms.push_back(a);
+    std::sort(result.ligand_atoms.begin(),result.ligand_atoms.end());
+    result.applicable=!result.ligand_atoms.empty();
+    result.detail=result.applicable?"actual-metal-and-connected-ligand-fragments":
+        "no-supported-associated-ligand-fragment";
+    return result;
+}
+
 std::vector<MOCurrentRadialShell> mo_current_radial_shells(
     const Wavefunction& wavefunction,const RoutedAnalysis& routed,
     const std::vector<std::size_t>& centres) {
@@ -69,6 +125,7 @@ MOGroupCompositionLedger mo_group_composition_ledger(
         result.unresolved=1;return result;
     }
     result.source="complete-NAO-original-norm-member-average";
+    const auto scope=mo_composition_scope(wavefunction,routed,centres);
     bool complete=true;
     const double divisor=static_cast<double>(members.size());
     for(const auto member:members) {
@@ -104,6 +161,9 @@ MOGroupCompositionLedger mo_group_composition_ledger(
                     case 3:result.centre_current_f+=weight;break;
                     default:result.centre_other+=weight;
                 }
+            } else if(scope.applicable &&
+                      std::find(scope.ligand_atoms.begin(),scope.ligand_atoms.end(),atom)==scope.ligand_atoms.end()) {
+                result.other_atoms+=weight;
             } else if(row.type.rfind("Val",0)==0) {
                 result.ligand_valence+=weight;
                 if(row.angular_l==0)result.ligand_valence_s+=weight;
@@ -1463,9 +1523,10 @@ GroupCandidate make_group_candidate(
         level.member_electrons.push_back(electron_glyphs_for_orbital(
             orbital,frontier.separate_spin_sets));
         level.total_occupation+=static_cast<double>(orbital.occupation);
-        energy_sum+=orbital.energy_hartree;
-        energy_min=std::min(energy_min,orbital.energy_hartree);
-        energy_max=std::max(energy_max,orbital.energy_hartree);
+        const double display_energy=diagram_orbital_energy(wavefunction,options,index);
+        energy_sum+=display_energy;
+        energy_min=std::min(energy_min,display_energy);
+        energy_max=std::max(energy_max,display_energy);
         level.homo=level.homo || (frontier.homo && *frontier.homo==index);
         level.lumo=level.lumo || (frontier.lumo && *frontier.lumo==index);
         level.metadata.selected=level.metadata.selected ||
@@ -1560,7 +1621,7 @@ GroupCandidate make_group_candidate(
                                level.metal_d_weight;
     const bool occupied_group=level.total_occupation>options.filter.occupation_threshold;
     const double virtual_ceiling=frontier.lumo && *frontier.lumo<wavefunction.orbitals.size()
-        ?wavefunction.orbitals[*frontier.lumo].energy_hartree+
+        ?diagram_orbital_energy(wavefunction,options,*frontier.lumo)+
              std::min(0.75,options.filter.virtual_window_hartree)
         :std::numeric_limits<double>::infinity();
     const bool energy_relevant=occupied_group ||
@@ -2381,9 +2442,27 @@ static MODiagramData build_mo_diagram_data_impl(
         "COV S-metric minimal atomic chemical-valence reference";
     data.frontier=find_frontier_orbitals(
         wavefunction.orbitals,options.filter.occupation_threshold);
+    if(options.canonical_display_energies.size()==wavefunction.orbitals.size()) {
+        const bool separate=data.frontier.separate_spin_sets;
+        data.frontier={};data.frontier.separate_spin_sets=separate;
+        for(std::size_t i=0;i<wavefunction.orbitals.size();++i) {
+            const auto& orbital=wavefunction.orbitals[i];
+            const bool filled=occupied(orbital,options.filter.occupation_threshold);
+            const auto choose=[&](std::optional<std::size_t>& entry) {
+                if(!entry || (filled?options.canonical_display_energies[i]>options.canonical_display_energies[*entry]:
+                                    options.canonical_display_energies[i]<options.canonical_display_energies[*entry]))entry=i;
+            };
+            choose(filled?data.frontier.homo:data.frontier.lumo);
+            if(orbital.spin==Spin::Beta)choose(filled?data.frontier.beta_homo:data.frontier.beta_lumo);
+            else choose(filled?data.frontier.alpha_homo:data.frontier.alpha_lumo);
+        }
+    }
     data.metadata=build_orbital_metadata(
         wavefunction,options.selected_index,
         options.degeneracy,options.filter);
+    if(options.canonical_display_energies.size()==wavefunction.orbitals.size())
+        for(std::size_t i=0;i<data.metadata.size();++i)
+            data.metadata[i].energy_hartree=options.canonical_display_energies[i];
     if(options.routed &&
        options.routed->canonical_fingerprint==nbo_canonical_fingerprint(wavefunction))
         for(std::size_t i=0;i<data.metadata.size();++i)
@@ -2403,6 +2482,7 @@ static MODiagramData build_mo_diagram_data_impl(
         wavefunction,ligand_field);
     auto current_centres=options.display_centre_atoms;
     if(current_centres.empty() && ligand_scope.available)current_centres.push_back(ligand_scope.metal);
+    data.composition_scope=mo_composition_scope(wavefunction,options.routed,current_centres);
     if(options.routed)data.current_radial_shells=mo_current_radial_shells(
         wavefunction,*options.routed,current_centres);
     data.sigma_framework=analyse_mo_sigma_framework(wavefunction,options.nbo_source,
@@ -2676,6 +2756,12 @@ static MODiagramData build_mo_diagram_data_impl(
         }
     }
     std::vector<RawPiPair> raw_pairs;
+    if(!options.canonical_display_energies.empty())
+        std::stable_sort(groups.begin(),groups.end(),[&](const auto& a,const auto& b) {
+            const auto as=group_spin(wavefunction,a),bs=group_spin(wavefunction,b);
+            if(as!=bs)return as==Spin::Alpha;
+            return a.level.layout_energy_hartree<b.level.layout_energy_hartree;
+        });
     if (!active_space_mode) {
         raw_pairs=find_pi_pairs(
             wavefunction,groups,options,data.ligand_field_point_group,
@@ -2893,8 +2979,8 @@ static MODiagramData build_mo_diagram_data_impl(
         }));
     if (included_count>row_budget) {
         const double frontier_energy=data.frontier.homo && data.frontier.lumo
-            ?0.5*(wavefunction.orbitals[*data.frontier.homo].energy_hartree+
-                  wavefunction.orbitals[*data.frontier.lumo].energy_hartree)
+            ?0.5*(diagram_orbital_energy(wavefunction,options,*data.frontier.homo)+
+                  diagram_orbital_energy(wavefunction,options,*data.frontier.lumo))
             :0.0;
         struct RankedGroup { std::size_t index=0; double score=0.0; };
         std::vector<RankedGroup> ranked;
@@ -2965,7 +3051,7 @@ static MODiagramData build_mo_diagram_data_impl(
             if(group.level.total_occupation<=options.filter.occupation_threshold ||
                !group.level.composition.complete || group.level.composition.core>=.70)continue;
             const auto& c=group.level.composition;
-            const double frontier=data.frontier.homo?wavefunction.orbitals[*data.frontier.homo].energy_hartree:
+            const double frontier=data.frontier.homo?diagram_orbital_energy(wavefunction,options,*data.frontier.homo):
                 group.level.layout_energy_hartree;
             const bool deep=c.ligand_valence_s>=.80 && centre_coverage(c)<.20 &&
                 group.level.layout_energy_hartree<frontier-.20;
@@ -3049,7 +3135,7 @@ static MODiagramData build_mo_diagram_data_impl(
             } else if(options.show_fragment_background) {
                 candidate.include=true;decision.reason_codes.push_back("requested-fragment-background");
             } else if(composition.complete && !current_centres.empty()) {
-                const double frontier=data.frontier.homo?wavefunction.orbitals[*data.frontier.homo].energy_hartree:
+                const double frontier=data.frontier.homo?diagram_orbital_energy(wavefunction,options,*data.frontier.homo):
                     candidate.level.layout_energy_hartree;
                 const bool deep_background=composition.ligand_valence_s>=0.80 && decision.coverage<0.20 &&
                     candidate.level.layout_energy_hartree<frontier-0.20;
@@ -3255,7 +3341,34 @@ static MODiagramData build_mo_diagram_data_impl(
 
 MODiagramData build_mo_diagram_data(const Wavefunction& wavefunction,
                                    const MODiagramOptions& options) {
-    auto data=build_mo_diagram_data_impl(wavefunction,options);
+    auto prepared=options;
+    NboRoCommonEnergyModel common;
+    if(options.ro_common_energy)common=*options.ro_common_energy;
+    else if(options.nbo_source && wavefunction.orbital_occupation_model==OrbitalOccupationModel::CanonicalShared) {
+        const auto raw=options.source_salc_model?*options.source_salc_model:
+            build_nbo_salc_model(wavefunction,*options.nbo_source);
+        common=build_nbo_ro_common_energy(wavefunction,*options.nbo_source,raw);
+    }
+    const bool common_view=options.use_ro_common_energy && common.available &&
+        common.canonical_fingerprint==nbo_canonical_fingerprint(wavefunction) &&
+        common.orbitals.size()==wavefunction.orbitals.size() && chemistry_available(wavefunction);
+    prepared.canonical_display_energies.clear();
+    if(common_view) {
+        prepared.canonical_display_energies.resize(wavefunction.orbitals.size());
+        for(const auto& entry:common.orbitals)
+            prepared.canonical_display_energies.at(entry.canonical_index)=entry.common_energy_hartree.value();
+    }
+    auto data=build_mo_diagram_data_impl(wavefunction,prepared);
+    data.ro_common_energy=std::move(common);data.using_ro_common_energy=common_view;
+    if(options.pi_field_response)data.pi_field_response=*options.pi_field_response;
+    else if(options.nbo_source && options.routed &&
+            options.routed->canonical_fingerprint==nbo_canonical_fingerprint(wavefunction)) {
+        std::vector<const NboPiCoupling*> channels;
+        for(const auto& entry:options.routed->pi_couplings)
+            if(entry.available() && entry.provider==RoutedProvider::Nbo)channels.push_back(&*entry.value);
+        if(!channels.empty())data.pi_field_response=analyse_pi_field_responses(
+            wavefunction,*options.nbo_source,channels);
+    }
     // Counts describe the complete final scrollable central graph, not the
     // earlier valence selector or the currently clipped canvas pixels.
     std::set<std::size_t> final_members;
@@ -3324,6 +3437,12 @@ MetalLigandDetailAvailability metal_ligand_detail_availability(
     const Wavefunction& wavefunction, const MODiagramData& data,
     const MODiagramLevel& level) {
     MetalLigandDetailAvailability result;
+    result.composition=data.composition_scope.applicable &&
+        level.composition.available && level.composition.complete;
+    if(!data.composition_scope.detail.empty() && !data.composition_scope.applicable) {
+        result.scope=ChemistryStatus::NotApplicable;
+        return result;
+    }
     if (wavefunction.atoms.empty()) return result;
     bool metal=false, ligand=false;
     for (const auto& atom:wavefunction.atoms) {
