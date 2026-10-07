@@ -2,46 +2,85 @@
 
 [English](BUILD.md)
 
-普通 Windows 下载包不需要 CUDA Toolkit、CMake 或 C++ 编译器。现有包适用于 RTX 50 系列；其他 NVIDIA GPU 架构可从源码构建。
+本文适用于当前源码树。已发布的 Windows 下载包有各自的平台要求；修改源码构建配置不会改变已有下载包。
 
 ## 环境要求
 
-- 支持 CUDA 的 NVIDIA GPU 和兼容的驱动程序
-- CUDA Toolkit 12.8 或更新版本
 - CMake 3.28 或更新版本
-- 支持 C++20 的编译器
-- OpenGL 2.1 兼容上下文
-- Git；CMake 用它获取 GLFW 和 Dear ImGui
+- 支持 C++20 的编译器、Ninja 和 Git
+- 联网获取 CMake 固定版本的 Eigen、GLFW、Dear ImGui 源码依赖
+- 构建桌面程序需要 OpenGL 开发文件；Linux 还需要 GLFW 对应的 X11 或 Wayland 开发依赖。运行时需要 OpenGL 2.1 兼容上下文
 
-默认 CUDA 架构为 `sm_120`，并包含 `compute_120` PTX。其他 GPU 需将 `CMAKE_CUDA_ARCHITECTURES` 设为目标架构。
+Windows 使用装有“使用 C++ 的桌面开发”工作负载的 Visual Studio 2022 x64 开发者命令提示符或 PowerShell。Debian/Ubuntu 需要 C++20 工具链及相应的 OpenGL/GLFW 开发包；macOS 使用 Xcode 16.2 或更新版本，包含 Metal 编译器。FreeBSD 源码构建使用 CPU 后端，并需要 `mesa-libs`、`libglvnd` 开发包。
 
-## 选择版本
+## 构建预设
 
-`v0.3.0` 是稳定版，`v0.4.0-pre.1` 是 NBO 预览版。以下命令在所选版本的源码目录中运行。
+以下命令均在源码根目录运行：
 
-## Windows / Visual Studio 2022
+```text
+cmake --preset cpu-core
+cmake --build --preset cpu-core --parallel
+ctest --preset cpu-core
+```
+
+`cpu-core` 构建核心库和测试，不构建桌面程序，也不需要 GPU SDK。构建使用 CPU 网格计算的桌面程序：
+
+```text
+cmake --preset portable
+cmake --build --preset portable --parallel
+```
+
+Linux/macOS 的程序路径为 `build/portable/cov`，Windows 为 `build\portable\cov.exe`。例如：
+
+```bash
+./build/portable/cov --compute-backend=cpu ./examples/h2.molden
+```
+
+Windows PowerShell 使用：
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release --parallel
-.\build\Release\cov.exe .\examples\h2.molden
+.\build\portable\cov.exe --compute-backend=cpu .\examples\h2.molden
 ```
 
-## Linux
+`cuda`、`metal`、`webgpu` 预设分别启用对应后端；`metal` 只在 macOS 显示。每个桌面预设使用独立构建目录。CUDA 预设需要 CUDA Toolkit 12.8；运行 CUDA 后端还需要兼容的 NVIDIA 驱动。默认设备代码目标为 `60、61、70、75、80、86、89、90、100、120`，另含 `compute_120` PTX。这组目标请使用 CUDA 12.8；CUDA 13 不再编译其中较旧的目标。如只需一个受支持架构，可指定：
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-./build/cov ./examples/h2.molden
+cmake --preset cuda -DCMAKE_CUDA_ARCHITECTURES=86-real
+cmake --build --preset cuda --parallel
 ```
 
-## 不使用 CUDA 的核心测试
+macOS 运行 `cmake --preset metal` 和 `cmake --build --preset metal`，构建 OpenGL 2.1 桌面程序及 Metal 计算模块。可选 WebGPU 需要解压 wgpu-native **v29.0.1.1**，再运行 `cmake --preset webgpu -DCOV_WGPU_NATIVE_ROOT=/absolute/path/to/wgpu-native` 和 `cmake --build --preset webgpu`。Windows 启动时还需将 WebGPU 运行库 DLL 放在 `cov.exe` 旁。
+
+## AMD 和 Intel 计算模块
+
+HIP 与 SYCL 使用各自的编译器，应分别构建为共享库；主程序仍由普通 C++ 工具链编译。Linux 下在源码根目录运行：
 
 ```bash
-cmake -S . -B build -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_TESTS=ON
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
+# AMD HIP/ROCm；选择已安装 SDK 支持的 gfx 目标。
+cmake -S src/compute/hip -B build/hip -DCOV_ROOT="$PWD" \
+  -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ -DCMAKE_HIP_ARCHITECTURES=gfx1100
+cmake --build build/hip --parallel
+
+# Intel oneAPI DPC++；模块仅选择 Intel Level Zero GPU。
+source /opt/intel/oneapi/setvars.sh --force
+cmake -S src/compute/sycl -B build/sycl -DCOV_ROOT="$PWD" -DCMAKE_CXX_COMPILER=icpx
+cmake --build build/sycl --parallel
 ```
+
+Windows 下安装相应 SDK 后，在 Visual Studio 2022 x64 开发者命令提示符运行：
+
+```bat
+cmake -S src/compute/hip -B build/hip -G Ninja -DCOV_ROOT="%CD%" -DCMAKE_CXX_COMPILER="C:/Program Files/AMD/ROCm/7.2/bin/hipcc.exe" -DCOV_HIP_ARCHITECTURES=gfx1100
+cmake --build build/hip --parallel
+
+call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64
+cmake -S src/compute/sycl -B build/sycl -G Ninja -DCOV_ROOT="%CD%" -DCMAKE_CXX_COMPILER=icx-cl
+cmake --build build/sycl --parallel
+```
+
+将生成的 `cov_compute_hip.dll` 或 `cov_compute_sycl.dll`（Windows），或 `libcov_compute_hip.so` 或 `libcov_compute_sycl.so`（Linux），放在 `cov.exe`/`cov` 旁。也可将 `COV_COMPUTE_MODULE_DIR` 设为模块所在目录的**绝对路径**。Windows 上将对应运行库 DLL 放在模块旁，或将 `COV_COMPUTE_RUNTIME_DIR` 设为 SDK 运行库所在目录的绝对路径。Linux 上的 HIP 或 oneAPI 运行库仍须可由系统加载。
+
+`--compute-backend=auto` 优先选择与显示 GPU 匹配的原生后端，再尝试其他可用原生后端，最后回退到 CPU。可显式指定 `cpu`、`cuda`、`hip`、`sycl`、`metal`、`webgpu`；`--compute-device=N` 指定 GPU 后端的零起始设备编号。WebGPU 需显式选择。OpenCL 保留以后开发，本源码树没有对应构建选项。
 
 ## 输入文件
 
@@ -50,3 +89,19 @@ COV 读取 Gaussian FCHK/FCH 和 Molden 波函数。打开 CHK 需要单独安�
 每个输入最多 100 个原子。支持 Cartesian 和实球谐 `s/p/d/f/g` 基函数。Molden 展开后的基函数数目须与轨道系数一致。
 
 Gaussian/NBO 文件准备见[单次作业模板](NBO_ONE_JOB.zh-CN.md)。
+
+## 计算验证
+
+启用 `COV_BUILD_TESTS=ON` 后运行 CTest，检查解析、CPU 网格和科学／界面回归。`COV_TEST_VIEWER_COMPUTE=ON` 还要求不含 CUDA 的查看器构建及可用显示环境（可用 Xvfb 软件 OpenGL），检查纹理更新、取消、切换请求及自动回退与显式失败。
+
+实际 GPU 验证独立于编译和 CTest。以下命令在模块或设备不可用时失败，不会把 CPU 回退计作 GPU 通过：
+
+```text
+cov_compute_module_probe /absolute/path/to/cov_compute_webgpu.dll
+cov_viewer_compute_smoke webgpu
+cov_cuda_grid_smoke
+```
+
+Linux/macOS 使用相应 `.so`／`.dylib` 路径。第一个探针接受任意原生计算模块，对照 CPU 检查 Cartesian/pure s～g 分量、收缩函数、网格分块和数值尾部。第二个需启用 `COV_TEST_VIEWER_COMPUTE`，也接受 `hip`、`sycl`、`metal`，检查实际显示纹理及模块创建、释放前后的 OpenGL 上下文。WebGPU 只使用 Vulkan／DX12／Metal，排除可能干扰查看器上下文的 GL 后端。第三个只在同时启用 CUDA 和查看器时构建，通过生产 CUDA/OpenGL 纹理对照 CPU。
+
+HIP、SYCL、Metal 的 CI 编译通过不等于对应硬件运行认证。2026-10-07 审计已在本地 Windows／RTX 5090 上验证 CPU、CUDA、WebGPU；其他厂商 GPU 仍需对应实机检查。Windows GUI 启动不附带控制台，接受 Unicode 输入路径；`formchk` 直接接收原样 Unicode 参数，不经过命令解释器。取证构建可同时使用计算后端参数与取证计划。

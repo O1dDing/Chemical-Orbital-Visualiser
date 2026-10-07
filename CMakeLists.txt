@@ -2,16 +2,25 @@ cmake_minimum_required(VERSION 3.28)
 
 project(CUDAOrbitalVisualisation VERSION 0.3.0 LANGUAGES CXX)
 
-option(COV_ENABLE_CUDA "Build the CUDA/OpenGL viewer" ON)
+option(COV_BUILD_VIEWER "Build the desktop viewer" ON)
+option(COV_ENABLE_CUDA "Build NVIDIA CUDA acceleration" OFF)
+option(COV_ENABLE_METAL "Build the native macOS Metal compute module" ${APPLE})
+option(COV_ENABLE_WEBGPU "Build the optional wgpu-native compute module" OFF)
+option(COV_TEST_VIEWER_COMPUTE "Test CPU texture upload and module failures with a software OpenGL display" OFF)
 option(COV_BUILD_TESTS "Build parser, orbital, diagram, molecule and UI smoke tests" ON)
 option(COV_ENABLE_VALIDATION "Enable local native validation plan and evidence capture" OFF)
-if(COV_ENABLE_VALIDATION AND NOT COV_ENABLE_CUDA)
-    message(FATAL_ERROR "Native validation requires the production CUDA/OpenGL viewer")
+if(COV_ENABLE_VALIDATION AND NOT COV_BUILD_VIEWER)
+    message(FATAL_ERROR "Native validation requires the desktop viewer")
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(APPLE AND COV_BUILD_VIEWER)
+    # Enable at the common parent before GLFW marks Cocoa sources as ObjC++.
+    enable_language(OBJCXX)
+endif()
 
 # Keep the downloadable Windows viewer self-contained with respect to the
 # Microsoft C/C++ runtime. OpenGL and the NVIDIA display driver remain normal
@@ -67,6 +76,13 @@ FetchContent_Declare(cov_eigen
 FetchContent_MakeAvailable(cov_eigen)
 target_include_directories(cov_parser SYSTEM PRIVATE ${cov_eigen_SOURCE_DIR})
 target_compile_definitions(cov_parser PRIVATE EIGEN_MPL2_ONLY)
+
+find_package(Threads REQUIRED)
+target_link_libraries(cov_parser PRIVATE Threads::Threads)
+add_library(cov_grid src/compute/orbital_grid.cpp)
+target_include_directories(cov_grid PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_features(cov_grid PUBLIC cxx_std_20)
+target_link_libraries(cov_grid PUBLIC Threads::Threads)
 
 add_library(cov_orbitals
     src/analysis/local_orbital_symmetry.cpp
@@ -129,7 +145,7 @@ else()
     target_compile_options(cov_platform PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-if(COV_ENABLE_CUDA OR COV_BUILD_TESTS)
+if(COV_BUILD_VIEWER OR COV_BUILD_TESTS)
     include(FetchContent)
     FetchContent_Declare(
         imgui
@@ -186,8 +202,8 @@ if(COV_ENABLE_CUDA)
     endif()
 
     if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES "120-real;120-virtual" CACHE STRING
-            "CUDA architectures (default: Blackwell sm_120 + PTX)" FORCE)
+        set(CMAKE_CUDA_ARCHITECTURES "60-real;61-real;70-real;75-real;80-real;86-real;89-real;90-real;100-real;120-real;120-virtual" CACHE STRING
+            "CUDA architectures (Pascal through Blackwell, with compute_120 PTX)" FORCE)
     endif()
 
     enable_language(CUDA)
@@ -195,7 +211,9 @@ if(COV_ENABLE_CUDA)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
     find_package(CUDAToolkit 12.8 REQUIRED)
-    find_package(OpenGL REQUIRED)
+    if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 13)
+        message(FATAL_ERROR "The Pascal-through-Blackwell build uses CUDA 12.8 or 12.9; CUDA 13 removed older offline targets")
+    endif()
 
     # AO-overlap recovery is ordinary C++ code with an optional dense CUDA
     # backend. Link the solver/BLAS runtime only in CUDA builds; CPU-only
@@ -215,6 +233,11 @@ if(COV_ENABLE_CUDA)
             CUDA::cusolver_static
         )
     endif()
+
+endif()
+
+if(COV_BUILD_VIEWER)
+    find_package(OpenGL REQUIRED)
 
     set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -243,7 +266,7 @@ if(COV_ENABLE_CUDA)
     )
 
     add_library(cov_gpu
-        src/cuda/orbital.cu
+        src/compute/orbital_evaluator.cpp
         src/render/gl_api.cpp
         src/render/volume_renderer.cpp
     )
@@ -254,10 +277,17 @@ if(COV_ENABLE_CUDA)
         PUBLIC
             cov_parser
             cov_molecule
-            CUDA::cudart_static
+            cov_grid
             OpenGL::GL
             glfw
+            ${CMAKE_DL_LIBS}
     )
+    target_compile_options(cov_gpu PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>)
+    if(COV_ENABLE_CUDA)
+        target_sources(cov_gpu PRIVATE src/cuda/orbital.cu)
+        target_compile_definitions(cov_gpu PRIVATE COV_ENABLE_CUDA=1)
+        target_link_libraries(cov_gpu PUBLIC CUDA::cudart_static)
+    endif()
     set_target_properties(cov_gpu PROPERTIES
         CUDA_SEPARABLE_COMPILATION OFF
         CUDA_RESOLVE_DEVICE_SYMBOLS OFF
@@ -285,7 +315,32 @@ if(COV_ENABLE_CUDA)
         $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>
     )
     if(WIN32)
-        set_property(TARGET cov PROPERTY WIN32_EXECUTABLE FALSE)
+        set_property(TARGET cov PROPERTY WIN32_EXECUTABLE TRUE)
+        target_link_libraries(cov PRIVATE shell32)
+        if(MSVC)
+            target_sources(cov PRIVATE src/platform/cov.manifest)
+            target_link_options(cov PRIVATE /ENTRY:mainCRTStartup)
+        else()
+            target_link_options(cov PRIVATE -Wl,-e,mainCRTStartup)
+        endif()
+    endif()
+    set(COV_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+    if(COV_ENABLE_METAL)
+        if(NOT APPLE)
+            message(FATAL_ERROR "Metal is available only on macOS")
+        endif()
+        add_subdirectory(src/compute/metal)
+        add_custom_command(TARGET cov POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:cov_compute_metal> $<TARGET_FILE_DIR:cov>)
+        add_dependencies(cov cov_compute_metal)
+    endif()
+    if(COV_ENABLE_WEBGPU)
+        add_subdirectory(src/compute/webgpu)
+        add_custom_command(TARGET cov POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:cov_compute_webgpu> $<TARGET_FILE_DIR:cov>)
+        add_custom_command(TARGET cov POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${COV_WGPU_RUNTIME}" $<TARGET_FILE_DIR:cov>)
+        add_dependencies(cov cov_compute_webgpu)
     endif()
     if(COV_ENABLE_VALIDATION)
         execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -310,11 +365,55 @@ if(COV_BUILD_TESTS)
     include(CTest)
     enable_testing()
 
-    if(COV_ENABLE_CUDA)
+    add_executable(cov_orbital_grid_smoke tests/orbital_grid_smoke.cpp)
+    target_link_libraries(cov_orbital_grid_smoke PRIVATE cov_grid)
+    add_test(NAME orbital_grid_smoke COMMAND cov_orbital_grid_smoke)
+    # Hardware conformance is opt-in: this probe fails on an absent module or
+    # device instead of counting a CPU fallback as a GPU pass.
+    add_executable(cov_compute_module_probe tests/compute_module_probe.cpp)
+    target_link_libraries(cov_compute_module_probe PRIVATE cov_grid ${CMAKE_DL_LIBS})
+    foreach(thread_mode native portable)
+        add_executable(cov_threading_${thread_mode}_smoke tests/threading_smoke.cpp)
+        target_include_directories(cov_threading_${thread_mode}_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        target_link_libraries(cov_threading_${thread_mode}_smoke PRIVATE Threads::Threads)
+        if(thread_mode STREQUAL "portable")
+            target_compile_definitions(cov_threading_${thread_mode}_smoke PRIVATE COV_FORCE_PORTABLE_THREADS=1)
+        endif()
+        add_test(NAME threading_${thread_mode}_smoke COMMAND cov_threading_${thread_mode}_smoke)
+        set_tests_properties(threading_${thread_mode}_smoke PROPERTIES TIMEOUT 15)
+    endforeach()
+    if(COV_TEST_VIEWER_COMPUTE)
+        if(NOT COV_BUILD_VIEWER OR COV_ENABLE_CUDA)
+            message(FATAL_ERROR "COV_TEST_VIEWER_COMPUTE requires a portable viewer build without CUDA")
+        endif()
+        add_executable(cov_viewer_compute_smoke tests/viewer_compute_smoke.cpp)
+        target_link_libraries(cov_viewer_compute_smoke PRIVATE cov_gpu)
+        add_library(cov_compute_failure MODULE tests/compute_failure_module.cpp)
+        target_include_directories(cov_compute_failure PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        set_target_properties(cov_compute_failure PROPERTIES OUTPUT_NAME cov_compute_hip
+            LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/test-modules
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/test-modules)
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/empty-modules)
+        add_test(NAME viewer_compute_missing COMMAND cov_viewer_compute_smoke missing)
+        set_tests_properties(viewer_compute_missing PROPERTIES
+            ENVIRONMENT "COV_COMPUTE_MODULE_DIR=${CMAKE_BINARY_DIR}/empty-modules" TIMEOUT 30)
+        add_test(NAME viewer_compute_failing COMMAND cov_viewer_compute_smoke failing)
+        set_tests_properties(viewer_compute_failing PROPERTIES
+            ENVIRONMENT "COV_COMPUTE_MODULE_DIR=$<TARGET_FILE_DIR:cov_compute_failure>" TIMEOUT 30)
+    endif()
+    add_executable(cov_formchk_spawn_smoke tests/formchk_spawn_smoke.cpp)
+    target_link_libraries(cov_formchk_spawn_smoke PRIVATE cov_parser)
+    target_compile_options(cov_formchk_spawn_smoke PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>)
+    add_test(NAME formchk_spawn_smoke COMMAND cov_formchk_spawn_smoke)
+
+    if(COV_ENABLE_CUDA AND COV_BUILD_VIEWER)
         # External scientific reference; never counted as a passing test when
         # the producer cube is absent. Exercises the production CUDA texture.
         add_executable(cov_cuda_cube_reference tests/cuda_cube_reference.cpp)
         target_link_libraries(cov_cuda_cube_reference PRIVATE cov_gpu)
+        # Opt-in hardware test; absence of a CUDA device must never be a pass.
+        add_executable(cov_cuda_grid_smoke tests/cuda_grid_smoke.cpp)
+        target_link_libraries(cov_cuda_grid_smoke PRIVATE cov_gpu)
     endif()
 
     add_executable(cov_parser_smoke tests/parser_smoke.cpp)
