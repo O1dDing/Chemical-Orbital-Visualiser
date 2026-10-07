@@ -53,7 +53,7 @@ void* create_impl(int index, char* error, size_t capacity) {
     const uint8_t* bytes = getsectiondata(&_mh_dylib_header, "__TEXT", "__cov_metal", &size);
     if (!bytes || !size) { error_text(error, capacity, "Embedded Metal shader is missing"); return nullptr; }
     dispatch_data_t data = dispatch_data_create(bytes, size, dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0),
-                                                 DISPATCH_DATA_DESTRUCTOR_NONE);
+                                                 ^{});
     NSError* ns_err = nil;
     id<MTLLibrary> library = [ctx->device newLibraryWithData:data error:&ns_err];
     if (!library) { error_text(error, capacity, ns_error(ns_err, "Could not load Metal shader")); return nullptr; }

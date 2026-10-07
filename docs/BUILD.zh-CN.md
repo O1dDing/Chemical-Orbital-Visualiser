@@ -11,7 +11,7 @@
 - 联网获取 CMake 固定版本的 Eigen、GLFW、Dear ImGui 源码依赖
 - 构建桌面程序需要 OpenGL 开发文件；Linux 还需要 GLFW 对应的 X11 或 Wayland 开发依赖。运行时需要 OpenGL 2.1 兼容上下文
 
-Windows 请使用装有“使用 C++ 的桌面开发”工作负载的 Visual Studio 2022 x64 开发者命令提示符或 PowerShell。Debian/Ubuntu 需要 C++20 工具链及相应的 OpenGL/GLFW 开发包；macOS 需要 Xcode 命令行工具。FreeBSD 是 CPU 版本的源码可移植性目标。
+Windows 使用装有“使用 C++ 的桌面开发”工作负载的 Visual Studio 2022 x64 开发者命令提示符或 PowerShell。Debian/Ubuntu 需要 C++20 工具链及相应的 OpenGL/GLFW 开发包；macOS 使用 Xcode 16.2 或更新版本，包含 Metal 编译器。FreeBSD 源码构建使用 CPU 后端，并需要 `mesa-libs`、`libglvnd` 开发包。
 
 ## 构建预设
 

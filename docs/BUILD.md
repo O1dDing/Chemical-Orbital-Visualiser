@@ -11,7 +11,7 @@ These instructions apply to this source tree. Published Windows downloads have t
 - Internet access for CMake's pinned Eigen, GLFW, and Dear ImGui source dependencies
 - For the viewer build: OpenGL development files and, on Linux, the GLFW X11 or Wayland development dependencies; running the viewer needs an OpenGL 2.1 compatibility context
 
-On Windows, use a Visual Studio 2022 x64 developer command prompt or developer PowerShell with the Desktop development with C++ workload. On Debian or Ubuntu, use a C++20 toolchain and the matching OpenGL/GLFW development packages. macOS builds need Xcode command-line tools. FreeBSD is a source portability target for the CPU build.
+On Windows, use a Visual Studio 2022 x64 developer command prompt or developer PowerShell with the Desktop development with C++ workload. On Debian or Ubuntu, use a C++20 toolchain and the matching OpenGL/GLFW development packages. macOS builds use Xcode 16.2 or newer, including its Metal compiler. FreeBSD source builds use the CPU backend and the `mesa-libs` and `libglvnd` development packages.
 
 ## Presets
 

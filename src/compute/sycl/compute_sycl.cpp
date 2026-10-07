@@ -64,7 +64,7 @@ struct Context {
 
     explicit Context(const sycl::device& device)
         : queue(device, [](sycl::exception_list errors) {
-              if (!errors.empty()) std::rethrow_exception(*errors.begin());
+              if (errors.begin() != errors.end()) std::rethrow_exception(*errors.begin());
           }, sycl::property_list{sycl::property::queue::in_order{}}),
           name(device.get_info<sycl::info::device::name>()) {}
 

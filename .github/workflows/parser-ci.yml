@@ -14,6 +14,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode 16.2
+        if: runner.os == 'macOS'
+        run: echo "DEVELOPER_DIR=/Applications/Xcode_16.2.app/Contents/Developer" >> "$GITHUB_ENV"
       - name: Configure CPU core build
         run: cmake -S . -B build -DCOV_BUILD_VIEWER=OFF -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_TESTS=ON
       - name: Build parser, orbital chemistry, diagram and UI targets
