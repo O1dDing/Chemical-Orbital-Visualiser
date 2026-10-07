@@ -200,7 +200,7 @@ void grid_chunks_and_bounds() {
     invalid_box.max_x=invalid_box.min_x-1.0f;
     rejects<std::invalid_argument>([&]{ cov::make_grid_request(invalid_box,1,1,1,0,1); },"reversed box");
     rejects<std::invalid_argument>([&]{ cov::evaluate_cpu_grid(terms,full,std::span<float>(all).first(11)); },"short output");
-    std::stop_source cancelled;
+    cov::stop_source cancelled;
     cancelled.request_stop();
     rejects<std::runtime_error>([&]{ cov::evaluate_cpu_grid(terms,full,all,cancelled.get_token()); },"cancellation");
 }

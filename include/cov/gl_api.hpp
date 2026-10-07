@@ -22,6 +22,8 @@
 namespace cov::gl {
 
 bool load();
+GLenum volume_external_format();
+GLint volume_internal_format();
 
 extern GLuint (APIENTRY* CreateShader)(GLenum);
 extern void (APIENTRY* ShaderSource)(GLuint, GLsizei, const char* const*, const GLint*);

@@ -3,6 +3,7 @@ name: Portable desktop viewer
 on:
   pull_request:
   push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -60,7 +61,7 @@ jobs:
         uses: vmactions/freebsd-vm@v1
         with:
           usesh: true
-          prepare: pkg install -y cmake ninja eigen libX11 libXrandr libXinerama libXcursor libXi mesa-libs
+          prepare: pkg install -y cmake ninja eigen libX11 libXrandr libXinerama libXcursor libXi mesa-libs libglvnd
           run: |
             cmake -S . -B build -G Ninja -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_TESTS=OFF -DGLFW_BUILD_WAYLAND=OFF -DCMAKE_BUILD_TYPE=Release
             cmake --build build --parallel 3
@@ -87,8 +88,9 @@ jobs:
             if (-not (Test-Path "build/Release/$file")) { throw "Missing $file" }
           }
       - name: Compile and validate WGSL without a GPU
+        shell: bash
         run: |
-          cargo install naga-cli --version 29.0.1 --locked
+          cargo install --git https://github.com/gfx-rs/wgpu --tag v29.0.1 naga-cli --locked
           naga src/compute/webgpu/orbital.wgsl
       - uses: actions/upload-artifact@v4
         with:

@@ -78,7 +78,7 @@ cmake -S src/compute/sycl -B build/sycl -G Ninja -DCOV_ROOT="%CD%" -DCMAKE_CXX_C
 cmake --build build/sycl --parallel
 ```
 
-将生成的 `cov_compute_hip.dll` 或 `cov_compute_sycl.dll`（Windows），或 `libcov_compute_hip.so` 或 `libcov_compute_sycl.so`（Linux），放在 `cov.exe`/`cov` 旁。也可将 `COV_COMPUTE_MODULE_DIR` 设为模块所在目录的**绝对路径**。对应 HIP 或 oneAPI 运行库仍须可由系统加载。
+将生成的 `cov_compute_hip.dll` 或 `cov_compute_sycl.dll`（Windows），或 `libcov_compute_hip.so` 或 `libcov_compute_sycl.so`（Linux），放在 `cov.exe`/`cov` 旁。也可将 `COV_COMPUTE_MODULE_DIR` 设为模块所在目录的**绝对路径**。Windows 上将对应运行库 DLL 放在模块旁，或将 `COV_COMPUTE_RUNTIME_DIR` 设为 SDK 运行库所在目录的绝对路径。Linux 上的 HIP 或 oneAPI 运行库仍须可由系统加载。
 
 `--compute-backend=auto` 优先选择与显示 GPU 匹配的原生后端，再尝试其他可用原生后端，最后回退到 CPU。可显式指定 `cpu`、`cuda`、`hip`、`sycl`、`metal`、`webgpu`；`--compute-device=N` 指定 GPU 后端的零起始设备编号。WebGPU 需显式选择。OpenCL 保留以后开发，本源码树没有对应构建选项。
 

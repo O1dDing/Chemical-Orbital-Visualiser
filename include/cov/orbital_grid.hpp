@@ -2,8 +2,8 @@
 
 #include "cov/compute_abi.h"
 #include "cov/model.hpp"
+#include "cov/threading.hpp"
 #include <span>
-#include <stop_token>
 #include <vector>
 
 namespace cov {
@@ -16,6 +16,6 @@ CovGridRequest make_grid_request(const GridBox& box, int nx, int ny, int nz,
                                 std::size_t first, std::size_t count);
 void evaluate_cpu_grid(std::span<const CovGaussianTerm> terms,
                        const CovGridRequest& request, std::span<float> output,
-                       std::stop_token stop = {});
+                       cov::stop_token stop = {});
 
 }

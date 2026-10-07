@@ -8,6 +8,7 @@ on:
       - src/compute/hip/**
       - src/compute/sycl/**
   push:
+    branches: [main]
     paths:
       - .github/workflows/native-compute.yml
       - include/cov/compute_abi.h
@@ -82,30 +83,47 @@ jobs:
           if errorlevel 1 exit /b 1
 
   hip-windows:
-    if: vars.COV_HIP_SDK_7_2_URL != '' && vars.COV_HIP_SDK_7_2_SHA256 != ''
     runs-on: windows-2022
-    env:
-      HIP_SDK_URL: ${{ vars.COV_HIP_SDK_7_2_URL }}
-      HIP_SDK_SHA256: ${{ vars.COV_HIP_SDK_7_2_SHA256 }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install AMD HIP SDK 7.2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned AMD ROCm 7.2.1 compiler and headers
         shell: pwsh
         run: |
-          $installer = Join-Path $env:RUNNER_TEMP 'amd-hip-sdk-7.2.exe'
-          curl.exe -fL --retry 3 --output $installer $env:HIP_SDK_URL
+          $base = 'https://repo.radeon.com/rocm/windows/rocm-rel-7.2.1/'
+          $packages = @(
+            @('rocm_sdk_core-7.2.1-py3-none-win_amd64.whl', 'F68989D48DF71CBFC3CB68BF705DC37C0F56E9666FEDDB59A1A0F5FF7539FE1C'),
+            @('rocm_sdk_devel-7.2.1-py3-none-win_amd64.whl', '19E6EE67E13432B7C1E8A4077DF795DCB1239546AE314700C4B4D97E5B4B8F63'),
+            @('rocm_sdk_libraries_custom-7.2.1-py3-none-win_amd64.whl', 'C7FE0B0731AF8896093FF69E11496830D3CB6A4AED73E895C60B7CBDC200BE92'),
+            @('rocm-7.2.1.tar.gz', '9084902EAA69213A00A90784AD89E6E5FE73C702DF0CC6CC3A70D777C7A6142B')
+          )
+          $paths = @()
+          foreach ($package in $packages) {
+            $path = Join-Path $env:RUNNER_TEMP $package[0]
+            curl.exe -fL --retry 3 --output $path ($base + $package[0])
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $package[1]) {
+              throw "ROCm package checksum mismatch: $($package[0])"
+            }
+            $paths += $path
+          }
+          python -m pip install --no-deps $paths
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $actual = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
-          if ($actual -ne $env:HIP_SDK_SHA256) { throw 'HIP SDK installer checksum mismatch' }
-          $log = Join-Path $env:RUNNER_TEMP 'hip-sdk-install.log'
-          $process = Start-Process -FilePath $installer -ArgumentList '-install','-log',$log -WindowStyle Hidden -Wait -PassThru
-          if ($process.ExitCode -ne 0) { exit $process.ExitCode }
+          rocm-sdk init
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $root = (& rocm-sdk path --root).Trim()
+          $bin = (& rocm-sdk path --bin).Trim()
+          if (-not (Test-Path (Join-Path $bin 'hipcc.exe'))) { throw 'ROCm hipcc.exe missing' }
+          "HIP_PATH=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "ROCM_HOME=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $bin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - name: Compile HIP host and gfx1100 device code
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           if errorlevel 1 exit /b 1
-          set "HIP_PATH=C:\Program Files\AMD\ROCm\7.2"
           if not exist "%HIP_PATH%\bin\hipcc.exe" exit /b 1
           cmake -S src/compute/hip -B build/native-hip -G Ninja -DCOV_ROOT="%GITHUB_WORKSPACE%" -DCMAKE_CXX_COMPILER="%HIP_PATH%\bin\hipcc.exe" -DCOV_HIP_ARCHITECTURES=gfx1100
           if errorlevel 1 exit /b 1

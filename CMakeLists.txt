@@ -17,6 +17,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if(APPLE AND COV_BUILD_VIEWER)
+    # Enable at the common parent before GLFW marks Cocoa sources as ObjC++.
+    enable_language(OBJCXX)
+endif()
+
 # Keep the downloadable Windows viewer self-contained with respect to the
 # Microsoft C/C++ runtime. OpenGL and the NVIDIA display driver remain normal
 # operating-system/driver dependencies.
@@ -356,6 +361,16 @@ if(COV_BUILD_TESTS)
     add_executable(cov_orbital_grid_smoke tests/orbital_grid_smoke.cpp)
     target_link_libraries(cov_orbital_grid_smoke PRIVATE cov_grid)
     add_test(NAME orbital_grid_smoke COMMAND cov_orbital_grid_smoke)
+    foreach(thread_mode native portable)
+        add_executable(cov_threading_${thread_mode}_smoke tests/threading_smoke.cpp)
+        target_include_directories(cov_threading_${thread_mode}_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        target_link_libraries(cov_threading_${thread_mode}_smoke PRIVATE Threads::Threads)
+        if(thread_mode STREQUAL "portable")
+            target_compile_definitions(cov_threading_${thread_mode}_smoke PRIVATE COV_FORCE_PORTABLE_THREADS=1)
+        endif()
+        add_test(NAME threading_${thread_mode}_smoke COMMAND cov_threading_${thread_mode}_smoke)
+        set_tests_properties(threading_${thread_mode}_smoke PROPERTIES TIMEOUT 15)
+    endforeach()
     if(COV_TEST_VIEWER_COMPUTE)
         if(NOT COV_BUILD_VIEWER OR COV_ENABLE_CUDA)
             message(FATAL_ERROR "COV_TEST_VIEWER_COMPUTE requires a portable viewer build without CUDA")

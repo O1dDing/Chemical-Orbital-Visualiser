@@ -78,7 +78,7 @@ cmake -S src/compute/sycl -B build/sycl -G Ninja -DCOV_ROOT="%CD%" -DCMAKE_CXX_C
 cmake --build build/sycl --parallel
 ```
 
-Put the resulting `cov_compute_hip.dll` or `cov_compute_sycl.dll` (Windows), or `libcov_compute_hip.so` or `libcov_compute_sycl.so` (Linux), beside `cov.exe`/`cov`. Alternatively, set `COV_COMPUTE_MODULE_DIR` to the **absolute** directory containing the modules. Keep the corresponding HIP or oneAPI runtime available to the system loader.
+Put the resulting `cov_compute_hip.dll` or `cov_compute_sycl.dll` (Windows), or `libcov_compute_hip.so` or `libcov_compute_sycl.so` (Linux), beside `cov.exe`/`cov`. Alternatively, set `COV_COMPUTE_MODULE_DIR` to the **absolute** directory containing the modules. On Windows, place the corresponding runtime DLLs beside the module or set `COV_COMPUTE_RUNTIME_DIR` to the absolute SDK runtime directory. On Linux, keep the HIP or oneAPI runtime available to the system loader.
 
 `--compute-backend=auto` prefers the native backend matching the display GPU, then other available native backends, and falls back to CPU computation. Explicit choices are `cpu`, `cuda`, `hip`, `sycl`, `metal`, and `webgpu`; `--compute-device=N` selects a zero-based GPU index for a GPU backend. WebGPU is opt-in. OpenCL is reserved for future work and has no build option in this tree.
 

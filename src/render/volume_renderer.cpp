@@ -569,8 +569,8 @@ void VolumeRenderer::resize_volume(const int nx, const int ny, const int nz) {
         throw std::runtime_error("The requested grid exceeds the display texture limit");
     glBindTexture(GL_TEXTURE_3D, texture_);
     while (glGetError() != GL_NO_ERROR) {}
-    gl::TexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
-                   nx, ny, nz, 0, GL_RED, GL_FLOAT, nullptr);
+    gl::TexImage3D(GL_TEXTURE_3D, 0, gl::volume_internal_format(),
+                   nx, ny, nz, 0, gl::volume_external_format(), GL_FLOAT, nullptr);
     const auto error = glGetError();
     glBindTexture(GL_TEXTURE_3D, 0);
     if (error != GL_NO_ERROR) throw std::runtime_error("Unable to allocate the orbital display texture");

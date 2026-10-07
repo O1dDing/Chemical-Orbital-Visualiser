@@ -1,6 +1,7 @@
 #include "cov/orbital_evaluator.hpp"
 #include "cov/orbital_grid.hpp"
 #include "cov/gl_api.hpp"
+#include "cov/threading.hpp"
 #ifdef COV_ENABLE_CUDA
 #include "cov/cuda_orbital.hpp"
 #endif
@@ -30,7 +31,6 @@
 namespace cov {
 namespace {
 constexpr GLenum texture_3d = 0x806F;
-constexpr GLenum red = 0x1903;
 
 std::filesystem::path module_directory() {
     if (const char* override_dir = std::getenv("COV_COMPUTE_MODULE_DIR")) {
@@ -67,6 +67,7 @@ std::filesystem::path module_directory() {
 struct Module {
 #ifdef _WIN32
     HMODULE library = nullptr;
+    DLL_DIRECTORY_COOKIE runtime_directory = nullptr;
 #else
     void* library = nullptr;
 #endif
@@ -76,6 +77,7 @@ struct Module {
         if (context) api->destroy(context);
 #ifdef _WIN32
         if (library) FreeLibrary(library);
+        if (runtime_directory) RemoveDllDirectory(runtime_directory);
 #else
         if (library) dlclose(library);
 #endif
@@ -83,6 +85,12 @@ struct Module {
     explicit Module(const std::string& name, int device) {
 #ifdef _WIN32
         const auto path = module_directory() / ("cov_compute_" + name + ".dll");
+        if (const char* runtime = std::getenv("COV_COMPUTE_RUNTIME_DIR")) {
+            const auto runtime_path = std::filesystem::u8path(runtime);
+            if (!runtime_path.is_absolute()) throw std::runtime_error("COV_COMPUTE_RUNTIME_DIR must be an absolute path");
+            runtime_directory = AddDllDirectory(runtime_path.c_str());
+            if (!runtime_directory) throw std::runtime_error("Unable to add the compute runtime directory");
+        }
         library = LoadLibraryExW(path.c_str(), nullptr, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
         auto get = library ? reinterpret_cast<CovGetComputeApi>(GetProcAddress(library, "cov_get_compute_api")) : nullptr;
 #else
@@ -109,6 +117,8 @@ struct Module {
         } catch (...) {
 #ifdef _WIN32
             if (library) FreeLibrary(library);
+            if (runtime_directory) RemoveDllDirectory(runtime_directory);
+            runtime_directory = nullptr;
 #else
             if (library) dlclose(library);
 #endif
@@ -135,7 +145,7 @@ struct OrbitalEvaluator::Impl {
     std::vector<float> result;
     std::exception_ptr failure;
     std::atomic<bool> done{false};
-    std::jthread worker; // destroyed before the module and wavefunction reference
+    cov::jthread worker; // destroyed before the module and wavefunction reference
 
     Impl(const Wavefunction& wf, ComputeOptions o) : wavefunction(wf), options(std::move(o)) {
         const std::vector<std::string> supported{"auto", "cpu", "cuda", "hip", "sycl", "metal", "webgpu"};
@@ -200,7 +210,7 @@ struct OrbitalEvaluator::Impl {
         glBindTexture(texture_3d, texture);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         while (glGetError() != GL_NO_ERROR) {}
-        gl::TexSubImage3D(texture_3d, 0, 0, 0, 0, nx, ny, nz, red, GL_FLOAT, result.data());
+        gl::TexSubImage3D(texture_3d, 0, 0, 0, 0, nx, ny, nz, gl::volume_external_format(), GL_FLOAT, result.data());
         const auto error = glGetError();
         glPixelStorei(GL_UNPACK_ALIGNMENT, old_alignment);
         glBindTexture(texture_3d, static_cast<GLuint>(old_binding));
@@ -250,7 +260,7 @@ void OrbitalEvaluator::begin_evaluate(std::size_t mo, const GridBox& box, int nx
     if (terms.size() > std::numeric_limits<uint32_t>::max()) throw std::runtime_error("Orbital basis is too large");
     impl_->result.resize(size);
     impl_->running = true;
-    impl_->worker = std::jthread([p = impl_.get(), terms = std::move(terms), box, size](std::stop_token stop) {
+    impl_->worker = cov::jthread([p = impl_.get(), terms = std::move(terms), box, size](cov::stop_token stop) {
         try {
             const auto start = std::chrono::steady_clock::now();
             auto compute = [&] {

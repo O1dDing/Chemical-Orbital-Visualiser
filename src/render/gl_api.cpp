@@ -2,8 +2,23 @@
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <cstdlib>
+#include <cstring>
 
 namespace cov::gl {
+
+GLenum volume_external_format() {
+    const auto* version = reinterpret_cast<const char*>(glGetString(GL_VERSION));
+    const auto* extensions = reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS));
+    // Legacy macOS OpenGL provides floating luminance textures, but may lack
+    // the later texture_rg extension. Both formats sample through .r.
+    const bool red = (version && std::atoi(version) >= 3) ||
+        (extensions && std::strstr(extensions, "GL_ARB_texture_rg"));
+    return red ? 0x1903 /* GL_RED */ : GL_LUMINANCE;
+}
+GLint volume_internal_format() {
+    return volume_external_format() == GL_LUMINANCE ? 0x8818 /* GL_LUMINANCE32F_ARB */ : 0x822E /* GL_R32F */;
+}
 
 GLuint (APIENTRY* CreateShader)(GLenum) = nullptr;
 void (APIENTRY* ShaderSource)(GLuint, GLsizei, const char* const*, const GLint*) = nullptr;

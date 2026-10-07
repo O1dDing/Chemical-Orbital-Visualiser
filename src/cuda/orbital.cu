@@ -678,7 +678,7 @@ void CudaOrbitalEvaluator::evaluate(const std::size_t mo_index,
                               plane*depth*sizeof(float),cudaMemcpyDeviceToHost),
                    "cudaMemcpy grid to host");
         gl::TexSubImage3D(GL_TEXTURE_3D,0,0,0,first_z,nx,ny,depth,
-                          GL_RED,GL_FLOAT,host_output.data());
+                          gl::volume_external_format(),GL_FLOAT,host_output.data());
         if (glGetError() != GL_NO_ERROR)
             throw std::runtime_error("Unable to upload CUDA grid to the display texture");
     }

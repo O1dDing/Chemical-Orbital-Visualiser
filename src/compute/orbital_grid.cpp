@@ -256,7 +256,7 @@ CovGridRequest make_grid_request(const GridBox& box, int nx, int ny, int nz,
 
 void evaluate_cpu_grid(std::span<const CovGaussianTerm> terms,
                        const CovGridRequest& request, std::span<float> output,
-                       std::stop_token stop) {
+                       cov::stop_token stop) {
     validate_request(request);
     if (output.size() < request.point_count)
         throw std::invalid_argument("Grid output is too small");
@@ -311,7 +311,7 @@ void evaluate_cpu_grid(std::span<const CovGaussianTerm> terms,
         }
     };
     {
-        std::vector<std::jthread> threads;
+        std::vector<cov::jthread> threads;
         threads.reserve(workers > 0 ? workers-1 : 0);
         for (std::size_t worker = 1; worker < workers; ++worker) {
             const auto begin = worker*block;
