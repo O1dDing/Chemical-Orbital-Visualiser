@@ -376,7 +376,8 @@ bool build_system_glyph_atlas(ImFont* primary, const float pixel_size,
                               const ImWchar* chinese, const ImWchar* japanese,
                               bool& zh_loaded, bool& ja_loaded,
                               std::string& chinese_name, std::string& japanese_name) {
-    auto* atlas = primary->ContainerAtlas;
+    // A newly added font receives its ContainerAtlas during its first build.
+    auto* atlas = ImGui::GetIO().Fonts;
     if (!atlas->Build()) return false;
     ImFontGlyphRangesBuilder pending;
     std::vector<SystemGlyphBitmap> bitmaps;
