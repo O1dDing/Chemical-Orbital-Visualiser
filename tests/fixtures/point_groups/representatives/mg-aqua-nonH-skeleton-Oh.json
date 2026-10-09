@@ -1,0 +1,21 @@
+{
+  "id": "mg-aqua-nonH-skeleton-Oh",
+  "target": "Oh",
+  "charge": 2,
+  "multiplicity": 1,
+  "atom_count": 7,
+  "element_counts": {
+    "Mg": 1,
+    "O": 6
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6125"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Atoms deliberately omitted for full-vs-skeleton geometry contrast. Parent complete source preserved: mg-aqua-Th",
+  "xyz_sha256": "e307ae7b1c59d32e3758620a98dcbe7d3987bbdc4211e55f60161ee4ae8dc8bf",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 1.332366932156285e-15,
+  "source_xyz_sha256": "2a53adcbd5b36085e45764a3482ce89cd9af8ea934d7cfa73a6c7a4b22ed3395"
+}

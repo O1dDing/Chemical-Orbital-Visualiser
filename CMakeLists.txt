@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(CUDAOrbitalVisualisation VERSION 0.3.0 LANGUAGES CXX)
+project(CUDAOrbitalVisualisation VERSION 0.4.0 LANGUAGES CXX)
 
 option(COV_BUILD_VIEWER "Build the desktop viewer" ON)
 option(COV_ENABLE_CUDA "Build NVIDIA CUDA acceleration" OFF)
@@ -38,15 +38,23 @@ add_library(cov_parser
     src/parser/wavefunction_io.cpp
     src/parser/formchk.cpp
     src/parser/gaussian_log.cpp
+    src/parser/nbo.cpp
+    src/parser/nbo_integration.cpp
+    src/analysis/nbo_salc.cpp
+    src/analysis/nbo_spin_average.cpp
+    src/analysis/pi_coupling.cpp
+    src/analysis/pi_field_response.cpp
     src/analysis/density.cpp
     src/analysis/overlap.cpp
     src/analysis/overlap_basis.cpp
     src/metric_subspace.cpp
     src/local_angular_generators.cpp
+    src/analysis/atomic_orbital_symmetry.cpp
     src/local_angular_projection.cpp
     src/analysis/bond_analysis.cpp
     src/analysis/symmetry.cpp
     src/analysis/point_group_catalog.cpp
+    src/analysis/point_group_irreps.cpp
     src/analysis/orbital_symmetry.cpp
     src/analysis/orbital_symmetry_final.cpp
     src/analysis/orbital_chemistry.cpp
@@ -85,6 +93,7 @@ target_compile_features(cov_grid PUBLIC cxx_std_20)
 target_link_libraries(cov_grid PUBLIC Threads::Threads)
 
 add_library(cov_orbitals
+    src/analysis/nbo_channels.cpp
     src/analysis/local_orbital_symmetry.cpp
     src/analysis/local_geometry.cpp
     src/analysis/orbital_tracking.cpp
@@ -100,6 +109,7 @@ add_library(cov_orbitals
     src/orbitals/mo_diagram_snapshot.cpp
     src/orbitals/mo_diagram_layout.cpp
     src/orbitals/mo_diagram_chemistry.cpp
+    src/orbitals/mo_sigma_framework.cpp
     src/orbitals/annotation_source_dispatch.cpp
 )
 set_source_files_properties(src/orbitals/orbital_view.cpp PROPERTIES
@@ -115,13 +125,20 @@ target_link_libraries(cov_orbitals PUBLIC cov_parser)
 target_compile_features(cov_orbitals PUBLIC cxx_std_20)
 
 add_library(cov_molecule
+    src/analysis/orbital_group_bonding.cpp
+    src/analysis/chemistry_route.cpp
     src/analysis/interaction_graph.cpp
     src/render/molecule_style.cpp
+    src/render/nbo_molecular_overlay.cpp
 )
 target_include_directories(cov_molecule PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_features(cov_molecule PUBLIC cxx_std_20)
+# Chemistry routing consumes parser-side NAO/SALC/Fock evidence. Express the
+# dependency so static-library consumers link in the correct order on GNU ld.
+target_link_libraries(cov_molecule PUBLIC cov_parser)
+target_link_libraries(cov_orbitals PUBLIC cov_molecule)
 add_library(cov_platform
     src/platform/file_dialog.cpp
 )
@@ -164,6 +181,9 @@ if(COV_BUILD_VIEWER OR COV_BUILD_TESTS)
     target_include_directories(cov_imgui_core PUBLIC
         ${imgui_SOURCE_DIR}
     )
+    # All consumers and backends must share the same index ABI. Large complete
+    # AO/MO diagrams exceed 65535 vertices in a single ImGui draw list.
+    target_compile_definitions(cov_imgui_core PUBLIC "ImDrawIdx=unsigned int")
 
     add_library(cov_validation_navigation STATIC src/validation/navigation.cpp)
     target_include_directories(cov_validation_navigation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -172,6 +192,12 @@ if(COV_BUILD_VIEWER OR COV_BUILD_TESTS)
 
     add_library(cov_ui STATIC
         src/ui/ui.cpp
+        src/ui/nbo_ui.cpp
+        src/ui/nbo_aomo_ui.cpp
+        src/ui/nbo_aomo_labels.cpp
+        src/ui/orbital_symmetry_components.cpp
+        src/ui/nbo_aomo_hover.cpp
+        src/ui/nbo_aomo_text.cpp
         src/ui/ui_text_dispatch.cpp
         src/ui/orbital_ui_text.cpp
         src/ui/orbital_ui_v2.cpp
@@ -188,7 +214,14 @@ if(COV_BUILD_VIEWER OR COV_BUILD_TESTS)
         ${imgui_SOURCE_DIR}
     )
     target_link_libraries(cov_ui PUBLIC cov_imgui_core cov_orbitals cov_molecule)
+    if(APPLE)
+        find_library(COV_CORETEXT_FRAMEWORK CoreText REQUIRED)
+        find_library(COV_COREGRAPHICS_FRAMEWORK CoreGraphics REQUIRED)
+        find_library(COV_COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+        target_link_libraries(cov_ui PRIVATE ${COV_CORETEXT_FRAMEWORK} ${COV_COREGRAPHICS_FRAMEWORK} ${COV_COREFOUNDATION_FRAMEWORK})
+    endif()
     target_compile_features(cov_ui PUBLIC cxx_std_20)
+    target_include_directories(cov_ui SYSTEM PRIVATE ${cov_eigen_SOURCE_DIR})
     target_compile_options(cov_ui PRIVATE
         $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>
     )
@@ -350,7 +383,7 @@ if(COV_BUILD_VIEWER)
         if(COV_VALIDATION_DIRTY)
             string(APPEND COV_VALIDATION_COMMIT "-dirty")
         endif()
-        add_library(cov_validation_support STATIC src/validation/native_session.cpp)
+        add_library(cov_validation_support STATIC src/validation/native_session.cpp src/validation/forensic_capture.cpp)
         target_include_directories(cov_validation_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
         target_compile_definitions(cov_validation_support PUBLIC COV_ENABLE_VALIDATION=1)
         target_compile_definitions(cov_validation_support PRIVATE COV_VALIDATION_COMMIT="${COV_VALIDATION_COMMIT}")
@@ -358,12 +391,83 @@ if(COV_BUILD_VIEWER)
         target_link_libraries(cov_validation_support PUBLIC cov_imgui_core cov_validation_navigation OpenGL::GL)
         target_link_libraries(cov_ui PUBLIC cov_validation_support)
         set_target_properties(cov PROPERTIES OUTPUT_NAME cov_validation)
+        if(COV_BUILD_TESTS)
+            add_executable(cov_forensic_capture_smoke tests/forensic_capture_smoke.cpp)
+            target_link_libraries(cov_forensic_capture_smoke PRIVATE cov_validation_support)
+            target_compile_options(cov_forensic_capture_smoke PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>)
+            add_test(NAME forensic_capture_smoke COMMAND cov_forensic_capture_smoke)
+        endif()
     endif()
 endif()
 
 if(COV_BUILD_TESTS)
+    add_executable(cov_nbo_skeleton_policy_smoke tests/nbo_skeleton_policy_smoke.cpp)
+    add_executable(cov_orbital_group_bonding_smoke tests/orbital_group_bonding_smoke.cpp)
+    target_link_libraries(cov_orbital_group_bonding_smoke PRIVATE cov_molecule cov_orbitals cov_parser)
+    add_test(NAME orbital_group_bonding_smoke COMMAND cov_orbital_group_bonding_smoke)
+    add_executable(cov_orbital_group_bonding_probe tests/orbital_group_bonding_probe.cpp)
+    target_link_libraries(cov_orbital_group_bonding_probe PRIVATE cov_molecule cov_orbitals cov_parser)
+    target_link_libraries(cov_nbo_skeleton_policy_smoke PRIVATE cov_molecule cov_orbitals cov_parser)
+    add_test(NAME nbo_skeleton_policy_smoke COMMAND cov_nbo_skeleton_policy_smoke)
+    add_executable(cov_nbo_skeleton_policy_probe tests/nbo_skeleton_policy_probe.cpp)
+    target_link_libraries(cov_nbo_skeleton_policy_probe PRIVATE cov_molecule cov_orbitals cov_parser)
+    add_executable(cov_chemistry_route_smoke tests/chemistry_route_smoke.cpp)
+    target_link_libraries(cov_chemistry_route_smoke PRIVATE cov_molecule cov_orbitals cov_parser)
+    add_test(NAME chemistry_route_smoke COMMAND cov_chemistry_route_smoke)
+    add_executable(cov_route_relation_projection_smoke tests/route_relation_projection_smoke.cpp)
+    target_link_libraries(cov_route_relation_projection_smoke PRIVATE cov_molecule cov_orbitals cov_parser)
+    add_test(NAME route_relation_projection_smoke COMMAND cov_route_relation_projection_smoke)
+    add_executable(cov_route_relation_projection_probe tests/route_relation_projection_probe.cpp)
+    target_link_libraries(cov_route_relation_projection_probe PRIVATE cov_molecule cov_orbitals cov_parser)
+    add_executable(cov_chemistry_route_probe tests/chemistry_route_probe.cpp)
+    target_link_libraries(cov_chemistry_route_probe PRIVATE cov_molecule cov_orbitals cov_parser)
+    add_executable(cov_unified_aomo_probe tests/unified_aomo_probe.cpp)
+    target_link_libraries(cov_unified_aomo_probe PRIVATE cov_parser)
+    add_executable(cov_nbo_matrix_equivalence tests/nbo_matrix_equivalence.cpp)
+    target_link_libraries(cov_nbo_matrix_equivalence PRIVATE cov_parser)
+    add_executable(cov_nbo_salc_smoke tests/test_nbo_salc.cpp)
+    add_executable(cov_nbo_spin_average_smoke tests/nbo_spin_average_smoke.cpp)
+    target_link_libraries(cov_nbo_spin_average_smoke PRIVATE cov_parser)
+    target_include_directories(cov_nbo_spin_average_smoke SYSTEM PRIVATE ${cov_eigen_SOURCE_DIR})
+    add_test(NAME nbo_spin_average_smoke COMMAND cov_nbo_spin_average_smoke)
+    add_executable(cov_nbo_spin_average_probe tests/nbo_spin_average_probe.cpp)
+    target_link_libraries(cov_nbo_spin_average_probe PRIVATE cov_parser)
+    add_executable(cov_pi_field_response_smoke tests/pi_field_response_smoke.cpp)
+    target_link_libraries(cov_pi_field_response_smoke PRIVATE cov_parser)
+    target_include_directories(cov_pi_field_response_smoke SYSTEM PRIVATE ${cov_eigen_SOURCE_DIR})
+    add_test(NAME pi_field_response_smoke COMMAND cov_pi_field_response_smoke)
+    add_executable(cov_pi_field_response_probe tests/pi_field_response_probe.cpp)
+    target_link_libraries(cov_pi_field_response_probe PRIVATE cov_parser cov_orbitals cov_molecule)
+    add_executable(cov_composition_display_policy_smoke tests/composition_display_policy_smoke.cpp)
+    target_link_libraries(cov_composition_display_policy_smoke PRIVATE cov_parser cov_orbitals)
+    add_test(NAME composition_display_policy_smoke COMMAND cov_composition_display_policy_smoke)
+    target_link_libraries(cov_nbo_salc_smoke PRIVATE cov_parser)
+    add_test(NAME nbo_salc_smoke COMMAND cov_nbo_salc_smoke)
+    add_executable(cov_nbo_pi_evidence_smoke tests/test_nbo_pi_evidence.cpp)
+    target_link_libraries(cov_nbo_pi_evidence_smoke PRIVATE cov_parser cov_orbitals)
+    add_test(NAME nbo_pi_evidence_smoke COMMAND cov_nbo_pi_evidence_smoke)
+    add_executable(cov_nbo_salc_invariance tests/nbo_salc_invariance.cpp)
+    add_executable(cov_nbo_salc_copy_probe tests/nbo_salc_copy_probe.cpp)
+    target_link_libraries(cov_nbo_salc_copy_probe PRIVATE cov_parser)
+    target_include_directories(cov_nbo_salc_copy_probe SYSTEM PRIVATE ${cov_eigen_SOURCE_DIR})
+    target_link_libraries(cov_nbo_salc_invariance PRIVATE cov_parser)
+    target_include_directories(cov_nbo_salc_invariance SYSTEM PRIVATE ${cov_eigen_SOURCE_DIR})
+    add_executable(cov_aomo_core_probe tests/aomo_core_probe.cpp)
+    target_link_libraries(cov_aomo_core_probe PRIVATE cov_parser)
+    add_executable(cov_nbo_integration_core_smoke tests/nbo_integration_core_smoke.cpp)
+    target_link_libraries(cov_nbo_integration_core_smoke PRIVATE cov_parser cov_orbitals)
+    add_test(NAME nbo_integration_core_smoke COMMAND cov_nbo_integration_core_smoke)
     include(CTest)
     enable_testing()
+
+    add_executable(cov_nbo_probe tests/nbo_probe.cpp)
+    target_link_libraries(cov_nbo_probe PRIVATE cov_parser)
+    add_executable(cov_nbo_smoke tests/nbo_smoke.cpp)
+    target_link_libraries(cov_nbo_smoke PRIVATE cov_parser)
+    add_test(NAME nbo_smoke COMMAND cov_nbo_smoke)
+    add_executable(cov_nbo_focus_core_smoke tests/nbo_focus_core_smoke.cpp)
+    target_link_libraries(cov_nbo_focus_core_smoke PRIVATE cov_parser)
+    add_test(NAME nbo_focus_core_smoke COMMAND cov_nbo_focus_core_smoke)
 
     add_executable(cov_orbital_grid_smoke tests/orbital_grid_smoke.cpp)
     target_link_libraries(cov_orbital_grid_smoke PRIVATE cov_grid)
@@ -451,6 +555,19 @@ if(COV_BUILD_TESTS)
 
     add_executable(cov_scientific_audit_dump tests/scientific_audit_dump.cpp)
     target_link_libraries(cov_scientific_audit_dump PRIVATE cov_parser cov_molecule cov_orbitals)
+    add_executable(cov_pi_diagram_probe tests/pi_diagram_probe.cpp)
+    target_link_libraries(cov_pi_diagram_probe PRIVATE cov_parser cov_molecule cov_orbitals)
+    add_executable(cov_pi_channel_smoke tests/pi_channel_smoke.cpp)
+    target_link_libraries(cov_pi_channel_smoke PRIVATE cov_orbitals)
+    add_test(NAME pi_channel_smoke COMMAND cov_pi_channel_smoke)
+    add_executable(cov_pi_mode_scope_smoke tests/pi_mode_scope_smoke.cpp)
+    target_link_libraries(cov_pi_mode_scope_smoke PRIVATE cov_parser cov_orbitals)
+    add_test(NAME pi_mode_scope_smoke COMMAND cov_pi_mode_scope_smoke)
+    add_executable(cov_mo_composition_ledger_smoke tests/mo_composition_ledger_smoke.cpp)
+    target_link_libraries(cov_mo_composition_ledger_smoke PRIVATE cov_parser cov_orbitals)
+    add_test(NAME mo_composition_ledger_smoke COMMAND cov_mo_composition_ledger_smoke)
+    add_executable(cov_mo_brief_scope_probe tests/mo_brief_scope_probe.cpp)
+    target_link_libraries(cov_mo_brief_scope_probe PRIVATE cov_parser cov_orbitals)
 
     # These collectors emit raw records for independently frozen control
     # reviewers. A successful process alone is not a scientific verdict.
@@ -510,6 +627,10 @@ if(COV_BUILD_TESTS)
     add_executable(cov_point_group_catalog_smoke tests/point_group_catalog_smoke.cpp)
     target_link_libraries(cov_point_group_catalog_smoke PRIVATE cov_parser)
     add_test(NAME point_group_catalog_smoke COMMAND cov_point_group_catalog_smoke)
+
+    add_executable(cov_point_group_irreps_smoke tests/point_group_irreps_smoke.cpp)
+    target_link_libraries(cov_point_group_irreps_smoke PRIVATE cov_parser)
+    add_test(NAME point_group_irreps_smoke COMMAND cov_point_group_irreps_smoke)
 
     add_executable(cov_coordination_geometry_smoke tests/coordination_geometry_smoke.cpp)
     target_link_libraries(cov_coordination_geometry_smoke PRIVATE cov_orbitals)
@@ -586,8 +707,43 @@ if(COV_BUILD_TESTS)
         COMMAND cov_mo_diagram_export_semantics_smoke)
 
     add_executable(cov_mo_diagram_snapshot_smoke tests/mo_diagram_snapshot_smoke.cpp)
+    add_executable(cov_nbo_layout_probe tests/nbo_layout_probe.cpp)
+    target_link_libraries(cov_nbo_layout_probe PRIVATE cov_ui)
+    target_compile_options(cov_nbo_layout_probe PRIVATE
+        $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>)
     target_link_libraries(cov_mo_diagram_snapshot_smoke PRIVATE cov_ui)
+    target_compile_options(cov_mo_diagram_snapshot_smoke PRIVATE
+        $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>)
     add_test(NAME mo_diagram_snapshot_smoke COMMAND cov_mo_diagram_snapshot_smoke)
+    add_executable(cov_nbo_aomo_labels_smoke tests/nbo_aomo_labels_smoke.cpp)
+    add_executable(cov_nbo_mode_scope_probe tests/nbo_mode_scope_probe.cpp)
+    target_link_libraries(cov_nbo_mode_scope_probe PRIVATE cov_ui)
+    add_executable(cov_nbo_salc_names_probe tests/nbo_salc_names_probe.cpp)
+    target_link_libraries(cov_nbo_salc_names_probe PRIVATE cov_ui)
+    target_compile_options(cov_nbo_salc_names_probe PRIVATE $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>)
+    add_executable(cov_orbital_runtime_probe tests/orbital_runtime_probe.cpp)
+    target_link_libraries(cov_orbital_runtime_probe PRIVATE cov_ui)
+    target_compile_options(cov_orbital_runtime_probe PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_executable(cov_atomic_orbital_symmetry_smoke tests/atomic_orbital_symmetry_smoke.cpp)
+    target_link_libraries(cov_atomic_orbital_symmetry_smoke PRIVATE cov_parser)
+    target_compile_options(cov_atomic_orbital_symmetry_smoke PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_test(NAME atomic_orbital_symmetry_smoke COMMAND cov_atomic_orbital_symmetry_smoke)
+    add_executable(cov_orbital_symmetry_components_smoke tests/orbital_symmetry_components_smoke.cpp)
+    add_executable(cov_orbital_symmetry_components_probe tests/orbital_symmetry_components_probe.cpp)
+    target_link_libraries(cov_orbital_symmetry_components_probe PRIVATE cov_ui)
+    target_compile_options(cov_orbital_symmetry_components_probe PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    target_link_libraries(cov_orbital_symmetry_components_smoke PRIVATE cov_ui)
+    target_compile_options(cov_orbital_symmetry_components_smoke PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+    add_test(NAME orbital_symmetry_components_smoke COMMAND cov_orbital_symmetry_components_smoke)
+    target_link_libraries(cov_nbo_aomo_labels_smoke PRIVATE cov_ui)
+    target_compile_options(cov_nbo_aomo_labels_smoke PRIVATE
+        $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>)
+    add_test(NAME nbo_aomo_labels_smoke COMMAND cov_nbo_aomo_labels_smoke)
+    add_executable(cov_nbo_aomo_hover_smoke tests/nbo_aomo_hover_smoke.cpp)
+    target_link_libraries(cov_nbo_aomo_hover_smoke PRIVATE cov_ui)
+    target_compile_options(cov_nbo_aomo_hover_smoke PRIVATE
+        $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>)
+    add_test(NAME nbo_aomo_hover_smoke COMMAND cov_nbo_aomo_hover_smoke)
     add_executable(cov_mo_diagram_layout_smoke tests/mo_diagram_layout_smoke.cpp)
     target_link_libraries(cov_mo_diagram_layout_smoke PRIVATE cov_ui)
     add_test(NAME mo_diagram_layout_smoke COMMAND cov_mo_diagram_layout_smoke)
@@ -625,4 +781,10 @@ if(COV_BUILD_TESTS)
     add_executable(cov_ui_details_resize_smoke tests/ui_details_resize_smoke.cpp)
     target_link_libraries(cov_ui_details_resize_smoke PRIVATE cov_ui)
     add_test(NAME ui_details_resize_smoke COMMAND cov_ui_details_resize_smoke)
+    add_executable(cov_point_group_geometry_smoke tests/point_group_geometry_smoke.cpp)
+    target_link_libraries(cov_point_group_geometry_smoke PRIVATE cov_parser)
+    target_compile_definitions(cov_point_group_geometry_smoke PRIVATE COV_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME point_group_geometry_smoke COMMAND cov_point_group_geometry_smoke)
+    add_executable(cov_orbital_naming_probe tests/orbital_naming_probe.cpp)
+    target_link_libraries(cov_orbital_naming_probe PRIVATE cov_ui)
 endif()

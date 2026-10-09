@@ -1,0 +1,22 @@
+{
+  "id": "mg-aqua-Th",
+  "target": "Th",
+  "charge": 2,
+  "multiplicity": 1,
+  "atom_count": 19,
+  "element_counts": {
+    "H": 12,
+    "Mg": 1,
+    "O": 6
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6125"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Source calculator may print only proper rotation subgroup; independent full O(3) atom test recorded.",
+  "xyz_sha256": "c2a24333898d5c9cdc84335b79a9a2c67a83c41adb50188ecedaa2254e223437",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 1.3371247845301083e-15,
+  "source_xyz_sha256": "b50fcd62a085bff5f91d23d54e087533879f7cd0c91c96337869629b084b11d3"
+}

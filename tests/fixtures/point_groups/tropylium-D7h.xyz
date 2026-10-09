@@ -1,0 +1,16 @@
+14
+source=https://symmetry.constructor.university/cgi-bin/group.cgi?group=6127 target_full_point_group=D7h source_reported_group=D status=pending_parent_COV_operation_check
+C       1.6115      0.0000      0.0000
+C       1.0048     -1.2599      0.0000
+C      -0.3586     -1.5711      0.0000
+C      -1.4519     -0.6992      0.0000
+C      -1.4519      0.6992      0.0000
+C      -0.3586      1.5711      0.0000
+C       1.0048      1.2599      0.0000
+H       2.6988      0.0000     -0.0000
+H       1.6827     -2.1100     -0.0000
+H      -0.6005     -2.6311     -0.0000
+H      -2.4315     -1.1710     -0.0000
+H      -2.4315      1.1710     -0.0000
+H      -0.6005      2.6311     -0.0000
+H       1.6827      2.1100     -0.0000

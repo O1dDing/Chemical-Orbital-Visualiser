@@ -2196,17 +2196,10 @@ void attach_planar_p_delocalised_families(
             chemistry.delocalised_pi_confidence=std::max(
                 chemistry.delocalised_pi_confidence,
                 assignment.confidence);
-            const double pi_weight=std::clamp(
+            chemistry.delocalised_pi_weight=std::clamp(
                 selected.weights[index],0.0,1.0);
-            chemistry.channel.sigma=0.0;
-            chemistry.channel.pi=pi_weight;
-            chemistry.channel.delta=0.0;
-            chemistry.channel.phi=0.0;
-            chemistry.channel.undetermined=1.0-pi_weight;
-            chemistry.channel.dominant=OrbitalAngularFamily::Pi;
-            chemistry.channel.status=pi_weight>=options.determined_fraction
-                ?ChemistryStatus::Determined
-                :ChemistryStatus::Percentages;
+            // Preserve the separately computed atom-pair angular character.
+            // Family membership must not relabel every member as a pure pi MO.
             chemistry.confidence=std::max(
                 chemistry.confidence,assignment.confidence);
             if (chemistry.method.find("oriented p active-subspace")==
@@ -2919,6 +2912,8 @@ void attach_multicentre_assignments(Wavefunction& wf) {
             if (index>=wf.orbitals.size()) continue;
             auto& chemistry=wf.orbitals[index].chemistry;
             chemistry.multicentre_label=label;
+            chemistry.multicentre_assignment_available=
+                assignment.provenance!=DataProvenance::Unavailable;
             chemistry.multicentre_participating_atoms=participating_atoms.size();
             chemistry.multicentre_participating_electrons=participating_electrons;
             chemistry.multicentre_participating_atom_indices=participating_atoms;

@@ -1,0 +1,27 @@
+{
+  "id": "ethane-staggered-D3d",
+  "group_id": 6123,
+  "target": "D3d",
+  "phase": "D3d/D3h conformation comparison",
+  "note": "Staggered ethane preset; preserve the named conformer.",
+  "title": "Ethane (staggered)",
+  "source_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6123",
+  "source_sha256": "c3a9ec255ca42a6f156a29d74aab2118274cb66106f4ec6ec941209c5a0fdd02",
+  "result_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Angstrom&unit2=Degree&n1=C&n2=C&x2=1.530700&n3=H&x3=1.093600&y3=111.357800&na3=1&nb3=2&n4=H&x4=1.093600&y4=111.357800&z4=120.000000&na4=1&nb4=2&nc4=3&n5=H&x5=1.093600&y5=111.357800&z5=240.000000&na5=1&nb5=2&nc5=3&n6=H&x6=1.093600&y6=111.357800&z6=60.000000&na6=2&nb6=1&nc6=3&n7=H&x7=1.093600&y7=111.357800&z7=180.000000&na7=2&nb7=1&nc7=3&n8=H&x8=1.093600&y8=111.357800&z8=300.000000&na8=2&nb8=1&nc8=3",
+  "result_sha256": "f4ab7591bf544f5f7898c90440acf98caa5fefc1db4c5a6c1e51b5f71721c99a",
+  "source_reported_group": "D",
+  "atom_count": 8,
+  "bond_count": 7,
+  "element_counts": {
+    "C": 2,
+    "H": 6
+  },
+  "filename": "ethane-staggered-D3d.xyz",
+  "sidecar": "ethane-staggered-D3d.json",
+  "source_page_type": "Symmetry site internal-coordinate starting structure; converted to Cartesian by same site group=6300 endpoint",
+  "source_reported_group_scope": "site calculator label recorded verbatim; may be the proper-rotation subgroup and is not accepted as full-group verification",
+  "full_point_group_status": "Verified on the unchanged Cartesian fixture by point_group_geometry_smoke; includes rigid rotation and atom-order checks. Geometric tolerance is not a wavefunction symmetry certificate.",
+  "coordinate_precision": "source MOL DATA coordinates retained verbatim (4 decimal places)",
+  "charge_multiplicity": "not encoded in coordinate source; chemistry-state bookkeeping not verified",
+  "cov_regression_test": "tests/point_group_geometry_smoke.cpp"
+}

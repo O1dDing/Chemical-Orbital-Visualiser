@@ -1,12 +1,18 @@
 #pragma once
+#include "cov/orbital_group_bonding.hpp"
 
 #include "cov/model.hpp"
 #include "cov/orbital_view.hpp"
 #include "cov/pi_pair_evidence.hpp"
+#include "cov/mo_sigma_framework.hpp"
+#include "cov/nbo_spin_average.hpp"
+#include "cov/pi_field_response.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
+#include <functional>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <string>
@@ -14,6 +20,7 @@
 #include <vector>
 
 namespace cov {
+struct RoutedAnalysis;
 
 enum class MODiagramMode {
     ValenceCentral = 0,
@@ -79,6 +86,7 @@ enum class BondingClass {
     Bonding,
     Nonbonding,
     Antibonding,
+    Mixed,
 };
 
 struct MulticentreDescriptor {
@@ -162,12 +170,16 @@ struct SymmetryNotation {
 
 [[nodiscard]] SymmetryNotation parse_symmetry_notation(std::string_view raw);
 [[nodiscard]] std::string format_symmetry_unicode(std::string_view raw);
+// Display only: preserve machine group keys and never convert group irreps.
+[[nodiscard]] std::string point_group_display(std::string_view raw);
 
 struct DiagramSelectionPlan {
     std::vector<std::size_t> included_indices;
     std::size_t hidden_count = 0;
     std::size_t valence_occupied_count = 0;
     std::size_t frontier_virtual_count = 0;
+    std::size_t final_group_count=0, final_member_count=0;
+    bool counts_are_final=false;
     // Complete protected manifolds may legitimately exceed the visual row
     // target. This records only that unavoidable excess; it is never a
     // licence to keep arbitrary unprotected rows.
@@ -176,6 +188,26 @@ struct DiagramSelectionPlan {
 };
 
 struct MODiagramOptions {
+    // Presentation supplied by the viewer; no dependency on its font library.
+    std::vector<std::string> display_names;
+    // Full canonical MO labels supplied by the same verified naming table.
+    // Separate from row/local symmetry_view and immutable producer labels.
+    std::vector<std::string> display_irreps;
+    std::vector<std::string> display_point_groups;
+    std::string figure_title;
+    std::string axis_title;
+    std::function<void(std::vector<std::uint8_t>&,int,int,int,int,const std::string&,
+                       std::uint8_t,std::uint8_t,std::uint8_t,int)> raster_text;
+    std::function<int(const std::string&,int)> raster_text_width;
+    const RoutedAnalysis* routed = nullptr; // immutable, same canonical fingerprint
+    const NboIntegration* nbo_source=nullptr; // immutable same-source sigma projector
+    const NboSalcModel* source_salc_model=nullptr; // verified unaveraged source
+    const NboRoCommonEnergyModel* ro_common_energy=nullptr; // immutable prepared cache
+    const PiFieldResponseAnalysis* pi_field_response=nullptr; // same wavefunction/attachment
+    bool use_ro_common_energy=true;
+    // Internal view override. Source wavefunction and its fingerprint never change.
+    std::vector<double> canonical_display_energies;
+    std::string routed_identity; // cache generation; changes on every reattachment
     MODiagramMode mode = MODiagramMode::ValenceCentral;
     EnergyUnit energy_unit = EnergyUnit::Hartree;
     EnergyAxisMode energy_axis_mode = EnergyAxisMode::NonlinearFocus;
@@ -187,6 +219,11 @@ struct MODiagramOptions {
     std::size_t max_levels = 0;
     std::size_t max_virtual_levels = 10;
     bool hide_ligand_centred_intermediates = false;
+    // 0 preserves the non-NBO path; 1/2/3 are brief/research/full AOMO scopes.
+    // These describe display membership, never a different electronic state.
+    unsigned aomo_scope=0;
+    bool show_core_background=false, show_fragment_background=false;
+    std::vector<std::size_t> display_centre_atoms;
 
     double nonlinear_minimum_gap_weight = 0.070;
 
@@ -223,10 +260,16 @@ struct OrbitalEnergyGapDescriptor {
     PiInteractionKind kind = PiInteractionKind::Coupled;
     double splitting_hartree = 0.0;
     double confidence = 0.0;
+    // Reading priority only: minimum absolute cross-Fock trace of the two
+    // complete uniform-sign endpoint groups, in hartree; not a bond energy.
+    double display_strength_hartree = std::numeric_limits<double>::quiet_NaN();
     bool lower_visible = true;
     bool upper_visible = true;
     std::size_t retained_level = 0;
     std::shared_ptr<const PiPartnerAssessment> orbital_evidence;
+    // Equivalent physical projector scopes share one displayed relation;
+    // retain each original channel reference for reproducible diagnostics.
+    std::vector<std::string> equivalent_channel_ids;
     OrbitalEnergyGapKind gap_kind = OrbitalEnergyGapKind::PiPartner;
     OrbitalSymmetryExplanation lower_symmetry_scope;
     OrbitalSymmetryExplanation upper_symmetry_scope;
@@ -249,6 +292,53 @@ using PiInteractionDescriptor = OrbitalEnergyGapDescriptor;
 
 [[nodiscard]] const char* pi_interaction_kind_name(
     PiInteractionKind kind) noexcept;
+
+// Exclusive buckets in the original complete NAO norm, averaged over the
+// actual canonical members. Missing data is never interpreted as a zero.
+struct MOGroupCompositionLedger {
+    bool available=false, complete=false;
+    std::string status="unavailable", detail, source="unavailable";
+    std::size_t member_count=0;
+    double weight_sum=0, normalization_error=0;
+    double centre_current_s=0, centre_current_p=0, centre_current_d=0,
+           centre_current_f=0, centre_other=0;
+    double ligand_valence=0, ligand_other=0, other_atoms=0, core=0, unresolved=0;
+    // Subtotals of ligand_valence, not additional exclusive buckets.
+    double ligand_valence_s=0, ligand_valence_p=0;
+};
+struct MOCurrentRadialShell {
+    std::size_t atom=0; // canonical zero-based identity
+    int n=0, l=0;
+    std::string evidence;
+};
+// Chemical scope is independent of whether a numerical NAO partition exists.
+// A user-selected nonmetal centre never becomes a metal, and disconnected
+// counterions never become ligands merely by being outside the centre bucket.
+struct MOCompositionScope {
+    bool applicable=false;
+    std::vector<std::size_t> centre_atoms,ligand_atoms,other_atoms;
+    std::string detail;
+};
+[[nodiscard]] MOCompositionScope mo_composition_scope(
+    const Wavefunction&,const RoutedAnalysis*,const std::vector<std::size_t>& centres);
+struct MOGroupDisplayDecision {
+    bool included=false, energy_window=false, major_relation=false, frontier=false;
+    double coverage=0; // complete-norm current-centre coverage, not conditional
+    double sigma_coverage=0; // overlapping verified donor projector, full norm
+    std::vector<std::string> reason_codes;
+};
+struct MODiagramGroupAudit {
+    std::vector<std::size_t> member_indices, member_spin_counterparts;
+    double energy_hartree=0, total_occupation=0;
+    MOGroupCompositionLedger composition;
+    MOGroupDisplayDecision display_decision;
+};
+// Current shells are frozen from source shell identities before MO selection.
+[[nodiscard]] std::vector<MOCurrentRadialShell> mo_current_radial_shells(
+    const Wavefunction&, const RoutedAnalysis&, const std::vector<std::size_t>& centres);
+[[nodiscard]] MOGroupCompositionLedger mo_group_composition_ledger(
+    const Wavefunction&, const RoutedAnalysis*, const std::vector<std::size_t>& members,
+    const std::vector<std::size_t>& centres, const std::vector<MOCurrentRadialShell>& shells);
 
 struct MODiagramLevel {
     OrbitalMetadata metadata;
@@ -283,6 +373,9 @@ struct MODiagramLevel {
     double metal_ligand_overlap = 0.0;
     bool raw_data_fallback = false;
     bool approximate_nonbonding = false;
+    std::vector<OrbitalGroupBondingResult> bonding_scopes;
+    MOGroupCompositionLedger composition;
+    MOGroupDisplayDecision display_decision;
 };
 
 // One visible row may represent an exactly-degenerate canonical-MO set and,
@@ -366,6 +459,19 @@ struct MODiagramData {
     std::vector<OrbitalMetadata> metadata;
     std::vector<OrbitalAnnotation> annotations;
     std::vector<PiInteractionDescriptor> pi_interactions;
+    // Includes rejected counterparts with their original member identities.
+    std::vector<PiPartnerAssessment> pi_partner_candidates;
+    // One scientific object per actual mode; canonical groups are nodes, not
+    // an arbitrary Cartesian product of purported two-level counterparts.
+    std::vector<PiModeNetworkAssessment> pi_mode_networks;
+    MOSigmaFramework sigma_framework;
+    NboRoCommonEnergyModel ro_common_energy;
+    bool using_ro_common_energy=false;
+    PiFieldResponseAnalysis pi_field_response;
+    MOCompositionScope composition_scope;
+    std::vector<MOCurrentRadialShell> current_radial_shells;
+    // Complete source groups, including folded and opposite-spin groups.
+    std::vector<MODiagramGroupAudit> group_audit;
     ElectronicStateDiagramMetadata electronic_state;
     // Every unambiguous Mayer-supported CN2--CN10 centre, including main-group
     // and non-metal centres.  This is structural metadata and never creates a
@@ -398,6 +504,8 @@ struct MODiagramData {
 
 [[nodiscard]] std::vector<const OrbitalEnergyGapDescriptor*> orbital_energy_gaps(
     const MODiagramData& data);
+[[nodiscard]] std::string pi_partner_candidates_json(
+    const std::vector<PiPartnerAssessment>& candidates);
 
 struct MODiagramViewSnapshot {
     const MODiagramData data;
@@ -439,6 +547,7 @@ struct MODiagramMemberView {
 // representative members. A default numeric zero is not availability evidence.
 struct MetalLigandDetailAvailability {
     ChemistryStatus scope = ChemistryStatus::Unavailable;
+    bool composition = false;
     bool populations = false;
     bool overlap = false;
     bool channels = false;
@@ -446,6 +555,8 @@ struct MetalLigandDetailAvailability {
 [[nodiscard]] MetalLigandDetailAvailability metal_ligand_detail_availability(
     const Wavefunction& wavefunction, const MODiagramData& data,
     const MODiagramLevel& level);
+
+enum class DiagramExportContent { Images, AnalysisData, All };
 
 struct MODiagramExportResult {
     bool svg = false;
@@ -461,7 +572,8 @@ struct MODiagramExportResult {
 
 [[nodiscard]] MODiagramExportResult export_mo_diagram_bundle(
     const MODiagramViewSnapshot& snapshot,
-    const std::filesystem::path& base_path);
+    const std::filesystem::path& base_path,
+    DiagramExportContent content = DiagramExportContent::All);
 // Explicit computed-export API for noninteractive callers. The live UI must
 // pass its already drawn snapshot through the overload above.
 [[nodiscard]] MODiagramExportResult export_mo_diagram_bundle(

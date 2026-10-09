@@ -1,0 +1,24 @@
+{
+  "id": "co-hexanitro-CoN6-skeleton-Oh",
+  "target": "Oh",
+  "charge": -3,
+  "multiplicity": 1,
+  "atom_count": 7,
+  "element_counts": {
+    "Co": 1,
+    "N": 6
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6125",
+    "https://doi.org/10.1107/S056774087801479X",
+    "https://doi.org/10.1107/S0108270193011588",
+    "https://journals.iucr.org/paper?buy=yes&cnor=iz1013"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Atoms deliberately omitted for full-vs-skeleton geometry contrast. Parent complete source preserved: co-hexanitro-N-Th",
+  "xyz_sha256": "590aaa125df06a01d6fb4c5669ee5aa84e625a4c0b6ddce769e0d4f72152062f",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 6.67803323082801e-17,
+  "source_xyz_sha256": "67b2f43e560d6a39642ac174bb10eaf93696171c536a7c5f917b9a7c594e3793"
+}

@@ -25,9 +25,10 @@ struct MoleculeRenderSettings {
     float molecule_opacity = 1.00f;
     float orbital_opacity = 0.92f;
     bool show_hydrogens = true;
-    // Coordination connectivity is visible by default with its dedicated line
-    // style. Higher-level multicentre support starts hidden so it cannot cover
-    // the ordinary structural skeleton.
+    bool show_numbers=false, number_atoms=true, number_fragments=true;
+    bool number_ignore_h=true;
+    // Strong coordination connectivity uses the same solid structural line.
+    // Its chemical semantics remain independent of the visual style.
     bool show_coordination_contacts = true;
     // Keep the default ball-and-stick skeleton clean. The independent
     // multicentre layer remains available for explicit inspection.
@@ -63,7 +64,7 @@ enum class InteractionVisualStyle : std::uint8_t {
             return InteractionVisualStyle::OrdinaryBond;
         case InteractionKind::CoordinationContact:
             return settings.show_coordination_contacts
-                       ? InteractionVisualStyle::CoordinationDash
+                       ? InteractionVisualStyle::OrdinaryBond
                        : InteractionVisualStyle::Hidden;
         case InteractionKind::MulticentreSupport:
             return settings.show_multicentre_support
@@ -98,6 +99,7 @@ struct BondVisual {
     bool delocalised = false;
     double bond_order = 0.0;
     DataProvenance provenance = DataProvenance::Unavailable;
+    std::string connectivity_method, connectivity_source_path;
 };
 
 // Structural radii through Cm follow Cordero et al. (Dalton Trans. 2008,
@@ -136,6 +138,7 @@ struct BondVisual {
 // coupling from being drawn as a bond. Covalent-radius geometry is the fallback
 // only when electronic evidence is unavailable. Pairwise Mayer evidence is not
 // an electron-counting or multicentre claim.
-[[nodiscard]] std::vector<BondVisual> analyse_bonds(const Wavefunction& wavefunction);
+[[nodiscard]] std::vector<BondVisual> analyse_bonds(const Wavefunction& wavefunction,
+    const std::vector<InteractionBondEvidence>& nbo_bonds = {});
 
 } // namespace cov

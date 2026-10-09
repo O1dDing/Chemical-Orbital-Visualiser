@@ -1,0 +1,26 @@
+{
+  "id": "co-en3-mirror-D3",
+  "target": "D3",
+  "charge": 3,
+  "multiplicity": 1,
+  "atom_count": 37,
+  "element_counts": {
+    "C": 6,
+    "Co": 1,
+    "H": 24,
+    "N": 6
+  },
+  "source_urls": [
+    "https://www.chemtube3d.com/model/gallery/Co(enH2)3calc.sdf",
+    "https://www.chemtube3d.com/coen33_/",
+    "https://old.iupac.org/reports/provisional/abstract04/RB-prs310804/Chap9-3.04.pdf",
+    "https://goldbook.iupac.org/terms/view/14213"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Reflection x -> -x of the full Co(en)3 source. All ligand bonds and atom identities are preserved; complete nuclear symmetry is checked for the opposite enantiomer.",
+  "xyz_sha256": "009c6d0128ab4e6a7172fb345266cc8f737a006e36f0937b915a1b42f5dd064c",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 1.0175362097255202e-15,
+  "source_xyz_sha256": "6daeea40314d76982cca54e3f4e1c3f7d4a197b94204ead6405f5717d3ffe086"
+}

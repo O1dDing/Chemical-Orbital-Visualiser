@@ -315,10 +315,29 @@ int main() {
     producer_multicentre.multicentre_assignments.push_back(provisional);
     cov::derive_orbital_chemistry(producer_multicentre);
     if (producer_multicentre.multicentre_assignments.size()!=1u ||
-        producer_multicentre.orbitals[0].chemistry.multicentre_label!="3c2e") {
+        producer_multicentre.orbitals[0].chemistry.multicentre_label!="3c2e" ||
+        !producer_multicentre.orbitals[0].chemistry.multicentre_assignment_available ||
+        !cov::annotate_orbital(producer_multicentre.orbitals[0]).multicentre.available) {
         std::cerr<<"producer multicentre assignment was not preserved\n";
         return EXIT_FAILURE;
     }
+
+    // A generic population/geometry fallback has candidate text but no
+    // assignment-to-member evidence. It must not become an established bond.
+    auto candidate=producer_multicentre.orbitals[0];
+    candidate.chemistry.multicentre_assignment_available=false;
+    if (cov::annotate_orbital(candidate).multicentre.available ||
+        candidate.chemistry.multicentre_label!="3c2e") {
+        std::cerr<<"candidate multicentre text was promoted or destroyed\n";
+        return EXIT_FAILURE;
+    }
+    for(const auto& assignment:local_3c4e.multicentre_assignments)
+        for(const auto index:assignment.orbitals)
+            if(index<local_3c4e.orbitals.size() &&
+               !cov::annotate_orbital(local_3c4e.orbitals[index]).multicentre.available) {
+                std::cerr<<"qualified assignment member lost its multicentre descriptor\n";
+                return EXIT_FAILURE;
+            }
 
     auto ion=make_cation_visibility_case();
     cov::OrbitalFilterSettings ion_filter;

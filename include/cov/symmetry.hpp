@@ -54,6 +54,8 @@ struct SymmetryOptions {
     double absolute_tolerance_bohr = 2.0e-3;
     double relative_tolerance = 2.0e-4;
     int maximum_rotation_order = 12;
+    // Retained for source compatibility. Verified molecular isomorphisms are
+    // enumerated completely and are not truncated by this former search limit.
     std::size_t maximum_candidate_axes = 768;
 };
 

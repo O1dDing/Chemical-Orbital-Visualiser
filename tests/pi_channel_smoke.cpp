@@ -1,0 +1,64 @@
+#include "cov/pi_pair_evidence.hpp"
+#include <iostream>
+#include <stdexcept>
+int main(){using namespace cov;auto require=[](bool ok,const char* why){if(!ok)throw std::runtime_error(why);};
+ // The original screenshot's scalar observations cannot establish direction.
+ PiPartnerComponents deep{-.5003894956667,.0455684785,.9203470735,.9995669512,.0057445997};
+ PiPartnerComponents frontier{-.275306531,.6091618954,.3248724218,.9981487152,.0272649687};
+ require(!assess_pi_partner(deep,frontier,LigandPiPrior::Acceptor).accepted,"composition falsely certified");
+ PiPartnerComponents tiny1{-.2,.8,.1,.9,.001},tiny2{-.199,.1,.8,.9,-.001};
+ const auto missing_fock=assess_pi_partner(tiny1,tiny2,LigandPiPrior::Donor);
+ require(missing_fock.input_valid&&!missing_fock.accepted&&!missing_fock.weak,"tiny gap without actual Fock cannot certify negligible pi");
+ PiPartnerComponents upper{-.0182660992,.22,.71,.9997,-.0552};
+ PiPartnerChannelEvidence e;e.channel_id="sample-independent:pi-antibonding";e.canonical_fingerprint="dataset-x";
+ e.spin="alpha";e.lower_members={1,2,3};e.upper_members={6,7,8};e.same_operator_verified=true;e.complete_membership_verified=true;
+ e.operator_kind="canonical-same-operator";e.occupations_verified=true;e.direction_verified=true;e.direction="centre_to_ligand";
+ e.lower_character="bonding_mixing";e.upper_character="antibonding_mixing";
+ e.lower_cross_fock_max_hartree=-.1;e.upper_cross_fock_min_hartree=.09;e.operator_error_hartree=1e-8;
+ e.operator_tolerance_hartree=2e-5;
+ e.mode_assessment.verified=e.mode_assessment.direction_verified=true;
+ e.mode_assessment.shared_mode_ids={"test:mode:0-1"};e.mode_assessment.matched_edge_ids={"alpha:1:2"};
+ e.mode_assessment.direction="centre_to_ligand";
+ e.mode_assessment.lower_cross_fock_mean_hartree=-.1;e.mode_assessment.upper_cross_fock_mean_hartree=.09;
+ const auto accepted=assess_pi_channel_partner(frontier,upper,LigandPiPrior::Donor,e);
+ require(accepted.accepted&&accepted.direction==PiPairDirection::Acceptor,"channel evidence must outrank catalogue");
+ auto missing=e;missing.same_operator_verified=false;require(!assess_pi_channel_partner(frontier,upper,LigandPiPrior::Acceptor,missing).accepted,"unverified operator");
+ missing=e;missing.mode_assessment={};require(!assess_pi_channel_partner(frontier,upper,LigandPiPrior::Acceptor,missing).accepted,"whole-block opposite signs cannot supply common mode");
+ missing=e;missing.operator_error_hartree=1;require(!assess_pi_channel_partner(frontier,upper,LigandPiPrior::Acceptor,missing).accepted,"operator residual exceeds tolerance");
+ missing=e;missing.operator_tolerance_hartree=0;require(!assess_pi_channel_partner(frontier,upper,LigandPiPrior::Acceptor,missing).accepted,"missing operator tolerance");
+ missing=e;missing.lower_members={1,1,3};require(!assess_pi_channel_partner(frontier,upper,LigandPiPrior::Acceptor,missing).accepted,"duplicate members");
+ missing=e;missing.upper_members={1,7,8};require(!assess_pi_channel_partner(frontier,upper,LigandPiPrior::Acceptor,missing).accepted,"overlap members");
+ missing=e;missing.occupations_verified=false;const auto unresolved=assess_pi_channel_partner(frontier,upper,LigandPiPrior::Acceptor,missing);
+ require(unresolved.accepted&&unresolved.direction==PiPairDirection::Acceptor,"ordered NBO direction must not be vetoed by complex projected density");
+ missing=e;missing.mode_assessment.direction_verified=false;
+ require(assess_pi_channel_partner(frontier,upper,LigandPiPrior::Acceptor,missing).direction==PiPairDirection::Coupled,"density alone cannot manufacture direction");
+ missing=e;missing.direction="ligand_to_centre";missing.direction_verified=true;
+ require(assess_pi_channel_partner(frontier,upper,LigandPiPrior::Donor,missing).direction==PiPairDirection::Acceptor,"scope union cannot override same-edge mode direction");
+ auto weak=e;weak.display_calibration={true,"test-calibration","test-family",0.025,0.02};
+ weak.frozen_operator.available=weak.frozen_operator.tracking_verified=weak.frozen_operator.occupation_boundary_preserved=true;
+ weak.frozen_operator.max_energy_shift_hartree=0.0001;weak.frozen_operator.max_group_width_change_hartree=0;
+ weak.frozen_operator.frontier_gap_change_hartree=0.0002;weak.frozen_operator.max_subspace_sin2=0.001;
+ weak.frozen_operator.numerical_error_bound_hartree=1e-8;weak.frozen_operator.minimum_external_gap_hartree=1;
+ const auto small=assess_pi_channel_partner(frontier,upper,LigandPiPrior::Donor,weak);
+ require(small.accepted&&small.weak&&small.direction==PiPairDirection::Acceptor,"verified directional coupling may be weak independently");
+ weak.display_calibration.validated=false;
+ require(!assess_pi_channel_partner(frontier,upper,LigandPiPrior::Donor,weak).weak,"uncalibrated display budget cannot fold");
+ weak.display_calibration.validated=true;weak.frozen_operator.max_subspace_sin2=0.4;
+ require(!assess_pi_channel_partner(frontier,upper,LigandPiPrior::Donor,weak).weak,"near resonance small energy strong mixing cannot fold");
+ missing=e;missing.operator_kind="independently-verified-physical-spin-fock";
+ require(assess_pi_channel_partner(frontier,upper,LigandPiPrior::Acceptor,missing).accepted,"physical operator relationship distinct from eigenvalue operator");
+ PiEndpointNboWeights lo,hi;lo.centre_to_ligand_donor=.8;hi.centre_to_ligand_acceptor=.7;
+ lo.occupation=2;hi.occupation=0;
+ auto endpoint=assess_pi_endpoint_direction(lo,hi,"centre_to_ligand",true,true,2,1e-4);
+ require(endpoint.verified&&endpoint.centre_to_ligand_supported,"ordered role projection maps endpoint direction");
+ hi.occupation=2;endpoint=assess_pi_endpoint_direction(lo,hi,"centre_to_ligand",true,true,2,1e-4);
+ require(endpoint.direction=="occupied_space_mixing"&&!endpoint.centre_to_ligand_supported,"full occupied endpoint relation cannot inherit scope backdonation");
+ hi.occupation=0;hi.centre_to_ligand_acceptor=1e-7;
+ require(!assess_pi_endpoint_direction(lo,hi,"centre_to_ligand",true,true,2,1e-4).verified,"mapping below propagated error cannot supply acceptor");
+ hi.centre_to_ligand_acceptor=.7;lo.ligand_to_centre_donor=.1;hi.ligand_to_centre_acceptor=.2;
+ require(assess_pi_endpoint_direction(lo,hi,"bidirectional",true,true,2,1e-4).direction=="bidirectional","both ordered directions retained without voting");
+ const auto json=pi_partner_assessment_json(accepted);
+ require(json.find("lower_cross_fock_max_hartree")!=std::string::npos&&json.find("canonical-group-energy-separation")!=std::string::npos,"missing reproducible evidence");
+ require(json.find("\"ranking_unit\":\"hartree\"")!=std::string::npos,"channel ranking unit");
+ std::cout<<"pi channel assessment checks passed\n";
+}

@@ -89,7 +89,11 @@ NavigationStep plan_navigation(const NavigationTarget& target, bool reveal_entir
             const float span=window->InnerRect.Max[axis]-window->InnerRect.Min[axis];
             const float pixels=std::floor(std::min((axis==ImGuiAxis_X?2.0f:5.0f)*window->CalcFontSize(),span*0.67f));
             if (pixels<1) continue;
-            ImVec2 wheel{};wheel[axis]=std::clamp(-delta/pixels,-3.0f,3.0f);
+            // ImGui truncates scroll coordinates to whole pixels. A half-pixel
+            // correction otherwise repeats forever without moving, preventing
+            // navigation from reaching the next scrollable ancestor.
+            const float wheel_delta=std::copysign(std::ceil(std::abs(delta)),delta);
+            ImVec2 wheel{};wheel[axis]=std::clamp(-wheel_delta/pixels,-3.0f,3.0f);
             const auto actual_mouse=ImGui::GetIO().MousePos;
             const bool needs_move=std::abs(actual_mouse.x-mouse.x)>0.01f || std::abs(actual_mouse.y-mouse.y)>0.01f;
             return {needs_move?NavigationKind::Move:NavigationKind::Wheel,mouse,wheel,window};

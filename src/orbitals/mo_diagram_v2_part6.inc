@@ -78,6 +78,7 @@ std::string bonding_plain(const BondingClass value) {
         case BondingClass::Bonding: return "BONDING";
         case BondingClass::Nonbonding: return "NONBONDING";
         case BondingClass::Antibonding: return "ANTIBONDING";
+        case BondingClass::Mixed: return "MIXED";
         default: return "N/A";
     }
 }
@@ -247,6 +248,25 @@ std::optional<ExportPiBracket> export_pi_bracket(
 
 } // namespace
 
+namespace {
+std::string export_level_name(const MODiagramData& data, const MODiagramLevel& level,
+                              const MODiagramOptions& options) {
+    std::string result;
+    for(const auto& member : mo_diagram_member_views(data,level)) {
+        if(!result.empty()) result += ", ";
+        const auto i=member.orbital_index;
+        result += i<options.display_names.size() ? options.display_names[i] :
+            "MO [list] "+std::to_string(i+1);
+    }
+    return result;
+}
+std::string export_axis_title(const MODiagramOptions& options) {
+    return (options.axis_title.empty() ?
+        std::string(options.energy_axis_mode==EnergyAxisMode::Linear ? "Energy" : "Nonlinear energy axis") :
+        options.axis_title) + " (" + energy_unit_symbol(options.energy_unit) + ")";
+}
+}
+
 bool write_mo_diagram_svg(const MODiagramData& data,
                           const MODiagramOptions& options,
                           const std::filesystem::path& path,
@@ -273,25 +293,15 @@ bool write_mo_diagram_svg(const MODiagramData& data,
     out << "<rect width=\"100%\" height=\"100%\" fill=\"#fbfcfe\"/>\n";
     out << "<text x=\"36\" y=\"40\" fill=\"#182231\" font-family=\"" << kSvgFontFamily << "\" "
            "font-size=\"24\" font-weight=\"600\">"
-        << xml_escape(mo_diagram_mode_title(data.mode)) << "</text>\n";
-    out << "<text x=\"36\" y=\"64\" fill=\"#68778b\" font-family=\"" << kSvgFontFamily << "\" "
-           "font-size=\"12\">" << xml_escape(data.selection.summary) << "</text>\n";
-    out << "<text x=\"36\" y=\"82\" fill=\"#7f8c9c\" font-family=\"" << kSvgFontFamily << "\" "
-           "font-size=\"11\">Source: " << wavefunction_source_name(data.electronic_state.source)
-        << "; raw MO energies and occupations are retained in metadata.</text>\n";
+        << xml_escape(options.figure_title.empty()?mo_diagram_mode_title(data.mode):options.figure_title) << "</text>\n";
 
     const int axis_x = 70;
     out << "<line x1=\"" << axis_x << "\" y1=\"110\" x2=\"" << axis_x
         << "\" y2=\"" << height - 62 << "\" stroke=\"#2d3745\" stroke-width=\"2\"/>\n";
     out << "<path d=\"M " << axis_x << " 98 l -5 10 h 10 z\" fill=\"#2d3745\"/>\n";
-    out << "<text x=\"24\" y=\"124\" fill=\"#4d5a6c\" font-family=\"" << kSvgFontFamily << "\" "
-           "font-size=\"12\" transform=\"rotate(-90 24 124)\">Energy · "
-        << (options.energy_axis_mode == EnergyAxisMode::Linear ? "linear" : "adaptive nonlinear (log-gap v3)")
-        << " (" << xml_escape(energy_unit_symbol(options.energy_unit)) << ")</text>\n";
-    if (options.energy_axis_mode == EnergyAxisMode::NonlinearFocus) {
-        out << "<text x=\"82\" y=\"102\" fill=\"#8b6173\" font-family=\"" << kSvgFontFamily << "\" "
-               "font-size=\"10\">nonlinear axis · ticks show exact physical energy</text>\n";
-    }
+    out << "<text x=\"24\" y=\"340\" fill=\"#4d5a6c\" font-family=\"" << kSvgFontFamily << "\" "
+           "font-size=\"12\" transform=\"rotate(-90 24 340)\">"
+        << xml_escape(export_axis_title(options)) << "</text>\n";
 
     for (const double fraction : {0.0, 0.25, 0.5, 0.75, 1.0}) {
         const double energy = energy_at_axis_fraction(fraction, data.energy_transform);
@@ -323,6 +333,9 @@ bool write_mo_diagram_svg(const MODiagramData& data,
             const double x=item.x+(static_cast<double>(member_index)-
                 0.5*static_cast<double>(members.size()-1))*31.0;
             out << "<line class=\"mo-member\" data-orbital-index=\"" << member.orbital_index
+                << "\" data-current-name=\"" << xml_escape(member.orbital_index<options.display_names.size()?options.display_names[member.orbital_index]:"")
+                << "\" data-current-irrep=\"" << xml_escape(member.orbital_index<options.display_irreps.size()?options.display_irreps[member.orbital_index]:"?")
+                << "\" data-current-point-group=\"" << xml_escape(member.orbital_index<options.display_point_groups.size()?point_group_display(options.display_point_groups[member.orbital_index]):"")
                 << "\" data-inspected-orbital-index=\"" << member.inspected_orbital_index
                 << "\" data-selected=\"" << (member.selected?"true":"false")
                 << "\" x1=\"" << x-12.0 << "\" y1=\"" << item.y
@@ -334,12 +347,10 @@ bool write_mo_diagram_svg(const MODiagramData& data,
         }
         out << "</g>\n";
 
-        // Export deliberately omits MO numbers. Human-readable orbital type is
-        // attached directly below the physical level; raw numbering remains in
-        // hover/JSON/CSV where it is useful without cluttering the figure.
+        // Names come from the same canonical naming table as the live viewer.
         out << "<text x=\"" << item.x << "\" y=\"" << item.y + 16
             << "\" text-anchor=\"middle\" fill=\"#435166\" font-family=\"" << kSvgFontFamily << "\" "
-               "font-size=\"10\">" << xml_escape(orbital_type_svg(level.annotation)) << "</text>\n";
+               "font-size=\"10\">" << xml_escape(export_level_name(data,level,options)) << "</text>\n";
         if (level.annotation.delocalised_pi.available) {
             write_svg_delocalised_pi(out, item.x, item.y + 29,
                                      level.annotation.delocalised_pi, "#5b6575");
@@ -370,8 +381,7 @@ bool write_mo_diagram_svg(const MODiagramData& data,
             out << " · " << xml_escape(interaction.symmetry);
         }
         out << " · " << symbol << "=" << std::setprecision(10)
-            << interaction.splitting_hartree << " Ha · support (not probability)="
-            << std::setprecision(4) << interaction.confidence << "</title>\n";
+            << interaction.splitting_hartree << " Ha</title>\n";
         out << "<line x1=\"" << x << "\" y1=\"" << bracket->top
             << "\" x2=\"" << x << "\" y2=\"" << bracket->bottom
             << "\" stroke=\"" << colour.hex << "\" stroke-width=\"2\"/>\n";
@@ -392,9 +402,6 @@ bool write_mo_diagram_svg(const MODiagramData& data,
     }
     out << "</g>\n";
 
-    out << "<text x=\"36\" y=\"" << height - 24
-        << "\" fill=\"#8793a3\" font-family=\"" << kSvgFontFamily << "\" font-size=\"10\">"
-           "MO numbering is intentionally omitted from the figure; exact/raw identifiers remain in interactive hover and machine metadata.</text>\n";
     out << "</svg>\n";
     if (!out) {
         if (error) *error = "Failed while writing SVG";

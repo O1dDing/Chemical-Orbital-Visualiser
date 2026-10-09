@@ -1,0 +1,25 @@
+{
+  "id": "co-hexanitro-N-Th",
+  "target": "Th",
+  "charge": -3,
+  "multiplicity": 1,
+  "atom_count": 19,
+  "element_counts": {
+    "Co": 1,
+    "N": 6,
+    "O": 12
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6125",
+    "https://doi.org/10.1107/S056774087801479X",
+    "https://doi.org/10.1107/S0108270193011588",
+    "https://journals.iucr.org/paper?buy=yes&cnor=iz1013"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "CoN6 octahedron Co-N=1.9516 A and equal N-O=1.2316 A from Ohba1978 values quoted by Adovasio1994 DOI10.1107/S0108270193011588. Ideal O-N-O=120 deg chosen explicitly. Ligand planes cyclic (xy,yz,zx), full CoN6O12 Th; unlike distorted Na3 salt DOI10.1107/S0108270101007995. Low-spin CoIII d6 singlet candidate; not an independently determined ground state.",
+  "xyz_sha256": "164e9eb316b67b064397232b4740b7dd62d378b18ab8eb5360a7e9af9603d69e",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 6.783958930389205e-16,
+  "source_xyz_sha256": "e402914c0800fcf9379c1c77fdb254b052a403d88b211aaca82a99d115b1ef67"
+}

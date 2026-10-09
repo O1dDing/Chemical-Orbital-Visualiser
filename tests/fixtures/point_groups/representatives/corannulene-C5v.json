@@ -1,0 +1,21 @@
+{
+  "id": "corannulene-C5v",
+  "target": "C5v",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 30,
+  "element_counts": {
+    "C": 20,
+    "H": 10
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6187"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Source calculator may print only proper rotation subgroup; independent full O(3) atom test recorded.",
+  "xyz_sha256": "9c7aca36313c53a8253d8f4defe8a3e6e3b196446e36c6cbd00f49760cf9b9cc",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 4.475041260008814e-05,
+  "source_xyz_sha256": "865caf84701d1d062dc1152570b75c419cef68d74b07b9df4ba4049239f8dcfe"
+}

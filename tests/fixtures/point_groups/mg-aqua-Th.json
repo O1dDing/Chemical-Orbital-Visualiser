@@ -1,0 +1,28 @@
+{
+  "id": "mg-aqua-Th",
+  "group_id": 6125,
+  "target": "Th",
+  "phase": "Small improper cubic model",
+  "note": "Hexaaquamagnesium(2+) source preset; site reports rotational subgroup T, full Th pending parent COV check.",
+  "title": "[Mg(H2O)6]2+-Ion",
+  "source_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6125",
+  "source_sha256": "86e9d34b0627b2ca11e092da35fea740f0767803efb53ed4e3b7ed9aeb7a9715",
+  "result_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Angstrom&unit2=Degree&n1=Mg&n2=O&x2=2.090000&n3=O&x3=2.090000&y3=90.000000&na3=1&nb3=2&n4=O&x4=2.090000&y4=90.000000&z4=180.000000&na4=1&nb4=3&nc4=2&n5=O&x5=2.090000&y5=90.000000&z5=180.000000&na5=1&nb5=4&nc5=3&n6=O&x6=2.090000&y6=90.000000&z6=90.000000&na6=1&nb6=2&nc6=3&n7=O&x7=2.090000&y7=90.000000&z7=270.000000&na7=1&nb7=2&nc7=3&n8=H&x8=1.000000&y8=127.500000&z8=0.000000&na8=2&nb8=1&nc8=3&n9=H&x9=1.000000&y9=127.500000&z9=180.000000&na9=2&nb9=1&nc9=3&n10=H&x10=1.000000&y10=127.500000&z10=0.000000&na10=4&nb10=1&nc10=3&n11=H&x11=1.000000&y11=127.500000&z11=180.000000&na11=4&nb11=1&nc11=3&n12=H&x12=1.000000&y12=127.500000&z12=90.000000&na12=3&nb12=1&nc12=2&n13=H&x13=1.000000&y13=127.500000&z13=270.000000&na13=3&nb13=1&nc13=2&n14=H&x14=1.000000&y14=127.500000&z14=90.000000&na14=5&nb14=1&nc14=2&n15=H&x15=1.000000&y15=127.500000&z15=270.000000&na15=5&nb15=1&nc15=2&n16=H&x16=1.000000&y16=127.500000&z16=0.000000&na16=6&nb16=1&nc16=2&n17=H&x17=1.000000&y17=127.500000&z17=180.000000&na17=6&nb17=1&nc17=2&n18=H&x18=1.000000&y18=127.500000&z18=0.000000&na18=7&nb18=1&nc18=2&n19=H&x19=1.000000&y19=127.500000&z19=180.000000&na19=7&nb19=1&nc19=2",
+  "result_sha256": "22d4242a787b36919e2f430573cefddd617d7c97f6fdda8de6c56be9f6e546e3",
+  "source_reported_group": "T",
+  "atom_count": 19,
+  "bond_count": 12,
+  "element_counts": {
+    "H": 12,
+    "Mg": 1,
+    "O": 6
+  },
+  "filename": "mg-aqua-Th.xyz",
+  "sidecar": "mg-aqua-Th.json",
+  "source_page_type": "Symmetry site internal-coordinate starting structure; converted to Cartesian by same site group=6300 endpoint",
+  "source_reported_group_scope": "site calculator label recorded verbatim; may be the proper-rotation subgroup and is not accepted as full-group verification",
+  "full_point_group_status": "Verified on the unchanged Cartesian fixture by point_group_geometry_smoke; includes rigid rotation and atom-order checks. Geometric tolerance is not a wavefunction symmetry certificate.",
+  "coordinate_precision": "source MOL DATA coordinates retained verbatim (4 decimal places)",
+  "charge_multiplicity": "not encoded in coordinate source; chemistry-state bookkeeping not verified",
+  "cov_regression_test": "tests/point_group_geometry_smoke.cpp"
+}

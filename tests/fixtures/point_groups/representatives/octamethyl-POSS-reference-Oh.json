@@ -1,0 +1,23 @@
+{
+  "id": "octamethyl-POSS-reference-Oh",
+  "target": "Oh",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 52,
+  "element_counts": {
+    "C": 8,
+    "H": 24,
+    "O": 12,
+    "Si": 8
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6332"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Source calculator may print only proper rotation subgroup; independent full O(3) atom test recorded.",
+  "xyz_sha256": "41a3957d9b2514018ccaae28fef8260a84ec03e5d7231ae2c73482fe6ef7b919",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 4.6151104473205536e-15,
+  "source_xyz_sha256": "1c828b1fedc396ef8b01824751ebaeaf334323e05b12320171958c96f56cfc44"
+}

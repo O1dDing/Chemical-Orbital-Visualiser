@@ -150,7 +150,7 @@ int main() {
     std::ostringstream svg_buf;
     svg_buf << svg_file.rdbuf();
     const std::string svg = svg_buf.str();
-    if (svg.find("adaptive nonlinear (log-gap v3)") == std::string::npos ||
+    if (svg.find("Nonlinear energy axis") == std::string::npos ||
         svg.find("data-symmetry=\"E1&quot;\"") == std::string::npos ||
         svg.find("font-size=\"6.3\"") != std::string::npos ||
         svg.find("baseline-shift=") != std::string::npos) {
@@ -161,8 +161,8 @@ int main() {
         std::cerr << "MO numbering leaked into exported figure\n";
         return 11;
     }
-    if (svg.find("font-size=\"10\">N/A</text>") == std::string::npos) {
-        std::cerr << "compact orbital type / bonding fallback was not rendered below levels\n";
+    if (svg.find("font-size=\"10\">MO [list] ") == std::string::npos) {
+        std::cerr << "missing name must retain an explicit canonical list identity\n";
         return 12;
     }
     if (svg.find(">↑</text>") != std::string::npos ||

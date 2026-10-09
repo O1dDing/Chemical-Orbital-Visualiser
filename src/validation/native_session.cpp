@@ -1,5 +1,6 @@
 #include "cov/validation.hpp"
 #include "cov/validation_navigation.hpp"
+#include "cov/forensic_capture.hpp"
 #include "cov/gl_api.hpp"
 #include <imgui_internal.h>
 #include <algorithm>
@@ -20,9 +21,14 @@ namespace cov::validation {
 namespace {
 using Clock = std::chrono::steady_clock;
 struct Target { ImVec2 lo, hi; ImGuiWindow* window; ImRect clip; };
-struct Command { std::string op, id, value; std::vector<float> args; };
+struct Command { std::string op, id, value; std::vector<float> args; std::vector<std::string> paths; };
+std::vector<std::filesystem::path> dropped_paths;
 bool enabled = false;
 bool hidden_window = false;
+bool forensic = false;
+int detail_page = 0;
+float detail_scroll_before = -1;
+bool detail_page_pending = false;
 int requested_window_width = 2100, requested_window_height = 1250;
 std::filesystem::path output;
 std::string export_name="actual-export";
@@ -30,6 +36,14 @@ std::vector<Command> commands;
 std::size_t next = 0, frame = 0, generation = 0, rendered_generation = 0;
 std::size_t volume_mo = 0, rendered_mo = 0;
 std::size_t drawn_ui_mo = 0, requested_mo = 0, diagram_generation = 0;
+std::string active_set="canonical", active_dataset, active_spin="alpha", active_association="not_attached";
+std::string active_coefficient_source="not_available";
+bool active_direct_fchk=false, active_density_verified=false;
+std::size_t active_source_index=std::numeric_limits<std::size_t>::max();
+std::string rendered_set="canonical", rendered_dataset, rendered_spin="alpha", rendered_association="not_attached";
+std::string rendered_coefficient_source="not_available";
+bool rendered_direct_fchk=false, rendered_density_verified=false;
+std::size_t rendered_source_index=std::numeric_limits<std::size_t>::max();
 int stage = 0, attempts = 0, failures = 0, cooldown = 0;
 bool complete_command = false;
 Clock::time_point started, command_started;
@@ -71,7 +85,8 @@ void finish(const std::string& status, const std::string& detail = {}) {
             << ",\"seconds\":" << number(std::chrono::duration<double>(Clock::now()-command_started).count()) << "}\n";
     actions.flush();
     if (status != "executed") ++failures;
-    ++next; stage = attempts = cooldown = 0; complete_command = false;
+    ++next; stage = attempts = cooldown = detail_page = 0; complete_command = false;
+    detail_scroll_before=-1;detail_page_pending=false;
     command_started = Clock::now();
 }
 NavigationTarget navigation_target(const Target& t) { return {t.lo,t.hi,t.window,t.clip.Min,t.clip.Max}; }
@@ -117,11 +132,30 @@ std::string state_json(std::size_t applied, const ui::OrbitalUIState& ui, const 
     std::ostringstream s; s << std::setprecision(17);
     s << "{\"schema\":1,\"frame\":" << frame << ",\"elapsed_seconds\":" << elapsed()
       << ",\"rendered_mo\":" << rendered_mo << ",\"applied_mo\":" << applied
+      << ",\"rendered_set\":" << quote(rendered_set)
+      << ",\"rendered_dataset\":" << quote(rendered_dataset)
+      << ",\"rendered_spin\":" << quote(rendered_spin)
+      << ",\"rendered_source_index\":";
+    if(rendered_source_index==std::numeric_limits<std::size_t>::max())s<<"null";else s<<rendered_source_index;
+    s << ",\"applied_set\":" << quote(active_set)
+      << ",\"applied_dataset\":" << quote(active_dataset)
+      << ",\"applied_spin\":" << quote(active_spin)
+      << ",\"applied_source_index\":";
+    if(active_source_index==std::numeric_limits<std::size_t>::max())s<<"null";else s<<active_source_index;
+    s << ",\"association\":" << quote(active_association)
+      << ",\"coefficient_source\":" << quote(active_coefficient_source)
+      << ",\"direct_fchk_coefficients\":" << (active_direct_fchk?"true":"false")
+      << ",\"density_verified\":" << (active_density_verified?"true":"false")
+      << ",\"rendered_coefficient_source\":" << quote(rendered_coefficient_source)
+      << ",\"rendered_direct_fchk_coefficients\":" << (rendered_direct_fchk?"true":"false")
+      << ",\"rendered_density_verified\":" << (rendered_density_verified?"true":"false")
       << ",\"drawn_ui_mo\":" << drawn_ui_mo << ",\"requested_mo\":" << requested_mo
       << ",\"scene_view\":" << scene_view_json
       << ",\"diagram_generation\":" << diagram_generation
       << ",\"rendered_generation\":" << rendered_generation << ",\"volume_generation\":" << generation
-      << ",\"scene_matches_applied\":" << (rendered_mo==applied?"true":"false")
+      << ",\"scene_matches_applied\":" << (rendered_mo==applied && rendered_set==active_set &&
+          rendered_dataset==active_dataset && rendered_spin==active_spin &&
+          rendered_source_index==active_source_index && rendered_coefficient_source==active_coefficient_source?"true":"false")
       << ",\"evaluation_reason\":" << quote(evaluation_reason) << ",\"kernel_ms\":" << kernel_ms
       << ",\"compact\":" << (ui.hide_ligand_centred_intermediates?"true":"false")
       << ",\"energy_unit\":" << static_cast<int>(ui.energy_unit)
@@ -129,8 +163,16 @@ std::string state_json(std::size_t applied, const ui::OrbitalUIState& ui, const 
       << ",\"filter\":" << static_cast<int>(ui.filter.mode);
     if (wf && applied<wf->orbitals.size()) {
         const auto& mo=wf->orbitals[applied];
-        s << ",\"energy_hartree\":" << mo.energy_hartree << ",\"occupation\":" << mo.occupation
-          << ",\"spin\":" << static_cast<int>(mo.spin);
+        s << ",\"energy_hartree\":";
+        if(std::isfinite(mo.energy_hartree) && active_set=="canonical")s<<mo.energy_hartree;
+        else s<<"null";
+        s << ",\"energy_semantics\":" << quote(active_set=="canonical"?"canonical eigenvalue":"not applicable; NBO diagonal Fock is separate")
+          << ",\"occupation\":";
+        if(active_set=="canonical")s<<mo.occupation;else s<<"null";
+        s << ",\"occupation_semantics\":" << quote(active_set=="canonical"?"canonical occupation":"selected orbital or combination metadata; renderer placeholder is not physical occupation")
+          << ",\"spin\":";
+        if(active_set=="canonical")s<<static_cast<int>(mo.spin);else s<<"null";
+        s << ",\"spin_semantics\":" << quote(active_set=="canonical"?"canonical wavefunction spin":"NBO spin is applied_spin; renderer channel may differ");
     }
     s << '}'; return s.str();
 }
@@ -158,16 +200,18 @@ bool configure(int argc, char** argv) {
         if(a=="--validation-plan" && i+1<argc) plan=std::filesystem::u8path(argv[++i]);
         else if(a=="--validation-output" && i+1<argc) output=std::filesystem::u8path(argv[++i]);
         else if(a=="--validation-background") hidden_window=true;
+        else if(a=="--validation-forensic") forensic=true;
         else throw std::runtime_error("unknown/incomplete validation argument: "+a);
     }
-    if(plan.empty() && output.empty() && !hidden_window) return false;
+    if(plan.empty() && output.empty() && !hidden_window && !forensic) return false;
     if(plan.empty() || output.empty()) throw std::runtime_error("plan and output are both required");
     std::ifstream in(plan); std::string line;
     std::getline(in,line); if(line!="COV_VALIDATION 1") throw std::runtime_error("unsupported validation plan schema");
     while(std::getline(in,line)) {
         if(line.empty() || line[0]=='#') continue;
         std::istringstream r(line); Command c; r>>c.op;
-        if(c.op=="scene") {float x;while(r>>x)c.args.push_back(x);if(c.args.size()!=6)throw std::runtime_error("scene requires opacity yaw pitch distance iso resolution");}
+        if(c.op=="drop") {std::string path;while(r>>std::quoted(path))c.paths.push_back(path);if(c.paths.empty())throw std::runtime_error("drop requires one or more quoted paths");}
+        else if(c.op=="scene") {float x;while(r>>x)c.args.push_back(x);if(c.args.size()!=6)throw std::runtime_error("scene requires opacity yaw pitch distance iso resolution");}
         else if(c.op=="window") {
             float width=0,height=0; std::string extra;
             if(!(r>>width>>height) || (r>>extra) || !std::isfinite(width) || !std::isfinite(height) ||
@@ -187,7 +231,12 @@ bool configure(int argc, char** argv) {
                 c.args={x,y};
             }
         }
-        if(c.op!="scene"&&c.op!="window"&&c.op!="drag"&&c.op!="wheel"&&c.op!="click"&&c.op!="hover"&&c.op!="seek"&&c.op!="text"&&c.op!="capture"&&!volume_command(c)&&c.op!="key"&&c.op!="wait"&&c.op!="export-name") throw std::runtime_error("unknown plan command");
+        if(c.op!="drop"&&c.op!="scene"&&c.op!="window"&&c.op!="drag"&&c.op!="wheel"&&c.op!="click"&&c.op!="expand"&&c.op!="hover"&&c.op!="seek"&&c.op!="text"&&c.op!="capture"&&!volume_command(c)&&c.op!="key"&&c.op!="wait"&&c.op!="export-name"&&c.op!="inspect"&&c.op!="inspect-details") throw std::runtime_error("unknown plan command");
+        if((c.op=="inspect" || c.op=="inspect-details") && !forensic)
+            throw std::runtime_error("inspect requires --validation-forensic");
+        if((c.op=="inspect" || c.op=="inspect-details" || c.op=="capture") &&
+           (c.id.empty() || c.id.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")!=std::string::npos))
+            throw std::runtime_error("capture/inspect requires a plain artifact name");
         if(c.op=="export-name" && (c.id.empty() || c.id.find_first_not_of(
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")!=std::string::npos)) {
             throw std::runtime_error("export-name requires a plain artifact name");
@@ -197,17 +246,20 @@ bool configure(int argc, char** argv) {
     if(std::filesystem::exists(output / "actions.jsonl")) throw std::runtime_error("refusing to overwrite an existing validation run");
     std::filesystem::create_directories(output);
     std::filesystem::copy_file(plan,output/"plan.txt");
-    frames.open(output/"frames.jsonl");actions.open(output/"actions.jsonl");
+    if(!forensic)frames.open(output/"frames.jsonl");
+    actions.open(output/"actions.jsonl");
     events.open(output/"events.jsonl");
     started=command_started=Clock::now(); enabled=true;
     std::ofstream identity(output/"identity.json");
     identity << "{\"schema\":1,\"git_commit\":" << quote(COV_VALIDATION_COMMIT)
              << ",\"input\":" << quote(argv[1]) << ",\"build\":\"validation ON\",\"imgui\":" << quote(IMGUI_VERSION)
              << ",\"window_mode\":" << quote(hidden_window?"background-hidden":"visible")
+             << ",\"forensic\":" << (forensic?"true":"false")
              << ",\"protocol\":\"local plan v1\",\"scientific_verdict\":\"external checker required\"}";
     return true;
 }
 bool active(){return enabled;}
+bool forensic_mode(){return enabled&&forensic;}
 bool background(){return enabled&&hidden_window;}
 int window_width(){return requested_window_width;}
 int window_height(){return requested_window_height;}
@@ -229,6 +281,9 @@ void begin_frame(OrbitCamera& camera, MoleculeRenderSettings& settings, float& i
         complete_command=true;
     }
 }
+std::vector<std::filesystem::path> take_dropped_paths(){
+    auto out=std::move(dropped_paths);dropped_paths.clear();return out;
+}
 void input_frame() {
     if(!enabled||done())return;
     auto& c=commands[next]; auto& io=ImGui::GetIO();
@@ -238,13 +293,42 @@ void input_frame() {
     io.ClearEventsQueue();
     io.AddFocusEvent(true);
     io.AddMousePosEvent(injected_mouse.x,injected_mouse.y);
+    if(c.op=="drop") {
+        if(stage==0)for(const auto& p:c.paths)dropped_paths.push_back(std::filesystem::u8path(p));
+        if(++stage>=5)complete_command=true;
+        return;
+    }
     if(c.op=="scene")return;
     if(c.op=="window") {if(++stage>=4)complete_command=true;return;}
     // Destination naming alone; the following real button click still owns
     // the production export. Existing COV_VALIDATION 1 plans keep the default.
     if(c.op=="export-name") {export_name=c.id;complete_command=true;return;}
     if(volume_command(c)) {++stage;return;}
-    if(c.op=="capture" || c.op=="wait") { if(++stage>=4) complete_command=true;return; }
+    if(c.op=="capture" || c.op=="wait" || c.op=="inspect") { if(++stage>=4) complete_command=true;return; }
+    if(c.op=="inspect-details") {
+        const auto found=previous.find("diagram.details.window");
+        if(found==previous.end() || !found->second.window || found->second.window->Collapsed) {
+            if(++attempts>=12)finish("failed","details window is not open");
+            return;
+        }
+        auto* w=found->second.window;
+        // Real wheel input, never SetScrollY: this also reveals occlusion failures.
+        const auto p=ImVec2(w->InnerRect.GetCenter().x,w->InnerRect.GetCenter().y);
+        injected_mouse=p;io.AddMousePosEvent(p.x,p.y);
+        if(cooldown>0) {io.AddMouseWheelEvent(0,-float(cooldown));cooldown=0;stage=1;return;}
+        if(stage==0 && detail_page==0 && w->Scroll.y>1) {
+            io.AddMouseWheelEvent(0,100);stage=1;detail_scroll_before=w->Scroll.y;return;
+        }
+        if(++stage<5)return;
+        if(detail_page==0 && w->Scroll.y>1 && detail_scroll_before>=0) {
+            finish("failed","details top is unreachable or covered");return;
+        }
+        if(detail_page>0 && w->Scroll.y<=detail_scroll_before+0.5f && w->Scroll.y<w->ScrollMax.y-1) {
+            finish("failed","details scrolling made no progress; check window stacking");return;
+        }
+        detail_page_pending=true;
+        return;
+    }
     if(c.op=="key") {
         const std::map<std::string,ImGuiKey> keys={{"Home",ImGuiKey_Home},{"Down",ImGuiKey_DownArrow},{"Up",ImGuiKey_UpArrow},{"Enter",ImGuiKey_Enter},{"Escape",ImGuiKey_Escape}};
         const auto k=keys.find(c.id);if(k==keys.end()){finish("failed","unsupported key");return;}
@@ -252,6 +336,16 @@ void input_frame() {
         if(++stage>=4)complete_command=true;return;
     }
     if(cooldown>0){--cooldown;return;}
+    if(c.op=="expand" && stage==0) {
+        // Observe the registered production header state; never force it.
+        // When closed, continue through the ordinary seek/down/up path.
+        if(previous.contains(c.id+".open")){finish("executed","header already open");return;}
+        if(!previous.contains(c.id)) {
+            if(++attempts>=4)finish("executed","header not applicable to this selection");
+            return;
+        }
+        if(!previous.contains(c.id+".closed")){finish("failed","header expansion state not registered");return;}
+    }
     if(stage==0) {
         const auto it=previous.find(c.id);
         if(it==previous.end()) {
@@ -261,7 +355,7 @@ void input_frame() {
             }
             if(++attempts>60)finish("failed","semantic target not drawn");return;
         }
-        if(!seek(it->second,c.op=="hover")) {if(++attempts>60)finish("failed","target clipped or unreachable by wheel input");return;}
+        if(!seek(it->second,c.op=="hover" || c.op=="seek")) {if(++attempts>60)finish("failed","target clipped or unreachable by wheel input");return;}
         if(c.op=="seek"){complete_command=true;return;}
     }
     // Once the real pointer sequence starts, finish its release and settling
@@ -303,12 +397,30 @@ void evaluated(std::size_t mo,const char* reason,float milliseconds) {
     if(!enabled)return;
     ++generation;volume_mo=mo;evaluation_reason=reason;kernel_ms=milliseconds;
 }
+void orbital_identity(const std::string& set,const std::string& dataset,
+                      const std::string& spin,std::size_t source_index,
+                      const std::string& association,
+                      const std::string& coefficient_source,
+                      bool direct_fchk_coefficients,bool density_verified) {
+    if(!enabled)return;
+    active_set=set;active_dataset=dataset;active_spin=spin;
+    active_source_index=source_index;active_association=association;
+    active_coefficient_source=coefficient_source;
+    active_direct_fchk=direct_fchk_coefficients;
+    active_density_verified=density_verified;
+}
 void ui_frame(std::size_t drawn,std::size_t requested) {
     drawn_ui_mo=drawn;requested_mo=requested;
 }
-void after_scene(const VolumeRenderer& renderer,const GridBox& box,std::size_t mo) {
+void after_scene(const VolumeRenderer& renderer,const GridBox& box,std::size_t mo,std::size_t field_index) {
     if(!enabled)return;
     rendered_mo=mo;rendered_generation=generation;
+    rendered_set=active_set;rendered_dataset=active_dataset;
+    rendered_spin=active_spin;rendered_source_index=active_source_index;
+    rendered_association=active_association;
+    rendered_coefficient_source=active_coefficient_source;
+    rendered_direct_fchk=active_direct_fchk;
+    rendered_density_verified=active_density_verified;
     if(done() || !volume_command(commands[next]) || stage<4)return;
     const auto& c=commands[next];
     if(!c.value.empty() && std::stoull(c.value)!=mo) {finish("failed","selected MO does not match requested readback");return;}
@@ -325,13 +437,22 @@ void after_scene(const VolumeRenderer& renderer,const GridBox& box,std::size_t m
     // Full-grid evidence is an opt-in extension of the existing v1 plan. It
     // stores the same texture just rendered, including its original float bits.
     const bool full=c.op=="volume_full";
-    const std::string binary_name=c.id+".volume.f32";
+    const std::string field_suffix=field_index?"-field"+std::to_string(field_index):"";
+    const std::string binary_name=c.id+field_suffix+".volume.f32";
     if(full)write_volume_binary(output/binary_name,volume);
     std::mt19937 rng(20260905);std::vector<std::uint32_t> indices;
     for(int i=0;i<8192;++i)indices.push_back(rng()%static_cast<std::uint32_t>(volume.size()));
     std::sort(indices.begin(),indices.end());indices.erase(std::unique(indices.begin(),indices.end()),indices.end());
-    std::ofstream out(output/(c.id+".volume.json"));out<<std::setprecision(17);
+    std::ofstream out(output/(c.id+field_suffix+".volume.json"));out<<std::setprecision(17);
     out<<"{\"schema\":1,\"frame\":"<<frame<<",\"generation\":"<<generation<<",\"rendered_mo\":"<<mo
+       <<",\"field_index\":"<<field_index
+       <<",\"orbital_set\":"<<quote(rendered_set)<<",\"dataset\":"<<quote(rendered_dataset)
+       <<",\"spin\":"<<quote(rendered_spin)<<",\"source_index\":";
+    if(rendered_source_index==std::numeric_limits<std::size_t>::max())out<<"null";else out<<rendered_source_index;
+    out<<",\"association\":"<<quote(rendered_association)
+       <<",\"coefficient_source\":"<<quote(rendered_coefficient_source)
+       <<",\"direct_fchk_coefficients\":"<<(rendered_direct_fchk?"true":"false")
+       <<",\"density_verified\":"<<(rendered_density_verified?"true":"false")
        <<",\"texture_id\":"<<renderer.volume_texture()<<",\"nx\":"<<nx<<",\"ny\":"<<ny<<",\"nz\":"<<nz
        <<",\"grid_box_bohr\":["<<box.min_x<<','<<box.min_y<<','<<box.min_z<<','<<box.max_x<<','<<box.max_y<<','<<box.max_z
        <<"],\"layout\":\"x fastest; coordinates use CUDA float interpolation i/(n-1)\"";
@@ -373,21 +494,39 @@ void item(const std::string& id) {
     if(!enabled || ImGui::GetCurrentWindow()->SkipItems)return;
     hit(id,ImGui::GetItemRectMin(),ImGui::GetItemRectMax());
 }
+void chrome_hit(const std::string& id, ImVec2 lo, ImVec2 hi) {
+    if(!enabled)return;
+    auto* window=ImGui::GetCurrentWindow();
+    targets[id]={lo,hi,window,window->OuterRectClipped};
+}
 void anchor(const std::string& id) {
     if(!enabled)return;const auto p=ImGui::GetCursorScreenPos();hit(id,p,ImVec2(p.x+20,p.y+4));
 }
 void record(const std::string& kind,const std::string& json) {
+    if(enabled && forensic && (kind=="nbo.integration" || kind=="aomo.selection" ||
+       kind=="chemistry.route" || kind=="input.density_evidence" || kind=="input.pi_topology_evidence"))return;
+    if(enabled && (kind=="nbo.integration" || kind=="aomo.selection")){
+        const auto name=(kind=="nbo.integration"?"integration-":"selection-")+std::to_string(frame)+".json";
+        std::ofstream file(output/name);file<<json;
+        if(!file)throw std::runtime_error("Cannot preserve integrated orbital evidence");
+        events<<"{\"frame\":"<<frame<<",\"kind\":"<<quote(kind)<<",\"file\":"<<quote(name)<<"}\n";
+        events.flush();return;
+    }
     if(enabled && (kind=="input.density_evidence" || kind=="input.pi_topology_evidence")) {
         events<<"{\"frame\":"<<frame<<",\"kind\":"<<quote(kind)<<",\"data\":"<<json<<"}\n";
         events.flush();
         return; // Full input evidence belongs to the load event, not per-frame traces.
     }
     if(enabled)trace.push_back("{\"kind\":"+quote(kind)+",\"data\":"+json+"}");
-    if(enabled && (kind=="export.actual" || kind=="input.numerical_diagnostics" ||
+    if(enabled && (kind=="export.actual" || kind=="nbo.export" ||
+                   kind=="browser.copy" || kind=="details.copy" || kind=="aomo.copy" ||
+                   kind=="nbo.attach" || kind=="nbo.attach.error" || kind=="scene.pick" ||
+                   kind=="aomo.selection.error" || kind=="input.package.error" ||
+                   kind=="input.numerical_diagnostics" || kind=="input.frame_tracking" ||
                    (kind=="diagram.cache" && json.find("false")!=std::string::npos))) {
         if(kind=="diagram.cache")++diagram_generation;
         events<<"{\"frame\":"<<frame<<",\"kind\":"<<quote(kind)<<",\"data\":"<<json<<"}\n";events.flush();
-        if(kind=="export.actual") {
+        if(kind=="export.actual" || kind=="nbo.export") {
             events<<"{\"frame\":"<<frame<<",\"kind\":\"export.frame-trace\",\"data\":[";
             bool first=true;
             for(const auto& entry:trace){if(!first)events<<',';first=false;events<<entry;}
@@ -403,9 +542,43 @@ std::filesystem::path export_base(const std::filesystem::path& original) {
 }
 void end_frame(int width,int height,std::size_t applied,const ui::OrbitalUIState& ui,const Wavefunction* wf) {
     if(!enabled)return;
-    const auto state=state_json(applied,ui,wf);frames<<state<<'\n';
+    const auto state=state_json(applied,ui,wf);
+    if(!forensic)frames<<state<<'\n';
+    const auto write_inspection=[&](const std::string& id) {
+        std::ofstream out(output/(id+".view.json"));
+        out<<"{\"schema\":1,\"state\":"<<state<<",\"targets\":[";bool first=true;
+        for(const auto& [name,t]:targets){if(!first)out<<',';first=false;out<<"{\"id\":"<<quote(name)
+            <<",\"rect\":["<<t.lo.x<<','<<t.lo.y<<','<<t.hi.x<<','<<t.hi.y
+            <<"],\"clip_rect\":["<<t.clip.Min.x<<','<<t.clip.Min.y<<','<<t.clip.Max.x<<','<<t.clip.Max.y
+            <<"],\"visible\":"<<(point_visible(t)?"true":"false")<<'}';}
+        out<<"],\"draw_trace\":[";first=true;
+        for(const auto& x:trace){if(!first)out<<',';first=false;out<<x;}
+        out<<"],\"rendered\":"<<capture_rendered_frame_json(ImGui::GetDrawData(),ImGui::GetIO().Fonts)<<'}';
+        out.close();if(!out)throw std::runtime_error("cannot save final display inspection");
+    };
+    if(!done() && detail_page_pending) {
+        const auto it=targets.find("diagram.details.window");
+        if(it==targets.end() || !it->second.window){finish("failed","details disappeared during capture");return;}
+        auto* w=it->second.window;
+        std::ostringstream name;name<<commands[next].id<<"-p"<<std::setfill('0')<<std::setw(3)<<detail_page;
+        write_inspection(name.str());
+        detail_page_pending=false;
+        if(w->Scroll.y>=w->ScrollMax.y-1)complete_command=true;
+        else if(++detail_page>=64){finish("failed","details page limit reached");return;}
+        else {
+            detail_scroll_before=w->Scroll.y;stage=0;
+            // Less than one visible page gives overlap between captured pages.
+            const float step=std::max(1.0f,std::floor(w->InnerRect.GetHeight()/(5.0f*w->CalcFontSize())*0.65f));
+            // input_frame clears backend events, so store the pending wheel.
+            cooldown=static_cast<int>(step);
+        }
+    }
     if(!done() && complete_command) {
         const auto c=commands[next];
+        if(c.op=="expand" && targets.contains(c.id+".closed")) {
+            finish("failed","header remained closed after real pointer input");return;
+        }
+        if(c.op=="inspect" || (forensic && c.op=="capture"))write_inspection(c.id);
         if(c.op=="capture" || c.op=="volume_full") {
             framebuffer(output/(c.id+".bmp"),width,height);
             std::ofstream out(output/(c.id+".ui.json"));

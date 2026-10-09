@@ -1,4 +1,5 @@
 #include "cov/mo_diagram.hpp"
+#include "cov/chemistry_route.hpp"
 #include "cov/ligand_field.hpp"
 #include "cov/local_geometry.hpp"
 #include "cov/local_orbital_symmetry.hpp"
@@ -15,9 +16,172 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace cov {
+
+namespace {
+double diagram_orbital_energy(const Wavefunction& w,const MODiagramOptions& options,std::size_t index) {
+    return options.canonical_display_energies.size()==w.orbitals.size()
+        ?options.canonical_display_energies[index]:w.orbitals[index].energy_hartree;
+}
+bool composition_metal(int z) noexcept {
+    if((z>=21 && z<=30)||(z>=39 && z<=48)||(z>=57 && z<=80)||
+       (z>=89 && z<=112))return true;
+    switch(z) {
+        case 3:case 4:case 11:case 12:case 13:case 19:case 20:
+        case 31:case 37:case 38:case 49:case 50:case 55:case 56:
+        case 81:case 82:case 83:case 87:case 88:case 113:case 114:
+        case 115:case 116:return true;
+        default:return false;
+    }
+}
+}
+
+MOCompositionScope mo_composition_scope(const Wavefunction& w,const RoutedAnalysis* routed,
+                                        const std::vector<std::size_t>& centres) {
+    MOCompositionScope result;
+    if(centres.empty()){result.detail="no-explicit-composition-centre";return result;}
+    for(auto a:centres) {
+        if(a>=w.atoms.size() || !composition_metal(w.atoms[a].atomic_number)) {
+            result.detail="composition-centre-is-not-a-metal";return result;
+        }
+        if(std::find(result.centre_atoms.begin(),result.centre_atoms.end(),a)==result.centre_atoms.end())
+            result.centre_atoms.push_back(a);
+    }
+    const bool linked=routed && routed->canonical_fingerprint==nbo_canonical_fingerprint(w) &&
+        routed->interaction_graph.available();
+    const auto graph=linked?make_fixed_bonding_scope(w,*routed->interaction_graph.value):
+        make_fixed_bonding_scope(w);
+    std::vector<std::vector<std::size_t>> adjacency(w.atoms.size());
+    for(const auto& [a,b]:graph.edges)if(a<w.atoms.size() && b<w.atoms.size()) {
+        adjacency[a].push_back(b);adjacency[b].push_back(a);
+    }
+    std::vector<bool> visited(w.atoms.size(),false);
+    std::queue<std::size_t> pending;
+    for(auto a:result.centre_atoms){visited[a]=true;pending.push(a);}
+    // Walk only verified skeletal/coordination connectivity. Other metals are
+    // boundaries, not ligand atoms; connected ligand fragments retain all atoms.
+    while(!pending.empty()) {
+        const auto a=pending.front();pending.pop();
+        for(auto b:adjacency[a])if(!visited[b] && !composition_metal(w.atoms[b].atomic_number)) {
+            visited[b]=true;pending.push(b);result.ligand_atoms.push_back(b);
+        }
+    }
+    for(std::size_t a=0;a<w.atoms.size();++a)if(!visited[a])result.other_atoms.push_back(a);
+    std::sort(result.ligand_atoms.begin(),result.ligand_atoms.end());
+    result.applicable=!result.ligand_atoms.empty();
+    result.detail=result.applicable?"actual-metal-and-connected-ligand-fragments":
+        "no-supported-associated-ligand-fragment";
+    return result;
+}
+
+std::vector<MOCurrentRadialShell> mo_current_radial_shells(
+    const Wavefunction& wavefunction,const RoutedAnalysis& routed,
+    const std::vector<std::size_t>& centres) {
+    if(routed.canonical_fingerprint!=nbo_canonical_fingerprint(wavefunction))return {};
+    std::map<std::pair<std::size_t,int>,int> valence;
+    std::set<std::tuple<std::size_t,int,int>> present;
+    for(const auto& entry:routed.mo_composition) {
+        if(!entry.available() || entry.provider!=RoutedProvider::Nbo)continue;
+        for(const auto& row:entry.value->rows) {
+            if(!row.atom || !row.principal_n || !row.angular_l || *row.principal_n<=0 ||
+               *row.angular_l<0 || *row.angular_l>3 ||
+               std::find(centres.begin(),centres.end(),row.atom-1)==centres.end())continue;
+            const auto atom=row.atom-1;
+            present.emplace(atom,*row.principal_n,*row.angular_l);
+            if(row.type.rfind("Val",0)!=0)continue;
+            const auto key=std::pair{atom,*row.angular_l};
+            auto [it,inserted]=valence.emplace(key,*row.principal_n);
+            if(!inserted)it->second=std::min(it->second,*row.principal_n);
+        }
+    }
+    std::vector<MOCurrentRadialShell> result;
+    for(const auto atom:centres) {
+        if(atom>=wavefunction.atoms.size())continue;
+        int outer_n=0;
+        for(int l=0;l<=3;++l)if(const auto it=valence.find({atom,l});it!=valence.end()) {
+            result.push_back({atom,it->second,l,"producer-Val-current-radial-shell"});
+            // The source valence period supplies necessary ns/np, including
+            // empty Ryd-labelled shells. Never follow a retained MO to higher nd/nf.
+            outer_n=std::max(outer_n,it->second+(l==2?1:l==3?2:0));
+        }
+        for(int l=0;l<=1;++l)if(outer_n>0 && !valence.contains({atom,l}) &&
+            present.contains({atom,outer_n,l}))
+            result.push_back({atom,outer_n,l,"source-valence-period-required-ns-np-framework"});
+    }
+    return result;
+}
+
+MOGroupCompositionLedger mo_group_composition_ledger(
+    const Wavefunction& wavefunction,const RoutedAnalysis* routed,
+    const std::vector<std::size_t>& members,const std::vector<std::size_t>& centres,
+    const std::vector<MOCurrentRadialShell>& shells) {
+    MOGroupCompositionLedger result;result.member_count=members.size();
+    if(!routed || members.empty() ||
+       routed->canonical_fingerprint!=nbo_canonical_fingerprint(wavefunction)) {
+        result.detail="complete-NAO-source-unavailable-or-identity-mismatch";
+        result.unresolved=1;return result;
+    }
+    result.source="complete-NAO-original-norm-member-average";
+    const auto scope=mo_composition_scope(wavefunction,routed,centres);
+    bool complete=true;
+    const double divisor=static_cast<double>(members.size());
+    for(const auto member:members) {
+        if(member>=routed->mo_composition.size()) {
+            complete=false;result.unresolved+=1/divisor;continue;
+        }
+        const auto& entry=routed->mo_composition[member];
+        if(!entry.available() || entry.provider!=RoutedProvider::Nbo) {
+            complete=false;result.unresolved+=1/divisor;continue;
+        }
+        result.available=true;complete=complete && entry.value->complete;
+        double sum=0;
+        for(const auto& row:entry.value->rows) {
+            if(!std::isfinite(row.weight) || row.weight<0) {complete=false;continue;}
+            sum+=row.weight;
+            const double weight=row.weight/divisor;
+            if(!row.atom || row.atom>wavefunction.atoms.size()) {
+                result.unresolved+=weight;continue;
+            }
+            if(row.type.rfind("Cor",0)==0) {result.core+=weight;continue;}
+            const auto atom=row.atom-1;
+            const bool centre=std::find(centres.begin(),centres.end(),atom)!=centres.end();
+            if(centre) {
+                const bool current=row.principal_n && row.angular_l &&
+                    std::any_of(shells.begin(),shells.end(),[&](const auto& shell) {
+                        return shell.atom==atom && shell.n==*row.principal_n && shell.l==*row.angular_l;
+                    });
+                if(!current)result.centre_other+=weight;
+                else switch(*row.angular_l) {
+                    case 0:result.centre_current_s+=weight;break;
+                    case 1:result.centre_current_p+=weight;break;
+                    case 2:result.centre_current_d+=weight;break;
+                    case 3:result.centre_current_f+=weight;break;
+                    default:result.centre_other+=weight;
+                }
+            } else if(scope.applicable &&
+                      std::find(scope.ligand_atoms.begin(),scope.ligand_atoms.end(),atom)==scope.ligand_atoms.end()) {
+                result.other_atoms+=weight;
+            } else if(row.type.rfind("Val",0)==0) {
+                result.ligand_valence+=weight;
+                if(row.angular_l==0)result.ligand_valence_s+=weight;
+                if(row.angular_l==1)result.ligand_valence_p+=weight;
+            } else result.ligand_other+=weight;
+        }
+        result.weight_sum+=sum/divisor;
+        result.normalization_error=std::max(result.normalization_error,std::abs(sum-1));
+        if(sum<1)result.unresolved+=(1-sum)/divisor;
+        // Numerical closure validation, never a chemical display threshold.
+        if(std::abs(sum-1)>1e-5)complete=false;
+    }
+    result.complete=result.available && complete;
+    result.status=result.complete?"complete":result.available?"partial":"unavailable";
+    result.detail=result.complete?"exclusive-complete-NAO-buckets; original-member-norm":
+        "missing-or-incomplete-members; do-not-infer-low-coverage";
+    return result;
+}
 
 OrbitalAnnotation annotate_orbital_legacy(const MolecularOrbital& orbital);
 DiagramSelectionPlan build_valence_selection_plan_legacy(
@@ -155,7 +319,7 @@ OrbitalAnnotation chemistry_annotation(const MolecularOrbital& orbital) {
         result.bonding_confidence=chemistry.confidence;
     }
 
-    if (!chemistry.multicentre_label.empty()) {
+    if (chemistry.multicentre_assignment_available && !chemistry.multicentre_label.empty()) {
         result.multicentre.available=true;
         result.multicentre.centres=
             chemistry.multicentre_participating_atoms;
@@ -175,8 +339,10 @@ OrbitalAnnotation chemistry_annotation(const MolecularOrbital& orbital) {
         result.multicentre.heuristic=false;
     }
 
-    if (chemistry.channel.dominant==OrbitalAngularFamily::Pi &&
-        chemistry.delocalised_participating_atoms>1u &&
+    if (std::isfinite(chemistry.delocalised_pi_weight) &&
+        chemistry.delocalised_pi_weight>0.0 &&
+        chemistry.delocalised_participating_atoms>2u &&
+        !chemistry.delocalised_family_orbitals.empty() &&
         !chemistry.delocalised_family_id.empty()) {
         result.delocalised_pi.available=true;
         result.delocalised_pi.participating_atoms=
@@ -1319,7 +1485,9 @@ GroupCandidate make_group_candidate(
     const std::vector<OrbitalLabel>& labels,
     const std::size_t base,
     const LigandScope* scope,
-    const std::size_t forced_group_size=0u) {
+    const std::size_t forced_group_size=0u,
+    const std::vector<MOCurrentRadialShell>* current_shells=nullptr,
+    const std::vector<std::size_t>* current_centres=nullptr) {
     GroupCandidate candidate;
     candidate.base_index=base;
     if (base>=wavefunction.orbitals.size() || base>=metadata.size() ||
@@ -1355,9 +1523,10 @@ GroupCandidate make_group_candidate(
         level.member_electrons.push_back(electron_glyphs_for_orbital(
             orbital,frontier.separate_spin_sets));
         level.total_occupation+=static_cast<double>(orbital.occupation);
-        energy_sum+=orbital.energy_hartree;
-        energy_min=std::min(energy_min,orbital.energy_hartree);
-        energy_max=std::max(energy_max,orbital.energy_hartree);
+        const double display_energy=diagram_orbital_energy(wavefunction,options,index);
+        energy_sum+=display_energy;
+        energy_min=std::min(energy_min,display_energy);
+        energy_max=std::max(energy_max,display_energy);
         level.homo=level.homo || (frontier.homo && *frontier.homo==index);
         level.lumo=level.lumo || (frontier.lumo && *frontier.lumo==index);
         level.metadata.selected=level.metadata.selected ||
@@ -1431,12 +1600,28 @@ GroupCandidate make_group_candidate(
     level.metadata.symmetry_view=aggregate_molecular_symmetry(
         wavefunction,level.member_indices);
 
+    if(current_shells && current_centres) {
+        level.composition=mo_group_composition_ledger(wavefunction,options.routed,
+            level.member_indices,*current_centres,*current_shells);
+        if(level.composition.complete) {
+            level.metal_s_weight=level.composition.centre_current_s;
+            level.metal_p_weight=level.composition.centre_current_p;
+            level.metal_d_weight=level.composition.centre_current_d;
+            level.ligand_p_weight=level.composition.ligand_valence_p;
+            level.direct_ligand_p_weight=0;
+            if(scope && scope->available)for(const auto member:level.member_indices)
+                for(const auto& row:options.routed->mo_composition[member].value->rows)
+                    if(row.atom && scope->direct_donors.contains(row.atom-1) &&
+                       row.type.rfind("Val",0)==0 && row.angular_l==1)
+                        level.direct_ligand_p_weight+=row.weight/count;
+        }
+    }
     const double metal_valence=level.metal_s_weight+
                                level.metal_p_weight+
                                level.metal_d_weight;
     const bool occupied_group=level.total_occupation>options.filter.occupation_threshold;
     const double virtual_ceiling=frontier.lumo && *frontier.lumo<wavefunction.orbitals.size()
-        ?wavefunction.orbitals[*frontier.lumo].energy_hartree+
+        ?diagram_orbital_energy(wavefunction,options,*frontier.lumo)+
              std::min(0.75,options.filter.virtual_window_hartree)
         :std::numeric_limits<double>::infinity();
     const bool energy_relevant=occupied_group ||
@@ -1531,11 +1716,13 @@ struct RawPiPair {
     OrbitalEnergyGapKind gap_kind=OrbitalEnergyGapKind::PiPartner;
     std::shared_ptr<const WeakCrystalFieldAssessment> crystal_field_evidence;
     std::shared_ptr<const PiPartnerAssessment> evidence;
+    std::vector<std::string> equivalent_channel_ids;
     std::size_t lower=0;
     std::size_t upper=0;
     PiInteractionKind kind=PiInteractionKind::Coupled;
     double split=0.0;
     double confidence=0.0;
+    double display_strength_hartree=std::numeric_limits<double>::quiet_NaN();
     std::size_t retained=0;
     std::string symmetry;
 };
@@ -1557,30 +1744,49 @@ std::vector<RawPiPair> find_pi_pairs(
     std::vector<GroupCandidate>& groups,
     const MODiagramOptions& options,
     const std::string& point_group,
-    const LigandScope* scope) {
+    const LigandScope* scope,
+    std::vector<PiPartnerAssessment>& candidate_evidence) {
     struct ScoredPair { RawPiPair pair; double score=0.0; };
     std::vector<ScoredPair> scored;
+    std::set<std::pair<std::string,std::string>> rejected_reasons;
     const LocalLigandPiRole role=scope!=nullptr
         ?scope->pi_role:LocalLigandPiRole::Unresolved;
     const LigandPiPrior prior=role==LocalLigandPiRole::SigmaOnly?LigandPiPrior::SigmaOnly:
         role==LocalLigandPiRole::Donor?LigandPiPrior::Donor:
         role==LocalLigandPiRole::Acceptor?LigandPiPrior::Acceptor:
         role==LocalLigandPiRole::Ambiguous?LigandPiPrior::Ambiguous:LigandPiPrior::Unresolved;
+    const bool matched_route=options.routed &&
+        options.routed->canonical_fingerprint==nbo_canonical_fingerprint(wavefunction);
+    const auto same_members=[](std::vector<std::size_t> a,std::vector<std::size_t> b) {
+        std::sort(a.begin(),a.end());std::sort(b.begin(),b.end());return a==b;
+    };
+    const auto routed_members=[&](const auto& a,const auto* b) {
+        if(!matched_route||scope==nullptr||!scope->available)return false;
+        for(const auto& routed:options.routed->pi_couplings) {
+            if(!routed.available()||routed.provider!=RoutedProvider::Nbo)continue;
+            const auto& channel=*routed.value;
+            if(channel.centre_atoms.size()!=1||channel.centre_atoms.front()!=scope->metal)continue;
+            const auto contains=[&](const auto& level){return std::any_of(channel.groups.begin(),channel.groups.end(),
+                [&](const auto& group){return same_members(group.members,level.member_indices);});};
+            if(contains(a)&&(b==nullptr||contains(*b)))return true;
+        }
+        return false;
+    };
     for (std::size_t lower=0;lower<groups.size();++lower) {
         if (groups[lower].suppressed_spin_counterpart) continue;
         const auto& a=groups[lower].level;
-        if (a.pi_fraction<0.60 ||
-            a.metal_d_weight+a.ligand_p_weight<0.18) continue;
+        if (!routed_members(a,static_cast<const MODiagramLevel*>(nullptr)) &&
+            (a.pi_fraction<0.60 || a.metal_d_weight+a.ligand_p_weight<0.18)) continue;
         const std::string symmetry_a=normalised_symmetry(a.metadata.symmetry_view.label);
         for (std::size_t upper=lower+1u;upper<groups.size();++upper) {
             if (groups[upper].suppressed_spin_counterpart) continue;
             const auto& b=groups[upper].level;
+            const bool routed_pair=routed_members(a,&b);
             if (b.layout_energy_hartree<=a.layout_energy_hartree ||
-                b.metadata.degeneracy_size!=a.metadata.degeneracy_size ||
                 group_spin(wavefunction,groups[upper])!=
                     group_spin(wavefunction,groups[lower]) ||
-                b.pi_fraction<0.60 ||
-                b.metal_d_weight+b.ligand_p_weight<0.18) continue;
+                (!routed_pair&&(b.metadata.degeneracy_size!=a.metadata.degeneracy_size ||
+                 b.pi_fraction<0.60 || b.metal_d_weight+b.ligand_p_weight<0.18))) continue;
             const std::string symmetry_b=normalised_symmetry(
                 b.metadata.symmetry_view.label);
             const bool a_known=orbital_symmetry_is_local(a.metadata.symmetry_view) &&
@@ -1600,19 +1806,117 @@ std::vector<RawPiPair> find_pi_pairs(
                        (symmetry_a.empty() || symmetry_a=="?" ||
                         symmetry_a=="n/a")) {
                 symmetry=symmetry_b;
-            } else {
+            } else if(!routed_pair) {
                 continue;
             }
-            if (!local_pi_irrep(point_group,symmetry)) continue;
-            auto evidence=std::make_shared<const PiPartnerAssessment>(assess_pi_partner(
+            if(routed_pair) {
+                const bool a_local=orbital_symmetry_is_local(a.metadata.symmetry_view);
+                const bool b_local=orbital_symmetry_is_local(b.metadata.symmetry_view);
+                if(a_local&&b_local&&(!compatible_symmetry_scopes(a.metadata.symmetry_view,b.metadata.symmetry_view)||
+                   symmetry_a!=symmetry_b))continue;
+                // A common multi-rank channel is not a proof of an unknown
+                // row's irrep. Keep the relation independent of label recovery.
+                if(!a_known||!b_known||symmetry_a!=symmetry_b)symmetry.clear();
+            } else if (!local_pi_irrep(point_group,symmetry)) continue;
+            std::vector<PiPartnerAssessment> assessments;
+            if(matched_route)for(const auto& routed:options.routed->pi_couplings) {
+                if(!routed.available()||routed.provider!=RoutedProvider::Nbo)continue;
+                const auto& channel=*routed.value;
+                if(scope==nullptr||!scope->available||channel.centre_atoms.size()!=1||
+                   channel.centre_atoms.front()!=scope->metal)continue;
+                const auto first=std::find_if(channel.groups.begin(),channel.groups.end(),
+                    [&](const auto& g){return same_members(g.members,a.member_indices);});
+                const auto second=std::find_if(channel.groups.begin(),channel.groups.end(),
+                    [&](const auto& g){return same_members(g.members,b.member_indices);});
+                if(first==channel.groups.end()||second==channel.groups.end()||first->spin!=second->spin) {
+                    PiPartnerAssessment missing;
+                    missing.input_valid=true;missing.prior=prior;
+                    missing.lower={a.layout_energy_hartree,a.metal_d_weight,a.ligand_p_weight,a.pi_fraction,a.metal_ligand_overlap};
+                    missing.upper={b.layout_energy_hartree,b.metal_d_weight,b.ligand_p_weight,b.pi_fraction,b.metal_ligand_overlap};
+                    missing.splitting_hartree=b.layout_energy_hartree-a.layout_energy_hartree;
+                    missing.detail="complete-canonical-member-set-not-matched-in-local-channel";
+                    missing.channel.channel_id=channel.id;
+                    missing.channel.canonical_fingerprint=options.routed->canonical_fingerprint;
+                    missing.channel.spin=nbo_spin_name(channel.spin);
+                    missing.channel.operator_kind=channel.operator_kind;
+                    // Unmatched scope is already present in routed data. It
+                    // is not a candidate for every unrelated pair of levels.
+                    continue;
+                }
+                PiPartnerChannelEvidence provenance;
+                provenance.channel_id=channel.id;
+                provenance.canonical_fingerprint=options.routed->canonical_fingerprint;
+                provenance.spin=nbo_spin_name(channel.spin);
+                provenance.lower_members=a.member_indices;provenance.upper_members=b.member_indices;
+                provenance.same_operator_verified=true;
+                provenance.operator_kind=channel.operator_kind;
+                // Use full-molecule source irreps, never recovered local row
+                // labels, to veto different strict representations.
+                const auto molecular_a=aggregate_molecular_symmetry(wavefunction,a.member_indices);
+                const auto molecular_b=aggregate_molecular_symmetry(wavefunction,b.member_indices);
+                PiEndpointSymmetryEvidence strict_a,strict_b;
+                const bool common_molecular_scope=compatible_symmetry_scopes(molecular_a,molecular_b) &&
+                    !orbital_symmetry_is_local(molecular_a) &&
+                    ((molecular_a.origin==OrbitalSymmetryOrigin::MolecularOperations &&
+                      molecular_a.molecular_assignment && molecular_b.molecular_assignment) ||
+                     (molecular_a.origin==OrbitalSymmetryOrigin::Producer &&
+                      !molecular_a.source_path.empty() && molecular_a.source_line_begin>0));
+                if(common_molecular_scope) {
+                    strict_a={true,options.routed->canonical_fingerprint+":full-molecular-operation-domain",
+                        normalised_symmetry(molecular_a.label)};
+                    strict_b={true,strict_a.scope_id,normalised_symmetry(molecular_b.label)};
+                }
+                provenance.mode_assessment=assess_pi_mode_pair(channel,a.member_indices,b.member_indices,
+                    strict_a,strict_b);
+                if(!provenance.mode_assessment.two_endpoint_relation)continue;
+                const auto valid_members=[&](const auto& level) {
+                    return level.member_indices.size()==level.metadata.degeneracy_size &&
+                        std::all_of(level.member_indices.begin(),level.member_indices.end(),[&](auto i){
+                            return i<wavefunction.orbitals.size() &&
+                                (channel.canonical_members_are_verified_shared_spatial?
+                                    wavefunction.orbitals[i].spin==Spin::Alpha:
+                                    ((channel.spin==NboSpin::Beta)==(wavefunction.orbitals[i].spin==Spin::Beta)));});
+                };
+                provenance.complete_membership_verified=valid_members(a)&&valid_members(b);
+                provenance.occupations_verified=channel.occupation_status=="available";
+                provenance.direction_reference=channel.direction_reference;
+                provenance.frozen_operator=channel.frozen_operator;
+                provenance.direction=provenance.mode_assessment.direction;
+                provenance.direction_verified=provenance.mode_assessment.direction_verified;
+                provenance.direction_reference+="; linked-source-edge/common-mode: "+
+                    provenance.mode_assessment.reason;
+                provenance.lower_character=first->character;provenance.upper_character=second->character;
+                provenance.lower_cross_fock_max_hartree=first->cross_fock_max_hartree;
+                provenance.upper_cross_fock_min_hartree=second->cross_fock_min_hartree;
+                provenance.operator_error_hartree=channel.operator_max_error_hartree;
+                provenance.operator_tolerance_hartree=channel.operator_validation_tolerance_hartree;
+                assessments.push_back(assess_pi_channel_partner(
+                    {a.layout_energy_hartree,a.metal_d_weight,a.ligand_p_weight,a.pi_fraction,a.metal_ligand_overlap},
+                    {b.layout_energy_hartree,b.metal_d_weight,b.ligand_p_weight,b.pi_fraction,b.metal_ligand_overlap},
+                    prior,provenance));
+            }
+            if(assessments.empty() && matched_route)continue;
+            if(assessments.empty())assessments.push_back(assess_pi_partner(
                 {a.layout_energy_hartree,a.metal_d_weight,a.ligand_p_weight,a.pi_fraction,a.metal_ligand_overlap},
                 {b.layout_energy_hartree,b.metal_d_weight,b.ligand_p_weight,b.pi_fraction,b.metal_ligand_overlap},
                 prior,options.weak_pi_split_hartree,options.weak_metal_ligand_overlap));
+            for(auto& assessment:assessments) {
+            assessment.channel.lower_members=a.member_indices;
+            assessment.channel.upper_members=b.member_indices;
+            if(assessment.channel.canonical_fingerprint.empty())
+                assessment.channel.canonical_fingerprint=matched_route?
+                    options.routed->canonical_fingerprint:nbo_canonical_fingerprint(wavefunction);
+            if(assessment.channel.spin.empty())assessment.channel.spin=
+                group_spin(wavefunction,groups[lower])==Spin::Beta?"beta":"alpha";
+            if(assessment.accepted || rejected_reasons.insert(
+                {assessment.channel.channel_id,assessment.detail}).second)
+                candidate_evidence.push_back(assessment);
+            auto evidence=std::make_shared<const PiPartnerAssessment>(std::move(assessment));
             if(!evidence->accepted)continue;
             const double score=evidence->ranking_score;
             RawPiPair pair;pair.evidence=evidence;
             pair.lower=lower;pair.upper=upper;pair.split=evidence->splitting_hartree;
-            pair.symmetry=a_known?a.metadata.symmetry_view.label:b.metadata.symmetry_view.label;
+            pair.symmetry=symmetry.empty()?"":(a_known?a.metadata.symmetry_view.label:b.metadata.symmetry_view.label);
             switch(evidence->direction) {
                 case PiPairDirection::Donor:pair.kind=PiInteractionKind::Donor;break;
                 case PiPairDirection::Acceptor:pair.kind=PiInteractionKind::Acceptor;break;
@@ -1624,6 +1928,7 @@ std::vector<RawPiPair> find_pi_pairs(
             const double b_metal=b.metal_s_weight+b.metal_p_weight+b.metal_d_weight;
             pair.retained=b_metal>a_metal?upper:lower;
             scored.push_back({pair,score});
+            }
         }
     }
 
@@ -1680,18 +1985,73 @@ std::vector<RawPiPair> find_pi_pairs(
     }
 
     std::sort(scored.begin(),scored.end(),[](const auto& a,const auto& b) {
-        return a.score>b.score;
+        if(a.score!=b.score)return a.score>b.score;
+        const std::string a_id=a.pair.evidence?a.pair.evidence->channel.channel_id:"";
+        const std::string b_id=b.pair.evidence?b.pair.evidence->channel.channel_id:"";
+        if(a_id!=b_id)return a_id<b_id;
+        if(a.pair.lower!=b.pair.lower)return a.pair.lower<b.pair.lower;
+        return a.pair.upper<b.pair.upper;
     });
-    std::set<std::size_t> used_pi,used_crystal_field;
+    const auto source_channel=[&](const RawPiPair& pair)->const NboPiCoupling* {
+        if(!matched_route || !pair.evidence)return nullptr;
+        for(const auto& row:options.routed->pi_couplings)
+            if(row.available() && row.value->id==pair.evidence->channel.channel_id)return &*row.value;
+        return nullptr;
+    };
+    const auto same_projector=[](const NboMatrix& a,const NboMatrix& b) {
+        if(!a.rows || !a.columns || a.rows!=b.rows || a.columns!=b.columns ||
+           a.values.size()!=a.rows*a.columns || b.values.size()!=b.rows*b.columns)return false;
+        // Both bases were orthonormalised in the same verified NAO metric.
+        // Compare spaces, permitting phase, member permutation and rotation.
+        double residual=0;
+        for(std::size_t j=0;j<b.columns;++j) {
+            std::vector<double> coordinates(a.columns,0);
+            for(std::size_t k=0;k<a.columns;++k)for(std::size_t r=0;r<a.rows;++r)
+                coordinates[k]+=a.values[r*a.columns+k]*b.values[r*b.columns+j];
+            for(std::size_t r=0;r<a.rows;++r) {
+                double value=b.values[r*b.columns+j];
+                for(std::size_t k=0;k<a.columns;++k)value-=a.values[r*a.columns+k]*coordinates[k];
+                residual+=value*value;
+            }
+        }
+        return residual<4e-10*double(b.columns);
+    };
+    const auto equivalent_relation=[&](const RawPiPair& a,const RawPiPair& b) {
+        if(a.gap_kind!=OrbitalEnergyGapKind::PiPartner || b.gap_kind!=a.gap_kind ||
+           a.lower!=b.lower || a.upper!=b.upper || a.kind!=b.kind)return false;
+        const auto* ca=source_channel(a);const auto* cb=source_channel(b);
+        return ca && cb && ca->spin==cb->spin && ca->operator_kind==cb->operator_kind &&
+            ca->direction_verified==cb->direction_verified &&
+            same_projector(ca->centre_projector_basis,cb->centre_projector_basis) &&
+            same_projector(ca->ligand_projector_basis,cb->ligand_projector_basis);
+    };
+    std::set<std::size_t> used_crystal_field;
     std::vector<RawPiPair> result;
     for (const auto& item:scored) {
-        auto& used=item.pair.gap_kind==OrbitalEnergyGapKind::CrystalField?used_crystal_field:used_pi;
-        if (used.count(item.pair.lower) || used.count(item.pair.upper)) continue;
-        used.insert(item.pair.lower);
-        used.insert(item.pair.upper);
-        groups[item.pair.lower].include=true;
-        groups[item.pair.upper].include=true;
+        const auto duplicate=std::find_if(result.begin(),result.end(),[&](const auto& prior) {
+            return equivalent_relation(prior,item.pair);
+        });
+        if(duplicate!=result.end()) {
+            duplicate->equivalent_channel_ids.push_back(item.pair.evidence->channel.channel_id);
+            continue;
+        }
+        // A canonical group can participate in more than one physical channel.
+        // Only the independent weak crystal-field screen is a disjoint match.
+        if(item.pair.gap_kind==OrbitalEnergyGapKind::CrystalField) {
+            if(used_crystal_field.count(item.pair.lower)||used_crystal_field.count(item.pair.upper))continue;
+            used_crystal_field.insert(item.pair.lower);used_crystal_field.insert(item.pair.upper);
+        }
+        const bool ordinary_eligible=!item.pair.evidence ||
+            item.pair.evidence->channel.channel_id.empty() ||
+            item.pair.evidence->channel.mode_assessment.ordinary_display_eligible;
+        if(options.aomo_scope!=1 || ordinary_eligible) {
+            groups[item.pair.lower].include=true;
+            groups[item.pair.upper].include=true;
+        }
         for (const auto group_index:{item.pair.lower,item.pair.upper}) {
+            // Shared participation in a multi-rank Fock channel cannot
+            // independently establish a missing row symmetry label.
+            if(item.pair.evidence&&!item.pair.evidence->channel.channel_id.empty())continue;
             auto& symmetry=groups[group_index].level.metadata.symmetry_view.label;
             const std::string current=normalised_symmetry(symmetry);
             if ((current.empty() || current=="?" || current=="n/a") &&
@@ -1708,22 +2068,8 @@ std::vector<RawPiPair> find_pi_pairs(
                 }
             }
         }
-        if (item.pair.kind==PiInteractionKind::WeakNearNonbonding) {
-            auto& lower=groups[item.pair.lower].level;
-            auto& upper=groups[item.pair.upper].level;
-            lower.approximate_nonbonding=true;
-            upper.approximate_nonbonding=true;
-            // Approximate nonbonding refers to this local contribution.
-            // Preserve the independently analysed whole-MO bonding role.
-            const std::size_t dropped=item.pair.retained==item.pair.lower
-                ?item.pair.upper:item.pair.lower;
-            if (item.pair.gap_kind==OrbitalEnergyGapKind::PiPartner &&
-                (options.hide_ligand_centred_intermediates ||
-                 !groups[dropped].level.metadata.selected)) {
-                groups[dropped].include=false;
-            }
-        }
         result.push_back(item.pair);
+        if(item.pair.evidence)result.back().equivalent_channel_ids.push_back(item.pair.evidence->channel.channel_id);
     }
     return result;
 }
@@ -1883,11 +2229,11 @@ MODiagramMode preferred_compact_mo_diagram_mode(
 
 const char* pi_interaction_kind_name(const PiInteractionKind kind) noexcept {
     switch (kind) {
-        case PiInteractionKind::Donor: return "pi-donor splitting";
-        case PiInteractionKind::Acceptor: return "pi-acceptor splitting";
+        case PiInteractionKind::Donor: return "pi donation";
+        case PiInteractionKind::Acceptor: return "pi back-donation";
         case PiInteractionKind::WeakNearNonbonding:
-            return "weak-field split; approximately nonbonding";
-        default: return "pi-coupled splitting";
+            return "weak pi interaction; approximately nonbonding";
+        default: return "pi coupling";
     }
 }
 
@@ -1929,6 +2275,44 @@ DiagramSelectionPlan build_valence_selection_plan(
                 ?"complete delocalised pi family only"
                 :"complete multicentre active space only");
         return plan;
+    }
+    if(options.routed &&
+       options.routed->canonical_fingerprint==nbo_canonical_fingerprint(wavefunction) &&
+       std::any_of(options.routed->mo_composition.begin(),
+                   options.routed->mo_composition.end(),[](const auto& result){
+                       return result.available()&&result.provider==RoutedProvider::Nbo;
+                   })){
+        const auto frontier=find_frontier_orbitals(
+            wavefunction.orbitals,options.filter.occupation_threshold);
+        const auto labels=build_orbital_labels(wavefunction.orbitals,
+            point_group_limited_degeneracy(wavefunction,options.degeneracy));
+        std::size_t core_hidden=0,unresolved_occupied=0;
+        for(std::size_t i=0;i<wavefunction.orbitals.size();++i){
+            const auto& mo=wavefunction.orbitals[i];
+            const bool occ=occupied(mo,options.filter.occupation_threshold);
+            const auto balance=routed_mo_shell_balance(*options.routed,i);
+            const bool deep_core=balance&&balance->complete&&occ&&
+                balance->core>=0.70&&balance->core>=balance->valence+0.10;
+            if(deep_core){++core_hidden;continue;}
+            const bool frontier_virtual=(frontier.alpha_lumo&&*frontier.alpha_lumo==i)||
+                (frontier.beta_lumo&&*frontier.beta_lumo==i);
+            const bool valence_virtual=balance&&balance->valence>=0.05;
+            if(occ||frontier_virtual||valence_virtual){
+                plan.included_indices.push_back(i);
+                if(occ){++plan.valence_occupied_count;if(!balance)++unresolved_occupied;}
+                else ++plan.frontier_virtual_count;
+            }
+        }
+        plan.included_indices=expand_degenerate(std::move(plan.included_indices),labels);
+        plan.hidden_count=metadata.size()>plan.included_indices.size()?metadata.size()-
+            plan.included_indices.size():0;
+        std::ostringstream summary;
+        summary<<"validated NAO Cor/Val/Ryd valence scope; "
+               <<plan.included_indices.size()<<'/'<<metadata.size()
+               <<" canonical MOs; complete deep-core hidden="<<core_hidden
+               <<"; unresolved occupied retained="<<unresolved_occupied
+               <<"; complete degeneracy groups retained";
+        plan.summary=summary.str();return plan;
     }
     const LigandFieldEnvironment ligand_field=
         analyse_ligand_field_environment(wavefunction);
@@ -2031,7 +2415,7 @@ DiagramSelectionPlan build_valence_selection_plan(
     return plan;
 }
 
-MODiagramData build_mo_diagram_data(
+static MODiagramData build_mo_diagram_data_impl(
     const Wavefunction& wavefunction,
     const MODiagramOptions& options) {
     if ((options.mode==MODiagramMode::DelocalisedPiFamilyOnly ||
@@ -2039,7 +2423,7 @@ MODiagramData build_mo_diagram_data(
         compact_active_indices(wavefunction,options.mode).empty()) {
         MODiagramOptions fallback=options;
         fallback.mode=MODiagramMode::ValenceCentral;
-        auto data=build_mo_diagram_data(wavefunction,fallback);
+        auto data=build_mo_diagram_data_impl(wavefunction,fallback);
         data.selection.summary=
             "compact active space unavailable; "+data.selection.summary;
         return data;
@@ -2058,14 +2442,61 @@ MODiagramData build_mo_diagram_data(
         "COV S-metric minimal atomic chemical-valence reference";
     data.frontier=find_frontier_orbitals(
         wavefunction.orbitals,options.filter.occupation_threshold);
+    if(options.canonical_display_energies.size()==wavefunction.orbitals.size()) {
+        const bool separate=data.frontier.separate_spin_sets;
+        data.frontier={};data.frontier.separate_spin_sets=separate;
+        for(std::size_t i=0;i<wavefunction.orbitals.size();++i) {
+            const auto& orbital=wavefunction.orbitals[i];
+            const bool filled=occupied(orbital,options.filter.occupation_threshold);
+            const auto choose=[&](std::optional<std::size_t>& entry) {
+                if(!entry || (filled?options.canonical_display_energies[i]>options.canonical_display_energies[*entry]:
+                                    options.canonical_display_energies[i]<options.canonical_display_energies[*entry]))entry=i;
+            };
+            choose(filled?data.frontier.homo:data.frontier.lumo);
+            if(orbital.spin==Spin::Beta)choose(filled?data.frontier.beta_homo:data.frontier.beta_lumo);
+            else choose(filled?data.frontier.alpha_homo:data.frontier.alpha_lumo);
+        }
+    }
     data.metadata=build_orbital_metadata(
         wavefunction,options.selected_index,
         options.degeneracy,options.filter);
+    if(options.canonical_display_energies.size()==wavefunction.orbitals.size())
+        for(std::size_t i=0;i<data.metadata.size();++i)
+            data.metadata[i].energy_hartree=options.canonical_display_energies[i];
+    if(options.routed &&
+       options.routed->canonical_fingerprint==nbo_canonical_fingerprint(wavefunction))
+        for(std::size_t i=0;i<data.metadata.size();++i)
+            if(const auto balance=routed_mo_shell_balance(*options.routed,i)){
+                const bool occ=occupied(wavefunction.orbitals[i],
+                                        options.filter.occupation_threshold);
+                if(balance->complete&&occ&&balance->core>=0.70&&
+                   balance->core>=balance->valence+0.10)
+                    data.metadata[i].region=OrbitalRegion::Core;
+                else if(occ||balance->valence>=0.05)
+                    data.metadata[i].region=OrbitalRegion::Valence;
+            }
 
     const LigandFieldEnvironment ligand_field=
         analyse_ligand_field_environment(wavefunction);
     const LigandScope ligand_scope=make_ligand_scope(
         wavefunction,ligand_field);
+    auto current_centres=options.display_centre_atoms;
+    if(current_centres.empty() && ligand_scope.available)current_centres.push_back(ligand_scope.metal);
+    data.composition_scope=mo_composition_scope(wavefunction,options.routed,current_centres);
+    if(options.routed)data.current_radial_shells=mo_current_radial_shells(
+        wavefunction,*options.routed,current_centres);
+    data.sigma_framework=analyse_mo_sigma_framework(wavefunction,options.nbo_source,
+        options.routed,current_centres);
+    if(options.routed && options.routed->canonical_fingerprint==nbo_canonical_fingerprint(wavefunction))
+        for(const auto& entry:options.routed->pi_couplings)if(entry.available() && entry.provider==RoutedProvider::Nbo) {
+            const auto& channel=*entry.value;
+            if(!current_centres.empty() && std::none_of(channel.centre_atoms.begin(),channel.centre_atoms.end(),
+                [&](auto atom){return std::find(current_centres.begin(),current_centres.end(),atom)!=current_centres.end();}))continue;
+            for(const auto& mode:channel.modes) {
+                auto network=assess_pi_mode_network(channel,mode);
+                if(network.verified)data.pi_mode_networks.push_back(std::move(network));
+            }
+        }
     if (ligand_field.available()) {
         data.ligand_field_point_group=ligand_field.local_point_group();
         data.ligand_field_geometry_id=ligand_field.geometry_machine_id();
@@ -2116,7 +2547,8 @@ MODiagramData build_mo_diagram_data(
         groups.push_back(make_group_candidate(
             wavefunction,options,data.frontier,data.metadata,
             data.annotations,labels,base,
-            ligand_scope.available?&ligand_scope:nullptr));
+            ligand_scope.available?&ligand_scope:nullptr,0u,
+            &data.current_radial_shells,&current_centres));
         const std::size_t step=base<labels.size()
             ?std::max<std::size_t>(1u,labels[base].group_size):1u;
         base+=step;
@@ -2231,7 +2663,8 @@ MODiagramData build_mo_diagram_data(
                 auto singleton=make_group_candidate(
                     wavefunction,options,data.frontier,data.metadata,
                     data.annotations,labels,member,
-                    ligand_scope.available?&ligand_scope:nullptr,1u);
+                    ligand_scope.available?&ligand_scope:nullptr,1u,
+                    &data.current_radial_shells,&current_centres);
                 if (!initialised) {
                     exact=std::move(singleton);
                     initialised=true;
@@ -2305,11 +2738,34 @@ MODiagramData build_mo_diagram_data(
         }
     }
 
+    // Local regrouping/spin collapse can change member sets. Recompute the
+    // same ledger over the final immutable canonical source membership.
+    for(auto& group:groups) {
+        auto composition_members=group.level.member_indices;
+        for(const auto counterpart:group.level.member_spin_counterparts)
+            if(counterpart<wavefunction.orbitals.size() &&
+               std::find(composition_members.begin(),composition_members.end(),counterpart)==composition_members.end())
+                composition_members.push_back(counterpart);
+        group.level.composition=mo_group_composition_ledger(wavefunction,options.routed,
+            composition_members,current_centres,data.current_radial_shells);
+        if(group.level.composition.complete) {
+            group.level.metal_s_weight=group.level.composition.centre_current_s;
+            group.level.metal_p_weight=group.level.composition.centre_current_p;
+            group.level.metal_d_weight=group.level.composition.centre_current_d;
+            group.level.ligand_p_weight=group.level.composition.ligand_valence_p;
+        }
+    }
     std::vector<RawPiPair> raw_pairs;
+    if(!options.canonical_display_energies.empty())
+        std::stable_sort(groups.begin(),groups.end(),[&](const auto& a,const auto& b) {
+            const auto as=group_spin(wavefunction,a),bs=group_spin(wavefunction,b);
+            if(as!=bs)return as==Spin::Alpha;
+            return a.level.layout_energy_hartree<b.level.layout_energy_hartree;
+        });
     if (!active_space_mode) {
         raw_pairs=find_pi_pairs(
             wavefunction,groups,options,data.ligand_field_point_group,
-            ligand_scope.available?&ligand_scope:nullptr);
+            ligand_scope.available?&ligand_scope:nullptr,data.pi_partner_candidates);
     } else {
         // Pair detection may enrich labels and, in the ordinary valence view,
         // deliberately brings both sides of a ligand-field interaction into
@@ -2321,7 +2777,7 @@ MODiagramData build_mo_diagram_data(
         auto paired_groups=groups;
         const auto candidates=find_pi_pairs(
             wavefunction,paired_groups,options,data.ligand_field_point_group,
-            ligand_scope.available?&ligand_scope:nullptr);
+            ligand_scope.available?&ligand_scope:nullptr,data.pi_partner_candidates);
         for (const auto& pair:candidates) {
             if (pair.lower>=groups.size() || pair.upper>=groups.size() ||
                 !groups[pair.lower].include || !groups[pair.upper].include) {
@@ -2392,6 +2848,9 @@ MODiagramData build_mo_diagram_data(
         }
     }
     for (const auto& pair:raw_pairs) {
+        if(options.aomo_scope==1 && pair.evidence &&
+           !pair.evidence->channel.channel_id.empty() &&
+           !pair.evidence->channel.mode_assessment.ordinary_display_eligible)continue;
         essential[pair.retained]=true;
         if (pair.gap_kind==OrbitalEnergyGapKind::CrystalField ||
             pair.kind!=PiInteractionKind::WeakNearNonbonding) {
@@ -2520,8 +2979,8 @@ MODiagramData build_mo_diagram_data(
         }));
     if (included_count>row_budget) {
         const double frontier_energy=data.frontier.homo && data.frontier.lumo
-            ?0.5*(wavefunction.orbitals[*data.frontier.homo].energy_hartree+
-                  wavefunction.orbitals[*data.frontier.lumo].energy_hartree)
+            ?0.5*(diagram_orbital_energy(wavefunction,options,*data.frontier.homo)+
+                  diagram_orbital_energy(wavefunction,options,*data.frontier.lumo))
             :0.0;
         struct RankedGroup { std::size_t index=0; double score=0.0; };
         std::vector<RankedGroup> ranked;
@@ -2557,10 +3016,225 @@ MODiagramData build_mo_diagram_data(
         }
     }
 
+    // AOMO presets own the central population as well as the side population.
+    // This final membership pass does not change source coefficients, grouping,
+    // occupations, or the scientific classification of a folded background.
+    if(options.aomo_scope && !active_space_mode) {
+        const bool full=options.aomo_scope==3;
+        const bool research=options.aomo_scope==2;
+        std::set<std::size_t> protected_pi;
+        for(const auto& pair:raw_pairs)
+            if(pair.evidence && pair.evidence->accepted &&
+               pair.evidence->channel.mode_assessment.ordinary_display_eligible) {
+                protected_pi.insert(pair.lower);protected_pi.insert(pair.upper);
+            }
+        for(const auto& network:data.pi_mode_networks)if(network.ordinary_display_eligible)
+            for(const auto& node:network.nodes)if(node.primary)
+                for(std::size_t index=0;index<groups.size();++index)
+                    if(std::all_of(node.members.begin(),node.members.end(),[&](auto member) {
+                        return mo_diagram_level_covers_orbital(groups[index].level,member);
+                    }))protected_pi.insert(index);
+        const auto centre_coverage=[](const MOGroupCompositionLedger& c) {
+            return c.centre_current_s+c.centre_current_p+c.centre_current_d+c.centre_current_f;
+        };
+        struct SigmaSupport {std::size_t index=0,members=0;double trace=0;bool deep=false;};
+        std::vector<SigmaSupport> sigma_support;
+        if(data.sigma_framework.available)for(std::size_t index=0;index<groups.size();++index) {
+            auto& group=groups[index];if(group.suppressed_spin_counterpart)continue;
+            std::set<std::size_t> members(group.level.member_indices.begin(),group.level.member_indices.end());
+            for(const auto counterpart:group.level.member_spin_counterparts)
+                if(counterpart<wavefunction.orbitals.size())members.insert(counterpart);
+            double trace=0;
+            for(const auto member:members)if(member<data.sigma_framework.canonical_weights.size())
+                trace+=data.sigma_framework.canonical_weights[member];
+            group.level.display_decision.sigma_coverage=members.empty()?0:trace/members.size();
+            if(group.level.total_occupation<=options.filter.occupation_threshold ||
+               !group.level.composition.complete || group.level.composition.core>=.70)continue;
+            const auto& c=group.level.composition;
+            const double frontier=data.frontier.homo?diagram_orbital_energy(wavefunction,options,*data.frontier.homo):
+                group.level.layout_energy_hartree;
+            const bool deep=c.ligand_valence_s>=.80 && centre_coverage(c)<.20 &&
+                group.level.layout_energy_hartree<frontier-.20;
+            sigma_support.push_back({index,members.size(),trace,deep});
+        }
+        // The energy reference is the lowest empty state with measured
+        // current-shell support. An external diffuse global LUMO is still
+        // reachable in the browser/research view, but cannot set this window.
+        double effective_lumo=std::numeric_limits<double>::infinity();
+        for(const auto& group:groups)if(!group.suppressed_spin_counterpart &&
+            group.level.total_occupation<=options.filter.occupation_threshold &&
+            group.level.composition.complete && centre_coverage(group.level.composition)>=0.05)
+            effective_lumo=std::min(effective_lumo,group.level.layout_energy_hartree);
+        const double virtual_window=std::min(0.75,options.filter.virtual_window_hartree);
+        std::set<std::size_t> shell_recovery;
+        if(!full && !research && !current_centres.empty()) {
+            // Recover the low-energy current-shell trace, not the entire
+            // arbitrarily large virtual basis. The energy kernel defines a
+            // reading budget, not a bond energy or numerical-zero threshold.
+            // Each angular family has at most two complete radial manifolds'
+            // worth of canonical members, plus separately verified major pairs.
+            for(int l=0;l<=3;++l) {
+                struct Support {std::size_t index=0,members=0;double score=0;};
+                std::vector<Support> ranked;double target=0;
+                for(std::size_t i=0;i<groups.size();++i) {
+                    const auto& group=groups[i];const auto& level=group.level;
+                    if(group.suppressed_spin_counterpart || !level.composition.complete ||
+                       level.total_occupation>options.filter.occupation_threshold ||
+                       level.composition.core>=0.70 || !std::isfinite(effective_lumo))continue;
+                    const auto& c=level.composition;
+                    const double weight=l==0?c.centre_current_s:l==1?c.centre_current_p:
+                        l==2?c.centre_current_d:c.centre_current_f;
+                    const double gap=std::max(0.0,level.layout_energy_hartree-effective_lumo);
+                    const double score=weight*level.member_indices.size()/
+                        (1+std::pow(gap/std::max(0.05,virtual_window),2));
+                    target+=score;
+                    if(centre_coverage(c)>=0.05 && weight>0)ranked.push_back(
+                        {i,level.member_indices.size(),score});
+                }
+                std::stable_sort(ranked.begin(),ranked.end(),[](const auto& a,const auto& b) {
+                    return a.score>b.score;
+                });
+                double recovered=0;std::size_t members=0;
+                const std::size_t member_budget=2u*(2u*static_cast<std::size_t>(l)+1u)*
+                    current_centres.size();
+                for(const auto& support:ranked) {
+                    if(recovered>=0.90*target)break;
+                    if(members && members+support.members>member_budget)continue;
+                    shell_recovery.insert(support.index);
+                    recovered+=support.score;members+=support.members;
+                }
+            }
+        }
+        for(std::size_t index=0;index<groups.size();++index) {
+            auto& candidate=groups[index];
+            if(candidate.suppressed_spin_counterpart)continue;
+            const auto& members=candidate.level.member_indices;
+            const auto& composition=candidate.level.composition;
+            auto& decision=candidate.level.display_decision;
+            decision.coverage=centre_coverage(composition);
+            decision.major_relation=protected_pi.contains(index);
+            const bool is_occupied=candidate.level.total_occupation>options.filter.occupation_threshold;
+            decision.energy_window=is_occupied || candidate.level.layout_energy_hartree<=effective_lumo+virtual_window;
+            decision.frontier=candidate.level.homo || (candidate.level.lumo &&
+                (!composition.complete || decision.coverage>=0.05));
+            if(!is_occupied && composition.complete && decision.coverage>=0.05 &&
+               candidate.level.layout_energy_hartree==effective_lumo) {
+                decision.frontier=true;
+                decision.reason_codes.push_back("effective-current-space-lowest-empty-state");
+            }
+            const bool core_group=composition.complete?composition.core>=0.70:
+                std::all_of(members.begin(),members.end(),[&](auto member) {
+                    return member<data.metadata.size() && data.metadata[member].region==OrbitalRegion::Core;
+                });
+            if(full || research) {
+                candidate.include=full || options.show_core_background || !core_group;
+                decision.reason_codes.push_back(full?"all-source-groups":"research-source-groups");
+            } else if(core_group) {
+                candidate.include=options.show_core_background;
+                decision.reason_codes.push_back(candidate.include?"requested-core-background":"folded-core-background");
+            } else if(options.show_fragment_background) {
+                candidate.include=true;decision.reason_codes.push_back("requested-fragment-background");
+            } else if(composition.complete && !current_centres.empty()) {
+                const double frontier=data.frontier.homo?diagram_orbital_energy(wavefunction,options,*data.frontier.homo):
+                    candidate.level.layout_energy_hartree;
+                const bool deep_background=composition.ligand_valence_s>=0.80 && decision.coverage<0.20 &&
+                    candidate.level.layout_energy_hartree<frontier-0.20;
+                candidate.include=decision.frontier || decision.major_relation ||
+                    (!deep_background && (is_occupied?decision.coverage>=0.05:shell_recovery.contains(index)));
+                if(decision.frontier)decision.reason_codes.push_back("retained-supported-frontier");
+                if(decision.major_relation)decision.reason_codes.push_back("retained-verified-major-mode-relation");
+                if(shell_recovery.contains(index) && candidate.include)
+                    decision.reason_codes.push_back("retained-current-shell-low-energy-trace-budget");
+                if(is_occupied && candidate.include && !deep_background)
+                    decision.reason_codes.push_back("retained-occupied-current-shell-support");
+                if(!candidate.include) {
+                    ++hidden_intermediate_count;
+                    decision.reason_codes.push_back(deep_background?"folded-deep-ligand-valence-s-background":
+                        decision.coverage<0.05?"folded-outside-current-shell-space":"folded-current-shell-display-budget");
+                }
+                if(candidate.level.lumo && !decision.frontier)
+                    decision.reason_codes.push_back("global-LUMO-outside-current-space-browser-reachable");
+            } else decision.reason_codes.push_back(composition.complete?
+                "legacy-membership-no-centre-scope":"legacy-membership-complete-NAO-unavailable");
+            decision.included=candidate.include;
+        }
+        // Recover a fixed occupied donor projector, whose NBO columns and
+        // canonical closure were validated before any view pruning. This is
+        // an overlapping channel reading, never a redefined MO population.
+        // Existing displayed groups count towards the same finite budget.
+        auto& sigma=data.sigma_framework;
+        sigma.display_member_budget=2*sigma.rank;
+        for(const auto& support:sigma_support)
+            if(groups[support.index].include && support.trace>0) {
+                sigma.retained_occupied_trace+=support.trace;
+                if(groups[support.index].level.display_decision.sigma_coverage>=.05)
+                    sigma.retained_members+=support.members;
+            }
+        if(!full && !research && sigma.available) {
+            std::stable_sort(sigma_support.begin(),sigma_support.end(),[](const auto& a,const auto& b) {
+                return a.trace>b.trace;
+            });
+            for(const auto& support:sigma_support) {
+                if(sigma.retained_occupied_trace>=sigma.trace_target*sigma.occupied_trace)break;
+                auto& group=groups[support.index];
+                if(group.include || support.deep || group.level.display_decision.sigma_coverage<.05 ||
+                   sigma.retained_members+support.members>sigma.display_member_budget)continue;
+                group.include=true;group.level.display_decision.included=true;
+                auto& reasons=group.level.display_decision.reason_codes;
+                std::erase_if(reasons,[](const auto& reason){return reason.rfind("folded-",0)==0;});
+                reasons.push_back("retained-verified-occupied-sigma-donor-space-budget");
+                sigma.retained_occupied_trace+=support.trace;sigma.retained_members+=support.members;
+                if(hidden_intermediate_count)--hidden_intermediate_count;
+            }
+        }
+    }
+
+    // Freeze the scientific source domain before weak-display decisions. A
+    // folded relation cannot shrink its own validation domain and pass itself.
+    std::vector<std::size_t> stable_display_members;
+    for(const auto& group:groups)if(group.include && !group.suppressed_spin_counterpart)
+        stable_display_members.insert(stable_display_members.end(),group.level.member_indices.begin(),group.level.member_indices.end());
+    std::map<std::string,PiFrozenOperatorAssessment> frozen_display_scopes;
+    if(options.routed)for(auto& pair:raw_pairs)if(pair.evidence && !pair.evidence->channel.channel_id.empty()) {
+        const auto& id=pair.evidence->channel.channel_id;
+        const NboPiCoupling* channel=nullptr;
+        for(const auto& entry:options.routed->pi_couplings)if(entry.available() && entry.value->id==id){channel=&*entry.value;break;}
+        if(!channel)continue;
+        const auto& mode=pair.evidence->channel.mode_assessment;
+        const double lower_strength=std::abs(mode.lower_cross_fock_mean_hartree)*
+            pair.evidence->channel.lower_members.size();
+        const double upper_strength=std::abs(mode.upper_cross_fock_mean_hartree)*
+            pair.evidence->channel.upper_members.size();
+        pair.display_strength_hartree=std::min(lower_strength,upper_strength);
+        if(!frozen_display_scopes.contains(id)) {
+            std::vector<std::size_t> same_spin_members;
+            for(auto member:stable_display_members)if(member<wavefunction.orbitals.size() &&
+                (channel->spin==NboSpin::Beta)==(wavefunction.orbitals[member].spin==Spin::Beta))same_spin_members.push_back(member);
+            frozen_display_scopes[id]=assess_pi_frozen_display_scope(*channel,same_spin_members);
+        }
+        auto result=*pair.evidence;
+        result.channel.frozen_operator=frozen_display_scopes.at(id);
+        result.channel.display_calibration=pi_channel_display_calibration(*channel);
+        result.weak=pi_display_negligible(result.channel.frozen_operator,result.channel.display_calibration);
+        pair.evidence=std::make_shared<const PiPartnerAssessment>(result);
+        for(auto& candidate:data.pi_partner_candidates)if(candidate.accepted && candidate.channel.channel_id==id &&
+            candidate.channel.lower_members==result.channel.lower_members && candidate.channel.upper_members==result.channel.upper_members)
+            candidate=result;
+    }
+
     std::vector<std::size_t> group_to_level(
         groups.size(),std::numeric_limits<std::size_t>::max());
     std::vector<double> axis_energies;
     for (std::size_t group=0;group<groups.size();++group) {
+        auto& level=groups[group].level;
+        level.display_decision.included=groups[group].include && !groups[group].suppressed_spin_counterpart;
+        if(groups[group].suppressed_spin_counterpart)
+            level.display_decision.reason_codes.push_back("paired-opposite-spin-source-group");
+        if(level.display_decision.reason_codes.empty())
+            level.display_decision.reason_codes.push_back(level.display_decision.included?
+                "retained-legacy-or-active-space-membership":"folded-legacy-or-active-space-membership");
+        data.group_audit.push_back({level.member_indices,level.member_spin_counterparts,
+            level.layout_energy_hartree,level.total_occupation,level.composition,level.display_decision});
         if (!groups[group].include) continue;
         group_to_level[group]=data.levels.size();
         axis_energies.push_back(groups[group].level.layout_energy_hartree);
@@ -2579,10 +3253,11 @@ MODiagramData build_mo_diagram_data(
             ?retained:upper;
         descriptor.lower_orbitals=groups[pair.lower].level.member_indices;
         descriptor.upper_orbitals=groups[pair.upper].level.member_indices;
-        descriptor.symmetry=pair.symmetry.empty()
+        descriptor.symmetry=pair.symmetry.empty()&&(!pair.evidence||pair.evidence->channel.channel_id.empty())
             ?groups[pair.lower].level.metadata.symmetry_view.label:pair.symmetry;
         descriptor.kind=pair.kind;
         descriptor.orbital_evidence=pair.evidence;
+        descriptor.equivalent_channel_ids=pair.equivalent_channel_ids;
         descriptor.crystal_field_evidence=pair.crystal_field_evidence;
         descriptor.gap_kind=pair.gap_kind;
         descriptor.lower_symmetry_scope=groups[pair.lower].level.metadata.symmetry_view;
@@ -2597,6 +3272,7 @@ MODiagramData build_mo_diagram_data(
             options.weak_crystal_field_overlap:options.weak_metal_ligand_overlap;
         descriptor.splitting_hartree=pair.split;
         descriptor.confidence=pair.confidence;
+        descriptor.display_strength_hartree=pair.display_strength_hartree;
         descriptor.lower_visible=lower!=std::numeric_limits<std::size_t>::max();
         descriptor.upper_visible=upper!=std::numeric_limits<std::size_t>::max();
         descriptor.retained_level=retained;
@@ -2663,10 +3339,110 @@ MODiagramData build_mo_diagram_data(
     return data;
 }
 
+MODiagramData build_mo_diagram_data(const Wavefunction& wavefunction,
+                                   const MODiagramOptions& options) {
+    auto prepared=options;
+    NboRoCommonEnergyModel common;
+    if(options.ro_common_energy)common=*options.ro_common_energy;
+    else if(options.nbo_source && wavefunction.orbital_occupation_model==OrbitalOccupationModel::CanonicalShared) {
+        const auto raw=options.source_salc_model?*options.source_salc_model:
+            build_nbo_salc_model(wavefunction,*options.nbo_source);
+        common=build_nbo_ro_common_energy(wavefunction,*options.nbo_source,raw);
+    }
+    const bool common_view=options.use_ro_common_energy && common.available &&
+        common.canonical_fingerprint==nbo_canonical_fingerprint(wavefunction) &&
+        common.orbitals.size()==wavefunction.orbitals.size() && chemistry_available(wavefunction);
+    prepared.canonical_display_energies.clear();
+    if(common_view) {
+        prepared.canonical_display_energies.resize(wavefunction.orbitals.size());
+        for(const auto& entry:common.orbitals)
+            prepared.canonical_display_energies.at(entry.canonical_index)=entry.common_energy_hartree.value();
+    }
+    auto data=build_mo_diagram_data_impl(wavefunction,prepared);
+    data.ro_common_energy=std::move(common);data.using_ro_common_energy=common_view;
+    if(options.pi_field_response)data.pi_field_response=*options.pi_field_response;
+    else if(options.nbo_source && options.routed &&
+            options.routed->canonical_fingerprint==nbo_canonical_fingerprint(wavefunction)) {
+        std::vector<const NboPiCoupling*> channels;
+        for(const auto& entry:options.routed->pi_couplings)
+            if(entry.available() && entry.provider==RoutedProvider::Nbo)channels.push_back(&*entry.value);
+        if(!channels.empty())data.pi_field_response=analyse_pi_field_responses(
+            wavefunction,*options.nbo_source,channels);
+    }
+    // Counts describe the complete final scrollable central graph, not the
+    // earlier valence selector or the currently clipped canvas pixels.
+    std::set<std::size_t> final_members;
+    for(const auto& level:data.levels) {
+        for(const auto member:level.member_indices)if(member<wavefunction.orbitals.size())final_members.insert(member);
+        if(level.member_indices.empty() && level.metadata.orbital_index<wavefunction.orbitals.size())
+            final_members.insert(level.metadata.orbital_index);
+        for(const auto member:level.member_spin_counterparts)
+            if(member<wavefunction.orbitals.size())final_members.insert(member);
+    }
+    data.selection.included_indices.assign(final_members.begin(),final_members.end());
+    data.selection.final_group_count=data.levels.size();
+    data.selection.final_member_count=final_members.size();
+    data.selection.counts_are_final=true;
+    data.selection.valence_occupied_count=0;
+    data.selection.frontier_virtual_count=0;
+    for(const auto member:final_members)
+        if(occupied(wavefunction.orbitals[member],options.filter.occupation_threshold))
+            ++data.selection.valence_occupied_count;
+        else ++data.selection.frontier_virtual_count;
+    data.selection.hidden_count=wavefunction.orbitals.size()-final_members.size();
+    const bool routed=options.routed &&
+        options.routed->canonical_fingerprint==nbo_canonical_fingerprint(wavefunction) &&
+        options.routed->interaction_graph.available();
+    const auto scope=routed?make_fixed_bonding_scope(wavefunction,*options.routed->interaction_graph.value):
+        make_fixed_bonding_scope(wavefunction);
+    for(auto& level:data.levels) {
+        auto members=level.member_indices;
+        if(members.empty())members.push_back(level.metadata.orbital_index);
+        for(auto index:level.member_spin_counterparts)
+            if(index<wavefunction.orbitals.size() && std::find(members.begin(),members.end(),index)==members.end())members.push_back(index);
+        std::map<Spin,std::vector<std::size_t>> blocks;
+        for(auto index:members)if(index<wavefunction.orbitals.size())blocks[wavefunction.orbitals[index].spin].push_back(index);
+        bool positive=!blocks.empty(),negative=!blocks.empty(),mixed=false;
+        for(const auto& [spin,indices]:blocks) {
+            OrbitalGroupBondingOptions group_options;group_options.expected_dimension=indices.size();
+            auto result=analyse_orbital_group_bonding(wavefunction,scope,indices,group_options);
+            positive&=result.status==OrbitalGroupBondingStatus::Positive;
+            negative&=result.status==OrbitalGroupBondingStatus::Negative;
+            mixed|=result.status==OrbitalGroupBondingStatus::Mixed;
+            level.bonding_scopes.push_back(std::move(result));
+        }
+        // Opposite spin blocks can differ; never average away a sign conflict.
+        bool any_positive=false,any_negative=false;
+        for(const auto& result:level.bonding_scopes) {
+            any_positive|=result.status==OrbitalGroupBondingStatus::Positive;
+            any_negative|=result.status==OrbitalGroupBondingStatus::Negative;
+        }
+        mixed|=any_positive&&any_negative;
+        const auto role=mixed?BondingClass::Mixed:positive?BondingClass::Bonding:
+            negative?BondingClass::Antibonding:BondingClass::Unclassified;
+        level.annotation.bonding_class=role;
+        level.annotation.bonding_source=role==BondingClass::Unclassified?
+            AnnotationSource::Unavailable:AnnotationSource::Derived;
+        level.annotation.bonding_confidence=0; // numerical bound lives with the actual group operator
+        for(auto index:members)if(index<data.annotations.size()) {
+            data.annotations[index].bonding_class=role;
+            data.annotations[index].bonding_source=level.annotation.bonding_source;
+            data.annotations[index].bonding_confidence=0;
+        }
+    }
+    return data;
+}
+
 MetalLigandDetailAvailability metal_ligand_detail_availability(
     const Wavefunction& wavefunction, const MODiagramData& data,
     const MODiagramLevel& level) {
     MetalLigandDetailAvailability result;
+    result.composition=data.composition_scope.applicable &&
+        level.composition.available && level.composition.complete;
+    if(!data.composition_scope.detail.empty() && !data.composition_scope.applicable) {
+        result.scope=ChemistryStatus::NotApplicable;
+        return result;
+    }
     if (wavefunction.atoms.empty()) return result;
     bool metal=false, ligand=false;
     for (const auto& atom:wavefunction.atoms) {

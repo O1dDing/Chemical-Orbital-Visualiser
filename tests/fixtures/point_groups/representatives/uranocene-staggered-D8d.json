@@ -1,0 +1,25 @@
+{
+  "id": "uranocene-staggered-D8d",
+  "target": "D8d",
+  "charge": 0,
+  "multiplicity": 3,
+  "atom_count": 33,
+  "element_counts": {
+    "C": 16,
+    "H": 16,
+    "U": 1
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6315",
+    "https://www.basissetexchange.org/api/basis/stuttgart%20rsc%201997/format/gaussian94/?elements=92&header=true",
+    "https://github.com/MolSSI-BSE/basis_set_exchange/blob/master/basis_set_exchange/data/NOTES.stuttgart",
+    "https://doi.org/10.1021/jp903912q"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Complete U(C8H8)2 specified conformation. The multiplicity field records a selected triplet calculation input, not an experimentally established or calculated ground-state assignment. This coordinate fixture tests nuclear geometry only; scalar-ECP and spin-orbit electronic models are separate evidence.",
+  "xyz_sha256": "5f082ea526472461ab92d83a7397a781c2877fde0542774da681985c66c03a6a",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 0.00012608410395635158,
+  "source_xyz_sha256": "dae4a0e3bc9e63f4280332eaea326590c8bb55e1f445058ff879fe4e4cf803aa"
+}

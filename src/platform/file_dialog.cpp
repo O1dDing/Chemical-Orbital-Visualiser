@@ -12,7 +12,7 @@
 
 namespace cov {
 
-FileDialogResult open_wavefunction_file_dialog() {
+FileDialogResult open_wavefunction_file_dialog(ui::Language language, bool nbo_input) {
     FileDialogResult result;
 
     std::array<wchar_t, 32768> buffer{};
@@ -21,21 +21,37 @@ FileDialogResult open_wavefunction_file_dialog() {
     ofn.hwndOwner = nullptr;
     ofn.lpstrFile = buffer.data();
     ofn.nMaxFile = static_cast<DWORD>(buffer.size());
-    ofn.lpstrFilter =
-        L"Gaussian wavefunction (*.fchk;*.fch;*.chk)\0"
-        L"*.fchk;*.fch;*.chk\0"
-        L"Gaussian formatted checkpoint (*.fchk;*.fch)\0"
-        L"*.fchk;*.fch\0"
-        L"Gaussian binary checkpoint via formchk (*.chk)\0"
-        L"*.chk\0"
-        L"Molden wavefunction (*.molden;*.molden.input;*.molden.inp)\0"
-        L"*.molden;*.molden.input;*.molden.inp\0"
-        L"Supported wavefunctions (*.fchk;*.fch;*.chk;*.molden;*.molden.input;*.molden.inp)\0"
-        L"*.fchk;*.fch;*.chk;*.molden;*.molden.input;*.molden.inp\0"
-        L"All files (*.*)\0"
-        L"*.*\0\0";
+    const auto local = [&](const wchar_t* en, const wchar_t* zh,
+                           const wchar_t* ja, const wchar_t* fr) {
+        switch(language) {
+            case ui::Language::ChineseSimplified: return zh;
+            case ui::Language::Japanese: return ja;
+            case ui::Language::French: return fr;
+            default: return en;
+        }
+    };
+    std::wstring filters;
+    const auto add_filter = [&](const wchar_t* label, const wchar_t* pattern) {
+        filters += label; filters.push_back(L'\0');
+        filters += pattern; filters.push_back(L'\0');
+    };
+    if(nbo_input) {
+        add_filter(local(L"NBO data", L"NBO 数据", L"NBO データ", L"Données NBO"),
+                   L"*.covnbopkg;*.log;*.out;*.nbo;*.47");
+    } else {
+        add_filter(local(L"Calculation files", L"计算文件", L"計算ファイル", L"Fichiers de calcul"),
+                   L"*.fchk;*.fch;*.chk;*.molden;*.molden.input;*.molden.inp;*.covnbopkg");
+    }
+    add_filter(L"Gaussian FCHK / FCH", L"*.fchk;*.fch");
+    add_filter(L"Gaussian CHK (formchk)", L"*.chk");
+    add_filter(L"Molden", L"*.molden;*.molden.input;*.molden.inp");
+    add_filter(local(L"All files", L"所有文件", L"すべてのファイル", L"Tous les fichiers"), L"*.*");
+    filters.push_back(L'\0');
+    ofn.lpstrFilter = filters.c_str();
     ofn.nFilterIndex = 1;
-    ofn.lpstrTitle = L"Open wavefunction";
+    ofn.lpstrTitle = nbo_input
+        ? local(L"Open NBO data", L"打开 NBO 数据", L"NBO データを開く", L"Ouvrir des données NBO")
+        : local(L"Open calculation", L"打开计算文件", L"計算ファイルを開く", L"Ouvrir un calcul");
     ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST |
                 OFN_NOCHANGEDIR | OFN_DONTADDTORECENT;
 
@@ -51,8 +67,12 @@ FileDialogResult open_wavefunction_file_dialog() {
     }
 
     std::ostringstream message;
-    message << "Windows Open File dialog failed (CommDlgExtendedError=" << error << ')';
-    result.error = message.str();
+    message << error;
+    const char* detail = language == ui::Language::ChineseSimplified ? "无法打开文件窗口。错误码：" :
+        language == ui::Language::Japanese ? "ファイル選択を開けません。エラー：" :
+        language == ui::Language::French ? "La fenêtre de sélection ne s’ouvre pas. Code : " :
+        "The file picker could not open. Error: ";
+    result.error = detail + message.str();
     return result;
 }
 
@@ -156,7 +176,7 @@ DialogRun run_dialog(const std::vector<std::string>& arguments) {
 
 } // namespace
 
-FileDialogResult open_wavefunction_file_dialog() {
+FileDialogResult open_wavefunction_file_dialog(ui::Language, bool) {
     FileDialogResult result;
 #if defined(__APPLE__)
     const std::vector<std::vector<std::string>> commands{{

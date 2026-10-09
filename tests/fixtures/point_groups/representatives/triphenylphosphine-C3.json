@@ -1,0 +1,23 @@
+{
+  "id": "triphenylphosphine-C3",
+  "target": "C3",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 34,
+  "element_counts": {
+    "C": 18,
+    "H": 15,
+    "P": 1
+  },
+  "source_urls": [
+    "https://www.chemtube3d.com/model/alexmodel/triphenylphosphine.spartan",
+    "https://www.chemtube3d.com/symtriphenylphosphinec3/"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Spartan embedded ENDCART block 9 decimals, full C18H15P propeller.",
+  "xyz_sha256": "38e5019a61ebba27e270872812286e856187b1acce08cfb74633d7d0f3f65366",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 3.261892830205737e-08,
+  "source_xyz_sha256": "026508b75418da291b3f7b5d2f54d6c56338cb9cce53f6e170f0e66048d210c6"
+}

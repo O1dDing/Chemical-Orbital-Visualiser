@@ -1,0 +1,21 @@
+{
+  "id": "biphenyl-planar-D2h",
+  "target": "D2h",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 22,
+  "element_counts": {
+    "C": 12,
+    "H": 10
+  },
+  "source_urls": [
+    "https://www2.chem.wisc.edu/deptfiles/OrgLab/UWW/Expt1/job_125027.html"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Inter-ring dihedral fixed 0.0 degrees. Ring dimensions from full Wisconsin source; ring plane thickness removed, max 0.023291482 Angstrom; full 12 C and 10 H retained.",
+  "xyz_sha256": "45227ee368085adf8568d7deaf56d6556ef71820fb36192f751cd51c96ee2cc3",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 8.977964682949773e-16,
+  "source_xyz_sha256": "08fa2c62173adc53969d68e93c3e29cd398b3525fd78ac14cc36eb017ebeca5e"
+}

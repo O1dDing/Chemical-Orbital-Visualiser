@@ -7,7 +7,7 @@
 
 namespace {
 void require(bool condition,const char* message) { if (!condition) throw std::runtime_error(message); }
-void nested_navigation(float scale,bool reveal_entire_item=false) {
+void nested_navigation(float scale,bool reveal_entire_item=false,bool fractional_vertical=false) {
     ImGui::CreateContext();auto& io=ImGui::GetIO();
     io.IniFilename=nullptr;io.DisplaySize={1200,1100};io.DeltaTime=1.0f/60;
     io.Fonts->AddFontDefault();io.Fonts->Build();
@@ -29,8 +29,9 @@ void nested_navigation(float scale,bool reveal_entire_item=false) {
                           ImGuiChildFlags_None,ImGuiWindowFlags_HorizontalScrollbar);
         ImGui::PopStyleVar();canvas=ImGui::GetCurrentWindow();
         const auto origin=ImGui::GetCursorScreenPos();
-        ImGui::Dummy({1200*scale,430*scale});
-        const std::array<ImVec2,4> offsets{{{950,85},{60,85},{950,355},{60,355}}};
+        ImGui::Dummy({1200*scale,(fractional_vertical?1200:430)*scale});
+        const float top=fractional_vertical?85.5f:85.0f,bottom=fractional_vertical?955.5f:355.0f;
+        const std::array<ImVec2,4> offsets{{{950,top},{60,top},{950,bottom},{60,bottom}}};
         for (int i=0;i<4;++i) {
             ImGui::SetCursorScreenPos({origin.x+offsets[i].x*scale,origin.y+offsets[i].y*scale});
             ImGui::PushID(i);
@@ -100,6 +101,7 @@ int main() {
     try {
         nested_navigation(1);nested_navigation(1.5f);
         nested_navigation(1,true);nested_navigation(1.5f,true);
+        nested_navigation(1,true,true);nested_navigation(1.5f,true,true);
         std::cout<<"validation_navigation_smoke ok\n";
     } catch (const std::exception& error) {
         std::cerr<<"validation_navigation_smoke: "<<error.what()<<'\n';

@@ -1,4 +1,6 @@
 #include "cov/orbital_ui.hpp"
+#include "cov/orbital_ui_text.hpp"
+#include "cov/ui_window_layers.hpp"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -7,6 +9,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <string>
 
 namespace {
 void require(bool value, const char* message) {
@@ -58,7 +61,8 @@ int main() {
         ImGui::NewFrame();
         ImGui::SetNextWindowPos({0,0},ImGuiCond_Always);
         ImGui::SetNextWindowSize({500,std::max(200.0f,io.DisplaySize.y)},ImGuiCond_Always);
-        ImGui::Begin("details test controls",nullptr,ImGuiWindowFlags_NoSavedSettings);
+        ImGui::Begin("details test controls",nullptr,ImGuiWindowFlags_NoSavedSettings |
+                     cov::ui::background_panel_flags);
         cov::ui::draw_energy_diagram(wf,7,state,language,1,actions);
         ImGui::End(); ImGui::Render();
         require(actions.drawn_diagram &&
@@ -88,6 +92,24 @@ int main() {
             "normal user resizing stopped working");
     inspect_bounds("moved-and-resized");
 
+    // Reproduce the persistent loss of the floating details behind the left
+    // panel, including opening details again after that panel receives focus.
+    ImGui::SetWindowPos("###cov.orbital.details",{100,100}); frame(); frame();
+    auto assert_above_panel = [&]() {
+        const auto* panel = ImGui::FindWindowByName("details test controls");
+        int panel_order=-1, details_order=-1;
+        for(int i=0;i<GImGui->Windows.Size;++i) {
+            if(GImGui->Windows[i]==panel) panel_order=i;
+            if(GImGui->Windows[i]==details()) details_order=i;
+        }
+        require(details_order>panel_order,"base panel permanently covered floating details");
+    };
+    io.AddMousePosEvent(25,40); frame();
+    io.AddMouseButtonEvent(0,true); frame();
+    io.AddMouseButtonEvent(0,false); frame(); frame(); assert_above_panel();
+    state.focus_diagram_details=true; frame(); frame(); assert_above_panel();
+    require(!state.focus_diagram_details,"details must not steal focus every frame");
+
     for (const ImVec2 size : {ImVec2(1003,658),ImVec2(960,1600),ImVec2(640,360),
                               ImVec2(320,240),ImVec2(2100,1250),ImVec2(3413,1392)}) {
         io.DisplaySize = size; frame(); inspect_bounds("open-across-resize");
@@ -113,9 +135,8 @@ int main() {
     require(!state.show_diagram_details, "visible close button did not close the details");
     state.show_diagram_details = true; frame(); frame(); inspect_bounds("reopened-small");
 
-    // Exercise the same wrapped card used by the ordinary sidebar. A colored
-    // pair description must occupy a few readable lines, not one glyph per line
-    // in the sliver remaining after an unconditional SameLine().
+    // Old saved expansion state must not resurrect the removed long chemistry
+    // panel. Adding pair evidence must not add sidebar text or alter its height.
     state.show_diagram_details = false;
     io.DisplaySize = {2100,1250};
     auto& chemistry = wf.orbitals[7].chemistry;
@@ -135,6 +156,11 @@ int main() {
         ImGui::SetNextWindowSize({width,1200},ImGuiCond_Always);
         ImGui::Begin("chemistry wrap test",nullptr,ImGuiWindowFlags_NoSavedSettings);
         ImGui::PushTextWrapPos(0);
+        // The ordinary sidebar now starts collapsed; this regression measures
+        // wrapping after the user opens the same real chemistry section.
+        const std::string chemistry_header=std::string(cov::ui::orbital_tr(
+            cov::ui::OrbitalText::SelectedMOChemistry,language))+"##diagram.chemistry";
+        ImGui::GetStateStorage()->SetInt(ImGui::GetID(chemistry_header.c_str()),1);
         cov::ui::draw_energy_diagram(wf,7,state,language,1,actions);
         const float height = ImGui::GetCursorPosY();
         ImGui::PopTextWrapPos(); ImGui::End(); ImGui::Render();
@@ -150,8 +176,8 @@ int main() {
             const float extra_lines = (two-one)/ImGui::GetTextLineHeightWithSpacing();
             std::cout << "pair wrapping: width=" << width << " language=" << int(language)
                       << " extra lines=" << extra_lines << '\n';
-            require(extra_lines > 0 && extra_lines <= 8,
-                    "pair analysis collapses into a narrow vertical text column");
+            require(std::abs(extra_lines)<0.01f,
+                    "removed long chemistry panel is still being rendered");
         }
     }
     ImGui::DestroyContext();

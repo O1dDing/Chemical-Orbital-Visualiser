@@ -1,0 +1,22 @@
+{
+  "id": "tetraphenylmethane-S4",
+  "target": "S4",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 45,
+  "element_counts": {
+    "C": 25,
+    "H": 20
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6176",
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=8&option=4&rot=4"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Fixed full 45-atom phenyl conformer; S4 public preset, no energy-minimum claim.",
+  "xyz_sha256": "e6182505a3355eb6efb938904fe82e40b85c6fd99b6cd65586f6e18ab1ad0a3d",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 8.864981273094606e-05,
+  "source_xyz_sha256": "c69a32ba72b00a04cc12af28cf6f9a861f1c9980ed43d4b4cc98ca6f9566b9ee"
+}

@@ -21,7 +21,7 @@ struct ViewerLayout {
 };
 
 inline ViewerLayout viewer_layout(float width, float height, int fb_width, int fb_height,
-                                  float ui_scale) {
+                                  float ui_scale, bool wide_diagram=false) {
     ViewerLayout layout;
     layout.window_width = width; layout.window_height = height;
     layout.framebuffer_width = fb_width; layout.framebuffer_height = fb_height;
@@ -32,7 +32,8 @@ inline ViewerLayout viewer_layout(float width, float height, int fb_width, int f
     // the client area. The scrollable panel never consumes the scene region.
     const float margin = std::floor(std::min(14.0f * scale, std::min(width, height) / 8.0f));
     const float usable_width = std::max(0.0f, width - 3.0f * margin);
-    const float preferred = std::min(540.0f * scale, std::max(370.0f, width * 0.46f));
+    const float preferred = wide_diagram ? std::min(1100.0f*scale,width*0.60f)
+        : std::min(540.0f * scale, std::max(370.0f, width * 0.46f));
     const float reserved_scene = std::min(320.0f * scale, usable_width * 0.5f);
     const float panel_width = std::floor(std::min(preferred, usable_width - reserved_scene));
     const float panel_height = std::floor(std::max(0.0f, height - 2.0f * margin));

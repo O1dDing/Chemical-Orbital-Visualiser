@@ -1,6 +1,7 @@
 #include "cov/orbital_ui.hpp"
 
 #include "cov/mo_diagram.hpp"
+#include "cov/nbo_aomo_text.hpp"
 
 #include <imgui.h>
 
@@ -600,6 +601,9 @@ void draw_energy_diagram(const Wavefunction& wavefunction,
 
     if (ImGui::Button(tr(Text::ExportBundle, language), ImVec2(-1.0f, 0.0f))) {
         actions.export_diagram = true;
+    }
+    if (ImGui::CollapsingHeader(aomo_text(language,"Analysis data (advanced)"))) {
+        if (ImGui::Button(aomo_text(language,"Export analysis data"))) actions.export_analysis=true;
     }
 }
 

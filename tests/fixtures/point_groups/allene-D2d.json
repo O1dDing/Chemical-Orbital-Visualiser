@@ -1,0 +1,27 @@
+{
+  "id": "allene-D2d",
+  "group_id": 6122,
+  "target": "D2d",
+  "phase": "D2d conformation",
+  "note": "Source allene preset; site reports rotational subgroup D.",
+  "title": "Allene",
+  "source_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6122",
+  "source_sha256": "f7f9be69e18dc4725f207f8dd2991887af2e18c6cb7607bad8e47ad4d7b90d52",
+  "result_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Angstrom&unit2=Degree&n1=C&n2=C&x2=1.302400&n3=H&x3=1.085600&y3=121.332400&na3=2&nb3=1&n4=H&x4=1.085600&y4=121.332400&z4=180.000000&na4=2&nb4=1&nc4=3&n5=Dummy&x5=1.000000&y5=90.000000&z5=0.000000&na5=1&nb5=2&nc5=3&n6=C&x6=1.302400&y6=90.000000&z6=180.000000&na6=1&nb6=5&nc6=2&n7=H&x7=1.085600&y7=121.332400&z7=90.000000&na7=6&nb7=2&nc7=3&n8=H&x8=1.085600&y8=121.332400&z8=270.000000&na8=6&nb8=2&nc8=3",
+  "result_sha256": "338ea079bb5d0fe6e7bc32380d293dcb91e5350ddce94b1646e3cde595f58de7",
+  "source_reported_group": "D",
+  "atom_count": 7,
+  "bond_count": 6,
+  "element_counts": {
+    "C": 3,
+    "H": 4
+  },
+  "filename": "allene-D2d.xyz",
+  "sidecar": "allene-D2d.json",
+  "source_page_type": "Symmetry site internal-coordinate starting structure; converted to Cartesian by same site group=6300 endpoint",
+  "source_reported_group_scope": "site calculator label recorded verbatim; may be the proper-rotation subgroup and is not accepted as full-group verification",
+  "full_point_group_status": "Verified on the unchanged Cartesian fixture by point_group_geometry_smoke; includes rigid rotation and atom-order checks. Geometric tolerance is not a wavefunction symmetry certificate.",
+  "coordinate_precision": "source MOL DATA coordinates retained verbatim (4 decimal places)",
+  "charge_multiplicity": "not encoded in coordinate source; chemistry-state bookkeeping not verified",
+  "cov_regression_test": "tests/point_group_geometry_smoke.cpp"
+}

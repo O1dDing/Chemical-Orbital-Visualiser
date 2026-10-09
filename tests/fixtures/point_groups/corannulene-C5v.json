@@ -1,0 +1,22 @@
+{
+  "id": "corannulene-C5v",
+  "target_group": "C5v",
+  "actual_group_verification_status": "source candidate only; parent COV operation check pending",
+  "geometry_kind": "public source all-atom coordinates",
+  "source_title": "Corannulene",
+  "source_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=405&option=4",
+  "coordinate_preset_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6187",
+  "source_preset_id": 6187,
+  "source_reported_group": "C",
+  "source_reported_group_note": "The site's calculator label is preserved verbatim; target is taken from the linked C5v character-table example. No conclusion about omitted symmetry elements is inferred.",
+  "atom_count": 30,
+  "charge": 0,
+  "multiplicity": 1,
+  "charge_multiplicity_basis": "neutral closed-shell corannulene candidate; source coordinates do not encode electronic state",
+  "coordinate_precision": "MOL DATA coordinates retained to source 4 decimal places; XYZ displays 6 decimals from those values",
+  "source_response_sha256": "3e64ee1870ac29c42780581b58a9d63dad6f108e20a65e360af05397673b7617",
+  "xyz_sha256": "4d4f50989bc0ef7c19f29c5cc7d01c8b0f32161a2b76badab0314403f454b2ec",
+  "quantum_calculation_performed": false,
+  "full_point_group_status": "Verified on the unchanged Cartesian fixture by point_group_geometry_smoke; includes rigid rotation and atom-order checks. Geometric tolerance is not a wavefunction symmetry certificate.",
+  "cov_regression_test": "tests/point_group_geometry_smoke.cpp"
+}

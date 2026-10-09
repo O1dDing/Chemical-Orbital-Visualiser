@@ -1,0 +1,22 @@
+{
+  "id": "boric-acid-C3h",
+  "target": "C3h",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 7,
+  "element_counts": {
+    "B": 1,
+    "H": 3,
+    "O": 3
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6164"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Source calculator may print only proper rotation subgroup; independent full O(3) atom test recorded.",
+  "xyz_sha256": "6300c9cd71b37c84f57bd551582d5d952197d987e0b2ecca864e0bd654d2b9eb",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 3.294391348503617e-05,
+  "source_xyz_sha256": "cceb47beb985e8d802addd26e7d485f9ab7577be229db66748806bc7435a04de"
+}

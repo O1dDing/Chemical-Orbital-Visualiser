@@ -273,6 +273,9 @@ struct PreparedOperation {
 
 PreparedOperation prepare(const Wavefunction& wf, const SymmetryOperation& op) {
     PreparedOperation out;
+    // This angular implementation has validated Cartesian/pure transforms
+    // through g only. Do not index its 15-entry g table for an h/i shell.
+    for(const auto& shell:wf.shells)if(shell.angular_momentum>4)return out;
     if (op.atom_permutation.size()!=wf.atoms.size()) return out;
     out.target_shell.assign(wf.shells.size(),wf.shells.size());
     out.local.resize(wf.shells.size());

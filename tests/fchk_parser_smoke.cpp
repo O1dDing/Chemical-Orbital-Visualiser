@@ -139,8 +139,9 @@ std::filesystem::path make_shell_convention_fixture() {
     return path;
 }
 
-std::filesystem::path make_cartesian_g_fixture() {
-    const auto path = std::filesystem::temp_directory_path() / "cov_cartesian_g_order.fchk";
+std::filesystem::path make_cartesian_g_fixture(const int shell_type=4) {
+    const auto path = std::filesystem::temp_directory_path() /
+                      ("cov_cartesian_g_order_"+std::to_string(shell_type)+".fchk");
     std::ofstream out(path, std::ios::binary);
     out << "Cartesian g ordering regression\n"
            "SP        ROHF synthetic\n";
@@ -151,7 +152,7 @@ std::filesystem::path make_cartesian_g_fixture() {
     scalar_i(out, "Number of independent functions", 15);
     array_i(out, "Atomic numbers", {6});
     array_r(out, "Current cartesian coordinates", {0.0, 0.0, 0.0});
-    array_i(out, "Shell types", {4});
+    array_i(out, "Shell types", {shell_type});
     array_i(out, "Number of primitives per shell", {1});
     array_i(out, "Shell to atom map", {1});
     array_r(out, "Primitive exponents", {1.0});
@@ -188,6 +189,62 @@ bool approximately(const double a, const double b, const double eps = 1.0e-6) {
     return std::abs(a - b) <= eps;
 }
 
+void check_unsupported_wavefunction_fields(const std::filesystem::path& real_fixture) {
+    const auto path = std::filesystem::temp_directory_path() / "cov_unsupported_fchk_field.fchk";
+    // These are explicit format-boundary controls, not claims that a Gaussian
+    // version emits these extensions. A valid real payload must not hide them.
+    for (const auto* label : {"Alpha MO coefficients (Imaginary)",
+                              "Complex Alpha MO coefficients",
+                              "Spinor MO coefficients", "Spinor coefficients",
+                              "Imaginary Total SCF Density",
+                              "Alpha Orbital Occupancies", "Beta MO Occupations",
+                              "Orbital Occupation Numbers"}) {
+        std::filesystem::copy_file(real_fixture,path,std::filesystem::copy_options::overwrite_existing);
+        { std::ofstream out(path,std::ios::app);array_r(out,label,{0.25,0.75}); }
+        bool rejected=false;
+        try { (void)cov::parse_fchk(path); }
+        catch (const std::exception& e) {
+            const std::string message=e.what();
+            rejected=message.find("Unsupported")!=std::string::npos &&
+                     message.find(label)!=std::string::npos && message.find("line")!=std::string::npos;
+        }
+        if (!rejected) throw std::runtime_error(std::string("Explicit unsupported field was ignored: ")+label);
+    }
+    std::filesystem::copy_file(real_fixture,path,std::filesystem::copy_options::overwrite_existing);
+    { std::ofstream out(path,std::ios::app);
+      array_r(out,"Imaginary Frequencies",{-25.0});
+      array_r(out,"Unrecognized auxiliary property",{0.25}); }
+    const auto real=cov::parse_fchk(path);
+    if (real.orbitals.size()!=2 || real.orbitals[0].occupation!=2.0)
+        throw std::runtime_error("Auxiliary unknown fields altered real orbitals");
+    std::filesystem::remove(path);
+}
+
+void check_above_g_rejection_preserves_loaded_canonical(const std::filesystem::path& real_fixture) {
+    auto loaded=cov::parse_fchk(real_fixture);
+    const auto original=loaded;
+    for(const int shell_type:{5,-5}) {
+        const auto path=make_cartesian_g_fixture(shell_type);
+        bool rejected=false;
+        try { loaded=cov::parse_fchk(path); }
+        catch(const std::exception& e) {
+            const std::string message=e.what();
+            rejected=message.find("above g")!=std::string::npos&&
+                     message.find("type="+std::to_string(shell_type))!=std::string::npos;
+        }
+        std::filesystem::remove(path);
+        if(!rejected)throw std::runtime_error("Unsupported +/-5 shell was not explicitly rejected");
+        if(loaded.basis_count!=original.basis_count||loaded.orbitals.size()!=original.orbitals.size()||
+           loaded.source_title!=original.source_title||loaded.atoms.size()!=original.atoms.size())
+            throw std::runtime_error("Rejected shell replaced the loaded canonical identity");
+        for(std::size_t i=0;i<original.orbitals.size();++i)
+            if(loaded.orbitals[i].coefficients!=original.orbitals[i].coefficients||
+               loaded.orbitals[i].gaussian_source_coefficients!=original.orbitals[i].gaussian_source_coefficients||
+               loaded.orbitals[i].occupation!=original.orbitals[i].occupation)
+                throw std::runtime_error("Rejected shell changed the loaded canonical fields");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -199,6 +256,8 @@ int main() {
     const auto invalid_integer = make_invalid_integer_fixture();
 
     try {
+        check_unsupported_wavefunction_fields(h2);
+        check_above_g_rejection_preserves_loaded_canonical(h2);
         bool contextual_error = false;
         try {
             (void)cov::parse_fchk(invalid_integer);

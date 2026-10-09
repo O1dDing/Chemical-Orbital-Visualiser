@@ -1,0 +1,21 @@
+{
+  "id": "biphenyl-twisted-D2",
+  "target": "D2",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 22,
+  "element_counts": {
+    "C": 12,
+    "H": 10
+  },
+  "source_urls": [
+    "https://www2.chem.wisc.edu/deptfiles/OrgLab/UWW/Expt1/job_125027.html"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Full 12 C and 10 H public Wisconsin WebMO conformation; independent exact geometry fixture with original rounded coordinates retained separately. The original quantum wavefunction is not part of this fixture.",
+  "xyz_sha256": "d4bfcf824a61392f11698b1010b40cf2397d3384da74162cf3b94fa5f2b7aab6",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 2.482534153247273e-16,
+  "source_xyz_sha256": "2426ba284940ceca564a4074163177df53d92866017fe941888621c73797d29b"
+}

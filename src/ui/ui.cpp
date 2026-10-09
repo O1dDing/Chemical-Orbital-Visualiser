@@ -1,5 +1,9 @@
 #include "cov/ui.hpp"
+#include "cov/nbo_ui.hpp"
+#include "cov/nbo_aomo_ui.hpp"
+#include "cov/validation.hpp"
 #include "cov/orbital_ui_text.hpp"
+#include "cov/orbital_inspection_ui.hpp"
 
 #include <imgui.h>
 
@@ -8,6 +12,16 @@
 #include <filesystem>
 #include <initializer_list>
 #include <string>
+
+#ifdef __APPLE__
+#include <CoreGraphics/CoreGraphics.h>
+#include <CoreText/CoreText.h>
+#include <cmath>
+#include <cstdio>
+#include <memory>
+#include <type_traits>
+#include <vector>
+#endif
 
 namespace cov::ui {
 namespace {
@@ -23,7 +37,7 @@ struct LocalisedString {
 
 constexpr std::array<LocalisedString, kTextCount> kStrings{{
     {"Chemical Orbital Visualiser", "Chemical Orbital Visualiser", "Chemical Orbital Visualiser", "Chemical Orbital Visualiser"},
-    {"Orbital energies, occupations and connections", "轨道能量、电子占据与轨道联系", "軌道エネルギー・占有数・軌道間のつながり", "Énergies, occupations et liens entre orbitales"},
+    {"Orbital energies, occupations and connections", "轨道能量、电子占据与轨道联系", "軌道エネルギー・占有数・軌道間の関係", "Énergies, occupations et relations orbitalaires"},
     {"Language", "语言", "言語", "Langue"},
     {"File", "文件", "ファイル", "Fichier"},
     {"Molden file", "Molden 文件", "Molden ファイル", "Fichier Molden"},
@@ -49,7 +63,7 @@ constexpr std::array<LocalisedString, kTextCount> kStrings{{
     {"Unmatched previous / current", "未匹配（前帧 / 当前帧）", "未対応（前 / 現在）", "Non appariés précédent / actuel"},
     {"Composite matching", "复合子空间匹配", "複合部分空間の対応", "Appariement des sous-espaces"},
     {"Exact / not needed", "精确 / 无需优化", "厳密 / 不要", "Exact / non requis"},
-    {"Conservative fallback", "保守回退", "保守的フォールバック", "Repli conservateur"},
+    {"Simplified matching", "已使用简化匹配", "簡略化した対応付け", "Appariement simplifié"},
     {"Compatible", "兼容", "互換", "Compatible"},
     {"Incompatible", "不兼容", "非互換", "Incompatible"},
     {"No previous frame", "尚无前一帧", "前のフレームなし", "Aucune géométrie précédente"},
@@ -71,7 +85,6 @@ constexpr std::array<LocalisedString, kTextCount> kStrings{{
     {"Grid ready", "网格就绪", "グリッド準備完了", "Grille prête"},
     {"Left-drag to orbit · mouse wheel to zoom", "按住鼠标左键旋转 · 滚轮缩放", "左ドラッグで回転 · ホイールでズーム", "Glisser gauche : rotation · molette : zoom"},
     {"Changing isovalue updates the display without recalculating the orbital grid.", "调整等值面会更新显示，无需重新计算轨道网格。", "等値面の変更は表示を更新し、軌道グリッドを再計算しません。", "Changer l’isovaleur actualise l’affichage sans recalculer la grille orbitale."},
-    {"Experimental MVP · scientific validation in progress", "实验性 MVP · 科学数值验证仍在进行", "実験的 MVP · 科学的検証を継続中", "MVP expérimental · validation scientifique en cours"},
     {"Ready", "就绪", "準備完了", "Prêt"},
     {"Parsing", "正在解析", "解析中", "Analyse"},
     {"Loaded", "已加载", "読み込み完了", "Chargé"},
@@ -88,7 +101,7 @@ constexpr std::array<LocalisedString, kTextCount> kStrings{{
     {"Orbital browser", "轨道浏览器", "軌道ブラウザ", "Explorateur d’orbitales"},
     {"Search", "搜索", "検索", "Rechercher"},
     {"Filter", "筛选", "フィルター", "Filtre"},
-    {"Auto · reasonable", "自动 · 合理范围", "自動 · 妥当範囲", "Auto · plage raisonnable"},
+    {"Auto", "自动", "自動", "Auto"},
     {"All", "全部", "すべて", "Toutes"},
     {"Occupied", "已占据", "占有", "Occupées"},
     {"Virtual", "虚轨道", "仮想", "Virtuelles"},
@@ -98,7 +111,7 @@ constexpr std::array<LocalisedString, kTextCount> kStrings{{
     {"Degeneracy tolerance", "简并阈值", "縮退判定しきい値", "Tolérance de dégénérescence"},
     {"Grouped labels", "分组标签", "グループ表示", "Étiquettes groupées"},
     {"Raw numbering", "原始编号", "元の番号", "Numérotation brute"},
-    {"Degenerate set", "简并组", "縮退組", "Groupe dégénéré"},
+    {"Energy-group size", "能级组成员数", "エネルギー群の成分数", "Taille du groupe de niveaux"},
     {"Energy unit", "能量单位", "エネルギー単位", "Unité d’énergie"},
     {"HOMO", "HOMO", "HOMO", "HOMO"},
     {"LUMO", "LUMO", "LUMO", "LUMO"},
@@ -107,7 +120,7 @@ constexpr std::array<LocalisedString, kTextCount> kStrings{{
     {"Valence MO diagram", "价电子层 MO 图", "価電子層 MO 図", "Diagramme MO de valence"},
     {"Valence diagram span", "价电子 MO 图范围", "価電子 MO 図の表示範囲", "Étendue du diagramme MO de valence"},
     {"Generate MO diagram", "生成 MO 图", "MO 図を生成", "Générer le diagramme MO"},
-    {"Export diagram + metadata", "导出图与元数据", "図とメタデータを書き出す", "Exporter diagramme + métadonnées"},
+    {"Export images", "导出图片", "画像を書き出す", "Exporter les images"},
     {"Exported", "已导出", "書き出し完了", "Exporté"},
     {"Export failed", "导出失败", "書き出し失敗", "Échec de l’export"},
     {"Molecule style", "分子样式", "分子表示", "Style moléculaire"},
@@ -123,7 +136,7 @@ constexpr std::array<LocalisedString, kTextCount> kStrings{{
     {"Show polyhedral cage support", "显示多面体笼骨架支撑", "多面体ケージ骨格を表示", "Afficher le support de cage polyédrique"},
     {"Show weak interactions", "显示弱相互作用", "弱い相互作用を表示", "Afficher les interactions faibles"},
     {"Hydrogen-bond, non-covalent and ionic contacts only; ambiguous contacts stay hidden.", "仅显示氢键、非共价和离子接触；歧义接触仍保持隐藏。", "水素結合・非共有結合・イオン接触のみ。曖昧な接触は表示しません。", "Contacts hydrogène, non covalents et ioniques uniquement ; les contacts ambigus restent masqués."},
-    {"Dashed bonds use a conservative delocalisation heuristic.", "虚线键使用保守的离域启发式判断。", "破線結合は保守的な非局在化ヒューリスティックです。", "Les liaisons en pointillés utilisent une heuristique prudente de délocalisation."},
+    {"Delocalised bonds: dashed lines.", "离域键：虚线。", "非局在化結合：破線。", "Liaisons délocalisées : pointillés."},
     {"Central valence layout", "中央价电子层布局", "中央価電子層レイアウト", "Disposition centrale de valence"},
     {"Valence-grouped levels", "价电子层分组能级", "価電子層のグループ準位", "Niveaux groupés de valence"},
     {"Valence MO diagram", "价电子层 MO 图", "価電子層 MO 図", "Diagramme MO de valence"},
@@ -138,18 +151,17 @@ constexpr std::array<LocalisedString, kTextCount> kStrings{{
     {"Native Open File is unavailable on this platform.", "当前平台不支持原生“打开文件”。", "このプラットフォームではネイティブのファイル選択を利用できません。", "La boîte de dialogue native n’est pas disponible sur cette plateforme."},
     {"Copy metadata", "复制元数据", "メタデータをコピー", "Copier les métadonnées"},
     {"No orbitals", "无轨道", "軌道がありません", "Aucune orbitale"},
-    {"Adaptive nonlinear energy scale (log-gap v3)", "自适应非线性能量轴（log-gap v3）", "適応型非線形エネルギー軸（log-gap v3）", "Échelle d’énergie non linéaire adaptative (log-gap v3)"},
+    {"Nonlinear energy axis", "非线性能量轴", "非線形エネルギー軸", "Axe d’énergie non linéaire"},
     {"Energy scale", "能量轴", "エネルギー軸", "Échelle d’énergie"},
     {"Linear", "线性", "線形", "Linéaire"},
-    {"Adaptive nonlinear", "自适应非线性", "適応型非線形", "Non linéaire adaptative"},
+    {"Nonlinear", "非线性", "非線形", "Non linéaire"},
     {"Orbital family", "轨道类型", "軌道タイプ", "Famille orbitale"},
     {"Bonding class", "成键类别", "結合分類", "Classe de liaison"},
     {"Exact energy", "精确能量", "正確なエネルギー", "Énergie exacte"},
     {"Multicentre bond", "多中心键", "多中心結合", "Liaison multicentrique"},
     {"Delocalised π system", "离域 π 体系", "非局在化 π 系", "Système π délocalisé"},
     {"Classification source", "分类来源", "分類の出典", "Source de classification"},
-    {"Confidence", "置信度", "信頼度", "Confiance"},
-    {"Degenerate members", "简并成员", "縮退メンバー", "Membres dégénérés"},
+    {"Energy-group members", "能级组成员", "エネルギー群の成分", "Membres du groupe de niveaux"},
 }};
 
 // These strings deliberately mirror text that is rendered directly by
@@ -158,6 +170,7 @@ constexpr std::array<LocalisedString, kTextCount> kStrings{{
 // omit characters in labels such as “轨道材质” and “柔和自动打光”, which made
 // Dear ImGui display '?' even though the operating-system CJK font was loaded.
 constexpr const char* kSupplementalChinese =
+    "无法定位载入数据当前计算不匹配找到多个文件读取失败详细错误字体缺少中文日文字形分子轨道能级已识别的连接整数键级未确定 "
     "轨道材质 标准 玻璃 表面模式 实体 线框 实体 + 线框 柔和自动打光 "
     "波函数文件（FCHK 优先；Molden 兼容） "
     "可拖入 .fchk/.fch/.chk 或兼容的 .molden 文件，也可直接输入路径。 "
@@ -170,6 +183,8 @@ constexpr const char* kSupplementalChinese =
     "UND / 最小价层参考之外 CUDA 设备 CUDA设备";
 
 constexpr const char* kSupplementalJapanese =
+    "互換性のないデータです "
+    "データが見つかりません現在の計算と一致しません複数読み込めませんファイル読込失敗エラー詳細中国語日本語のフォントがありません分子軌道のエネルギー整数結合次数が未確定 "
     "軌道マテリアル 標準 ガラス 表示モード ソリッド ワイヤー "
     "ソリッド + ワイヤー ソフト自動照明 "
     "波動関数ファイル（FCHK 優先・Molden 互換） "
@@ -182,13 +197,49 @@ constexpr const char* kSupplementalJapanese =
     "MO 寄与は重なり密度由来、Mayer は全密度の原子対指数。 "
     "UND / 最小原子価参照外 CUDA デバイス";
 
+// Exact non-ASCII characters used by the four-language integration controls
+// in main.cpp, nbo_aomo_ui.cpp and nbo_ui.cpp. The range builder deduplicates
+// these source-derived characters instead of loading a full CJK range.
+constexpr const char* kIntegrationChineseGlyphs =
+    "²–…→−、。一三上下不与且两严个中为主义互些交仅仍代件会位低体作使保候值元先入全关内再出击分划"
+    "则删别到前力加动勾化印原及取变叠只可右号合同后和器图在场均型域基堡声壳处复多央失始子存完定实导尾"
+    "局层居展属左已布带幅平并度开弱归当待微德恢情成或截所手打拖择指按据接控描放数整文断新方旋无明是显"
+    "暗有未杂权来构析架查标核格检正此段母比没注测浏消清源滚灰点片独瓣用电留白百的相看真着确示离称移空"
+    "立符等简算类系素紫累红级纳线组结绘续维绿缩缺置而联能自色节荷蓝藏行表要视览角计证该详说请调负轨轮"
+    "输这连述适选透逐道部配里重量金键间阈降除随隐集零面项题验骨高（），：；";
+constexpr const char* kIntegrationJapaneseGlyphs =
+    "²–…→−、。あいえかがきくげこさしすせただちつてでとなにねのはびぶべまみむもらりるれわをんァア"
+    "イクグスセタッテデトドピフブプホメラリルロン・ー一上下不中主乗二互交付以位体作係保個候値元入全典"
+    "内出分列別利削割力加動化区印原厳去可右号各合含和図在基場変外大央子字存定実密小局展属左布幅底度従"
+    "復微成所手択拠拡持指振描損操数整新明書未析査格検構機欠次正残殻注消淡混済準濃灰点独用画異白的目直"
+    "相着確示移積空立符等算系素紫累細結続緑線縮群能色荷行表補複見規覧親角解計証詳認説調負赤軌追退透造"
+    "連運道選部配重量金開間関除際隠集零電青非面項骨（）：；";
+constexpr const char* kIntegrationLatinGlyphs = "²Éèéê–’";
+
+// Direct labels introduced in orbital_ui_v2.cpp and ui_text_dispatch.cpp
+// bypass the orbital browser's own localisation table.
+constexpr const char* kOrbitalDiagramChineseGlyphs =
+    "MO 图设置 正则 MO 能量参考图 "
+    "波函数文件或计算目录（FCHK 优先；自动关联 NBO） "
+    "可同时拖入波函数与 NBO 文件，或拖入计算目录；也可直接输入文件或目录路径。兼容 .fchk/.fch/.chk 和 .molden。 "
+    "源文件 MO（从 1 开始） 源 MO";
+constexpr const char* kOrbitalDiagramJapaneseGlyphs =
+    "MO 図の設定 正準 MO エネルギー参照図 "
+    "波動関数ファイルまたは計算フォルダー（FCHK 優先・NBO 自動関連付け） "
+    "波動関数と NBO ファイルをまとめて、または計算フォルダーをドロップできます。ファイルやフォルダーのパス入力も可能です。.fchk/.fch/.chk・.molden に対応。 "
+    "入力 MO（1 始まり） 入力 MO";
+constexpr const char* kOrbitalDiagramLatinGlyphs =
+    "Réglages du diagramme OM Référence énergétique des OM canoniques "
+    "Fichier de fonction d’onde ou dossier de calcul (FCHK prioritaire ; association NBO automatique) "
+    "Déposez ensemble les fichiers de fonction d’onde et NBO, ou un dossier de calcul ; vous pouvez aussi saisir leur chemin. Formats .fchk/.fch/.chk et .molden compatibles.";
+
 // Keep all symbols produced by MO labels/annotations in the primary font.
 // Π⁵₆ is included as an exact sequence as well as through the complete digit
 // sets, which protects both the large-pi family label and future N-centre
 // families from atlas-range regressions.
 constexpr const char* kScientificGlyphs =
-    "● · – — − ± × → ← ↔ ↑ ↓ "
-    "α β σ π δ φ Σ Π Δ Φ Γ Π⁵₆ "
+    "● · – — − ± × ≈ → ← ↔ ↑ ↓ "
+    "α β σ π δ φ η Σ Π Δ Φ Γ Π⁵₆ ∞ "
     "⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ ⁺ ⁻ "
     "₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉ ₊ ₋ ′ ″";
 
@@ -223,6 +274,130 @@ void merge_font_if_available(const std::string& path,
     if (ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), pixel_size, &cfg, ranges)) loaded = true;
 }
 
+#ifdef __APPLE__
+struct CFReleaseOwned {
+    void operator()(const void* value) const { if (value) CFRelease(value); }
+};
+template<class T> using CFOwned = std::unique_ptr<std::remove_pointer_t<T>, CFReleaseOwned>;
+
+std::string core_text_string(CFStringRef value) {
+    if (!value) return {};
+    const auto capacity = CFStringGetMaximumSizeForEncoding(CFStringGetLength(value), kCFStringEncodingUTF8) + 1;
+    std::string text(static_cast<std::size_t>(capacity), '\0');
+    if (!CFStringGetCString(value, text.data(), capacity, kCFStringEncodingUTF8)) return {};
+    text.resize(std::char_traits<char>::length(text.c_str()));
+    return text;
+}
+
+struct SystemGlyphBitmap {
+    int rectangle = -1;
+    int width = 0;
+    int height = 0;
+    std::vector<unsigned char> pixels;
+};
+
+// CoreText selects the actual installed font and collection face. Rendering
+// through the system also handles Apple's variable/nonstandard glyph tables,
+// which a readable PingFang.ttc plus stb_truetype cannot reliably represent.
+bool add_system_glyphs(ImFont* primary, const float pixel_size, const ImWchar* ranges,
+                       CFStringRef language, CFStringRef preferred_name,
+                       ImFontGlyphRangesBuilder& pending,
+                       std::vector<SystemGlyphBitmap>& bitmaps, std::string& source_name) {
+    auto* atlas = primary->ContainerAtlas;
+    CFOwned<CTFontRef> preferred(CTFontCreateWithName(preferred_name, pixel_size, nullptr));
+    if (!preferred) return false;
+    bool complete = true;
+    bool reported = false;
+    for (const ImWchar* range = ranges; range[0]; range += 2) {
+        for (unsigned int codepoint = range[0]; codepoint <= range[1]; ++codepoint) {
+            if (codepoint <= 0x20 || primary->FindGlyphNoFallback(static_cast<ImWchar>(codepoint)) || pending.GetBit(codepoint)) continue;
+            const UniChar character = static_cast<UniChar>(codepoint);
+            CFOwned<CFStringRef> text(CFStringCreateWithCharacters(kCFAllocatorDefault, &character, 1));
+            CFOwned<CTFontRef> font(CTFontCreateForStringWithLanguage(preferred.get(), text.get(), CFRangeMake(0, 1), language));
+            CGGlyph glyph = 0;
+            CFOwned<CFStringRef> postscript(font ? CTFontCopyPostScriptName(font.get()) : nullptr);
+            const auto name = core_text_string(postscript.get());
+            if (!font || name.find("LastResort") != std::string::npos ||
+                !CTFontGetGlyphsForCharacters(font.get(), &character, &glyph, 1) || glyph == 0) {
+                std::fprintf(stderr, "System font missing %s U+%04X\n", core_text_string(language).c_str(), codepoint);
+                complete = false;
+                continue;
+            }
+            CGRect bounds{};
+            CGSize advance{};
+            CTFontGetBoundingRectsForGlyphs(font.get(), kCTFontOrientationHorizontal, &glyph, &bounds, 1);
+            CTFontGetAdvancesForGlyphs(font.get(), kCTFontOrientationHorizontal, &glyph, &advance, 1);
+            const bool whitespace = codepoint == 0xA0 || (codepoint >= 0x2000 && codepoint <= 0x200A) ||
+                                    codepoint == 0x202F || codepoint == 0x205F || codepoint == 0x3000;
+            const int left = static_cast<int>(std::floor(CGRectGetMinX(bounds))) - 1;
+            const int bottom = static_cast<int>(std::floor(CGRectGetMinY(bounds))) - 1;
+            const int top = static_cast<int>(std::ceil(CGRectGetMaxY(bounds))) + 1;
+            const int right = static_cast<int>(std::ceil(CGRectGetMaxX(bounds))) + 1;
+            SystemGlyphBitmap bitmap;
+            bitmap.width = std::max(1, right - left);
+            bitmap.height = std::max(1, top - bottom);
+            bitmap.pixels.resize(static_cast<std::size_t>(bitmap.width) * bitmap.height, 0);
+            CFOwned<CGColorSpaceRef> gray(CGColorSpaceCreateDeviceGray());
+            CFOwned<CGContextRef> context(CGBitmapContextCreate(bitmap.pixels.data(), bitmap.width, bitmap.height,
+                                                              8, bitmap.width, gray.get(), kCGImageAlphaNone));
+            if (!context) { complete = false; continue; }
+            CGContextSetAllowsAntialiasing(context.get(), true);
+            CGContextSetShouldAntialias(context.get(), true);
+            CGContextSetShouldSmoothFonts(context.get(), false);
+            CGContextSetTextDrawingMode(context.get(), kCGTextFill);
+            CGContextSetGrayFillColor(context.get(), 1.0, 1.0);
+            const CGPoint origin = CGPointMake(-left, -bottom);
+            CTFontDrawGlyphs(font.get(), &glyph, &origin, 1, context.get());
+            CGContextFlush(context.get());
+            if (!whitespace && std::none_of(bitmap.pixels.begin(), bitmap.pixels.end(), [](unsigned char pixel) { return pixel != 0; })) {
+                std::fprintf(stderr, "System font produced no pixels for %s U+%04X\n", name.c_str(), codepoint);
+                complete = false;
+                continue;
+            }
+            bitmap.rectangle = atlas->AddCustomRectFontGlyph(primary, static_cast<ImWchar>(codepoint),
+                bitmap.width, bitmap.height, static_cast<float>(advance.width),
+                ImVec2(static_cast<float>(left), std::round(primary->Ascent) - static_cast<float>(top)));
+            pending.SetBit(codepoint);
+            bitmaps.push_back(std::move(bitmap));
+            if ((!reported && codepoint >= 0x3000) || codepoint == 0x6742) {
+                source_name = name;
+                CFOwned<CFTypeRef> attribute(CTFontCopyAttribute(font.get(), kCTFontURLAttribute));
+                CFOwned<CFStringRef> path(attribute && CFGetTypeID(attribute.get()) == CFURLGetTypeID()
+                    ? CFURLCopyFileSystemPath(static_cast<CFURLRef>(attribute.get()), kCFURLPOSIXPathStyle) : nullptr);
+                std::fprintf(stderr, "COV system font %s U+%04X: %s [%s]\n", core_text_string(language).c_str(), codepoint, name.c_str(), core_text_string(path.get()).c_str());
+                reported = true;
+            }
+        }
+    }
+    return complete;
+}
+
+bool build_system_glyph_atlas(ImFont* primary, const float pixel_size,
+                              const ImWchar* chinese, const ImWchar* japanese,
+                              bool& zh_loaded, bool& ja_loaded,
+                              std::string& chinese_name, std::string& japanese_name) {
+    // A newly added font receives its ContainerAtlas during its first build.
+    auto* atlas = ImGui::GetIO().Fonts;
+    if (!atlas->Build()) return false;
+    ImFontGlyphRangesBuilder pending;
+    std::vector<SystemGlyphBitmap> bitmaps;
+    zh_loaded = add_system_glyphs(primary, pixel_size, chinese, CFSTR("zh-Hans"), CFSTR("PingFangSC-Regular"), pending, bitmaps, chinese_name);
+    ja_loaded = add_system_glyphs(primary, pixel_size, japanese, CFSTR("ja"), CFSTR("HiraginoSans-W3"), pending, bitmaps, japanese_name);
+    if (!atlas->Build()) return false;
+    // Custom rectangles own atlas locations; local bitmaps are copied into the
+    // atlas before its RGBA upload is generated. No native pointers survive.
+    for (const auto& bitmap : bitmaps) {
+        const auto* rectangle = atlas->GetCustomRectByIndex(bitmap.rectangle);
+        if (!rectangle || !rectangle->IsPacked()) return false;
+        for (int row = 0; row < bitmap.height; ++row) {
+            std::copy_n(bitmap.pixels.data() + row * bitmap.width, bitmap.width,
+                        atlas->TexPixelsAlpha8 + (rectangle->Y + row) * atlas->TexWidth + rectangle->X);
+        }
+    }
+    return zh_loaded && ja_loaded;
+}
+#endif
+
 const char* localised(const LocalisedString& value, const Language language) noexcept {
     switch (language) {
         case Language::ChineseSimplified: return value.zh;
@@ -252,8 +427,10 @@ const char* language_name(const Language language) noexcept {
 const char* supplemental_glyph_seed(const Language language) noexcept {
     static const std::string english=orbital_ui_glyph_seed(Language::English);
     static const std::string chinese=std::string(kSupplementalChinese)+" "+
+        kIntegrationChineseGlyphs+" "+kOrbitalDiagramChineseGlyphs+" "+
         orbital_ui_glyph_seed(Language::ChineseSimplified);
     static const std::string japanese=std::string(kSupplementalJapanese)+" "+
+        kIntegrationJapaneseGlyphs+" "+kOrbitalDiagramJapaneseGlyphs+" "+
         orbital_ui_glyph_seed(Language::Japanese);
     static const std::string french=orbital_ui_glyph_seed(Language::French);
     switch (language) {
@@ -351,8 +528,8 @@ bool configure_fonts(const float pixel_size) {
     const std::string japanese = first_existing({"C:/Windows/Fonts/YuGothM.ttc", "C:/Windows/Fonts/YuGothR.ttc", "C:/Windows/Fonts/meiryo.ttc", "C:/Windows/Fonts/msgothic.ttc"});
 #elif defined(__APPLE__)
     const std::string base = first_existing({"/System/Library/Fonts/SFNS.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf"});
-    const std::string chinese = first_existing({"/System/Library/Fonts/PingFang.ttc", "/Library/Fonts/NotoSansCJK-Regular.ttc"});
-    const std::string japanese = first_existing({"/Library/Fonts/NotoSansCJK-Regular.ttc", "/System/Library/Fonts/AppleGothic.ttf"});
+    std::string chinese = "macOS Chinese";
+    std::string japanese = "macOS Japanese";
 #else
     const std::string base = first_existing({"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"});
     const std::string chinese = first_existing({"/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf"});
@@ -365,7 +542,19 @@ bool configure_fonts(const float pixel_size) {
     latin_builder.AddText(language_name(Language::French));
     latin_builder.AddText(supplemental_glyph_seed(Language::English));
     latin_builder.AddText(supplemental_glyph_seed(Language::French));
+    const auto nbo_en=nbo_glyph_seed(Language::English);
+    const auto nbo_fr=nbo_glyph_seed(Language::French);
+    latin_builder.AddText(nbo_en.c_str());
+    latin_builder.AddText(nbo_fr.c_str());
+    const auto aomo_en=nbo_aomo_glyph_seed(Language::English);
+    const auto aomo_fr=nbo_aomo_glyph_seed(Language::French);
+    latin_builder.AddText(aomo_en.c_str());
+    latin_builder.AddText(aomo_fr.c_str());
     latin_builder.AddText(scientific_glyph_seed());
+    const auto inspection_seed=inspection_glyph_seed();
+    latin_builder.AddText(inspection_seed.c_str());
+    latin_builder.AddText(kIntegrationLatinGlyphs);
+    latin_builder.AddText(kOrbitalDiagramLatinGlyphs);
     ImVector<ImWchar> latin_ranges;
     latin_builder.BuildRanges(&latin_ranges);
 
@@ -385,7 +574,17 @@ bool configure_fonts(const float pixel_size) {
     ja_builder.AddText(language_name(Language::Japanese));
     zh_builder.AddText(supplemental_glyph_seed(Language::ChineseSimplified));
     ja_builder.AddText(supplemental_glyph_seed(Language::Japanese));
+    const auto nbo_zh=nbo_glyph_seed(Language::ChineseSimplified);
+    const auto nbo_ja=nbo_glyph_seed(Language::Japanese);
+    zh_builder.AddText(nbo_zh.c_str());
+    ja_builder.AddText(nbo_ja.c_str());
+    const auto aomo_zh=nbo_aomo_glyph_seed(Language::ChineseSimplified);
+    const auto aomo_ja=nbo_aomo_glyph_seed(Language::Japanese);
+    zh_builder.AddText(aomo_zh.c_str());
+    ja_builder.AddText(aomo_ja.c_str());
     zh_builder.AddText(scientific_glyph_seed());
+    zh_builder.AddText(inspection_seed.c_str());
+    ja_builder.AddText(inspection_seed.c_str());
     ja_builder.AddText(scientific_glyph_seed());
     ImVector<ImWchar> zh_ranges;
     ImVector<ImWchar> ja_ranges;
@@ -394,9 +593,14 @@ bool configure_fonts(const float pixel_size) {
 
     bool zh_loaded = false;
     bool ja_loaded = false;
+#ifdef __APPLE__
+    const bool built = build_system_glyph_atlas(primary, pixel_size, zh_ranges.Data, ja_ranges.Data,
+                                               zh_loaded, ja_loaded, chinese, japanese);
+#else
     merge_font_if_available(chinese, pixel_size, zh_ranges.Data, zh_loaded);
     merge_font_if_available(japanese, pixel_size, ja_ranges.Data, ja_loaded);
     const bool built = io.Fonts->Build();
+#endif
     g_font_status = file_name_or_default(base, "ImGui default");
     g_font_status += " + ";
     g_font_status += zh_loaded ? file_name_or_default(chinese, "CJK") : "ZH fallback missing";
@@ -406,6 +610,21 @@ bool configure_fonts(const float pixel_size) {
 }
 
 const char* font_status() noexcept { return g_font_status.c_str(); }
+const char* font_status(Language language) {
+    static std::string display;
+    display=g_font_status;
+    const char* zh=language==Language::ChineseSimplified?"缺少中文字体":
+        language==Language::Japanese?"中国語フォントなし":
+        language==Language::French?"Police chinoise absente":"Chinese font unavailable";
+    const char* ja=language==Language::ChineseSimplified?"缺少日文字体":
+        language==Language::Japanese?"日本語フォントなし":
+        language==Language::French?"Police japonaise absente":"Japanese font unavailable";
+    for(const auto& pair:{std::pair{"ZH fallback missing",zh},std::pair{"JA fallback missing",ja}}) {
+        if(const auto pos=display.find(pair.first);pos!=std::string::npos)
+            display.replace(pos,std::char_traits<char>::length(pair.first),pair.second);
+    }
+    return display.c_str();
+}
 
 void section_title(const char* label) {
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.68f, 0.82f, 1.0f));
@@ -417,7 +636,14 @@ void begin_card(const char* id, const float height) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 11.0f));
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.082f, 0.108f, 0.145f, 0.94f));
     ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.18f, 0.23f, 0.30f, 0.90f));
-    ImGui::BeginChild(id, ImVec2(0.0f, height), true, ImGuiWindowFlags_None);
+    if(height<=0)
+        ImGui::BeginChild(id, ImVec2(0,0),
+            ImGuiChildFlags_Border|ImGuiChildFlags_AutoResizeY|ImGuiChildFlags_AlwaysAutoResize,
+            ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
+    else
+        ImGui::BeginChild(id, ImVec2(0.0f, height), true, ImGuiWindowFlags_None);
+    if(height<=0)cov::validation::field(std::string("layout.card.")+id+".scroll_max_y",
+        std::to_string(ImGui::GetScrollMaxY()));
     ImGui::PushTextWrapPos(0.0f);
 }
 

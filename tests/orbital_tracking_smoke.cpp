@@ -1,8 +1,11 @@
 #include "cov/orbital_tracking.hpp"
 
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -88,6 +91,71 @@ bool single_union_match(const cov::OrbitalTrackingResult& result,
            result.matches.front().to_members == expected;
 }
 
+bool same_correspondence(const cov::OrbitalTrackingResult& left,
+                         const cov::OrbitalTrackingResult& right) {
+    if (left.matches.size() != right.matches.size() ||
+        left.unmatched_from != right.unmatched_from ||
+        left.unmatched_to != right.unmatched_to ||
+        left.atom_mapping_compatible != right.atom_mapping_compatible ||
+        left.composite_optimisation_truncated != right.composite_optimisation_truncated)
+        return false;
+    for (std::size_t i = 0u; i < left.matches.size(); ++i) {
+        const auto& a = left.matches[i];
+        const auto& b = right.matches[i];
+        if (a.from_members != b.from_members || a.to_members != b.to_members ||
+            a.similarity != b.similarity || a.score != b.score ||
+            a.ambiguous != b.ambiguous || a.source != b.source) return false;
+    }
+    return !left.tracking_budget_exhausted && !right.tracking_budget_exhausted;
+}
+
+bool preserves_unresolved(const cov::OrbitalTrackingResult& result,
+                          const std::size_t from_count, const std::size_t to_count) {
+    const auto complete = [](const auto& groups, const std::size_t count) {
+        std::vector<std::size_t> seen(count, 0u);
+        for (const auto& group : groups) {
+            if (group.empty()) return false;
+            for (const auto member : group) {
+                if (member >= count || ++seen[member] != 1u) return false;
+            }
+        }
+        for (const auto visits : seen) if (visits != 1u) return false;
+        return true;
+    };
+    return result.tracking_budget_exhausted && result.matches.empty() &&
+        result.unmatched_from.empty() && result.unmatched_to.empty() &&
+        result.composite_matches_selected == 0u &&
+        complete(result.unresolved_from, from_count) &&
+        complete(result.unresolved_to, to_count);
+}
+
+bool stage_boundary_checks(const cov::Wavefunction& from,
+                           const cov::Wavefunction& to,
+                           cov::OrbitalTrackingOptions options = {}) {
+    options.maximum_tracking_milliseconds = std::numeric_limits<double>::infinity();
+    options.maximum_tracking_work_units = std::numeric_limits<std::size_t>::max();
+    const auto reference = cov::track_orbital_subspaces(from, to, options);
+    if (reference.tracking_budget_exhausted) return false;
+    auto exact_options = options;
+    exact_options.maximum_tracking_work_units = reference.tracking_work_units;
+    if (!same_correspondence(reference,
+            cov::track_orbital_subspaces(from, to, exact_options))) return false;
+    std::size_t cumulative = 0u;
+    for (std::size_t stage = 1u; stage < reference.tracking_work_units_by_stage.size(); ++stage) {
+        const auto work = reference.tracking_work_units_by_stage[stage];
+        cumulative += work;
+        if (work == 0u) continue;
+        auto limited = options;
+        limited.maximum_tracking_work_units = cumulative - 1u;
+        const auto stopped = cov::track_orbital_subspaces(from, to, limited);
+        if (!preserves_unresolved(stopped, from.orbitals.size(), to.orbitals.size()) ||
+            stopped.budget_exhausted_stage != static_cast<cov::OrbitalTrackingStage>(stage) ||
+            stopped.budget_exhaustion_reason != cov::OrbitalTrackingBudgetExhaustion::WorkLimit ||
+            stopped.tracking_work_units > limited.maximum_tracking_work_units) return false;
+    }
+    return true;
+}
+
 } // namespace
 
 int main() {
@@ -147,6 +215,54 @@ int main() {
         return EXIT_FAILURE;
     }
 
+    // Check observable scores and ambiguity, not merely assignment counts.
+    // The second source's locally preferred edge is consumed by the stronger
+    // source, so its valid second choice must retain the ambiguity warning.
+    for (const auto& match : competition.matches) {
+        const bool first_source = match.from_members == std::vector<std::size_t>{0u};
+        const double expected_score = first_source ? 0.99 : 0.59;
+        const double expected_similarity = first_source ? 1.0 : 0.60;
+        if (std::abs(match.score - expected_score) > 1e-12 ||
+            std::abs(match.similarity - expected_similarity) > 1e-12 ||
+            match.ambiguous != !first_source ||
+            match.source != cov::OrbitalTrackingSource::SMetricChemicalDescriptor) {
+            std::cerr << "ordinary score or ambiguity regression\n";
+            return EXIT_FAILURE;
+        }
+    }
+
+    // Incompatible atom order must still retain sorted, degenerate membership
+    // groups on both sides, even when their chemical descriptors are unusable.
+    auto incompatible_from = split_frame(2u, true, -0.30, 2.0);
+    incompatible_from.orbitals.push_back(orbital(-0.80, 2.0, 0u, 1.0));
+    auto incompatible_to = incompatible_from;
+    std::swap(incompatible_to.atoms[0], incompatible_to.atoms[1]);
+    incompatible_to.orbitals[0].chemistry.available = false;
+    const auto incompatible = cov::track_orbital_subspaces(
+        incompatible_from, incompatible_to);
+    const std::vector<std::vector<std::size_t>> incompatible_groups{{2u}, {0u, 1u}};
+    if (incompatible.atom_mapping_compatible || !incompatible.matches.empty() ||
+        incompatible.unmatched_from != incompatible_groups ||
+        incompatible.unmatched_to != incompatible_groups ||
+        incompatible.composite_optimisation_truncated) {
+        std::cerr << "incompatible frame membership regression\n";
+        return EXIT_FAILURE;
+    }
+
+    // Missing chemistry supports no assignment; every original group must be
+    // reported unmatched, with no optimizer truncation invented for this case.
+    auto unavailable_to = second;
+    for (auto& mo : unavailable_to.orbitals) mo.chemistry.available = false;
+    const auto unavailable = cov::track_orbital_subspaces(first, unavailable_to);
+    const std::vector<std::vector<std::size_t>> singleton_groups{{0u}, {1u}};
+    if (!unavailable.atom_mapping_compatible || !unavailable.matches.empty() ||
+        unavailable.unmatched_from != singleton_groups ||
+        unavailable.unmatched_to != singleton_groups ||
+        unavailable.composite_optimisation_truncated) {
+        std::cerr << "unsupported ordinary assignment regression\n";
+        return EXIT_FAILURE;
+    }
+
     // Symmetry lowering may split an e subspace into two adjacent singlets.
     // Tracking must preserve the two-dimensional identity as a whole instead
     // of silently dropping it because the temporary group sizes differ.
@@ -193,6 +309,31 @@ int main() {
         !interleaved.unmatched_from.empty() ||
         !interleaved.unmatched_to.empty()) {
         std::cerr << "interleaved local split subspace regression\n";
+        return EXIT_FAILURE;
+    }
+
+    // A complete split/recombine may consume one side while the other has a
+    // chemically distinct extra singlet. Preserve that unmatched member in
+    // both transition directions without requesting an ordinary assignment.
+    auto shorter_split = interleaved_to;
+    shorter_split.orbitals.erase(shorter_split.orbitals.begin() + 1);
+    const auto partial_lowering = cov::track_orbital_subspaces(
+        interleaved_from, shorter_split);
+    const auto partial_restoring = cov::track_orbital_subspaces(
+        shorter_split, interleaved_from);
+    const std::vector<std::vector<std::size_t>> extra_singlet{{2u}};
+    const auto partial_union = [](const cov::OrbitalTrackingResult& value) {
+        return value.atom_mapping_compatible && value.matches.size() == 1u &&
+            value.composite_matches_selected == 1u &&
+            value.matches.front().from_members == std::vector<std::size_t>{0u, 1u} &&
+            value.matches.front().to_members == std::vector<std::size_t>{0u, 1u};
+    };
+    if (!partial_union(partial_lowering) || !partial_union(partial_restoring) ||
+        partial_lowering.unmatched_from != extra_singlet ||
+        !partial_lowering.unmatched_to.empty() ||
+        !partial_restoring.unmatched_from.empty() ||
+        partial_restoring.unmatched_to != extra_singlet) {
+        std::cerr << "partial split/recombine unmatched membership regression\n";
         return EXIT_FAILURE;
     }
 
@@ -355,6 +496,81 @@ int main() {
         std::cerr << "large conflict fallback bound/determinism regression\n";
         return EXIT_FAILURE;
     }
+    // Boundaries cover incomplete ordinary/composite candidate sets, matrix
+    // preallocation, partially augmented Hungarian solutions and reporting.
+    // Even a previously emitted match must roll back if a later phase stops.
+    if (!stage_boundary_checks(first, second) ||
+        !stage_boundary_checks(competition_from, competition_to) ||
+        !stage_boundary_checks(interleaved_from, interleaved_to) ||
+        !stage_boundary_checks(packing_from, packing_to)) {
+        std::cerr << "end-to-end budget boundary/correspondence regression\n";
+        return EXIT_FAILURE;
+    }
+
+    auto tied_from = competition_from;
+    auto tied_to = competition_to;
+    tied_from.orbitals[1] = orbital(-0.20, 0.0, 0u, 1.0);
+    tied_to.orbitals[1] = orbital(-0.15, 0.0, 0u, 1.0);
+    cov::OrbitalTrackingOptions tie_options;
+    tie_options.energy_weight = 0.0;
+    const auto tied = cov::track_orbital_subspaces(tied_from, tied_to, tie_options);
+    if (!stage_boundary_checks(tied_from, tied_to, tie_options) ||
+        tied.matches.size() != 2u || !tied.matches[0].ambiguous ||
+        !tied.matches[1].ambiguous ||
+        tied.matches[0].from_members != std::vector<std::size_t>{0u} ||
+        tied.matches[0].to_members != std::vector<std::size_t>{0u} ||
+        tied.matches[1].from_members != std::vector<std::size_t>{1u} ||
+        tied.matches[1].to_members != std::vector<std::size_t>{1u}) {
+        std::cerr << "equal-score Hungarian order changed under tracking budget\n";
+        return EXIT_FAILURE;
+    }
+
+    // Isolated equal-energy anchors yield two independent conflict components.
+    // Their local DP budgets both suffice, but they share one tracking budget.
+    cov::Wavefunction components_from, components_to;
+    components_from.atoms = first.atoms;
+    components_to.atoms = first.atoms;
+    for (std::size_t group = 0u; group < 2u; ++group) {
+        const double energy = -5.0 + 3.0 * static_cast<double>(group);
+        components_from.orbitals.push_back(orbital(energy, 2.0, group, 1.0));
+        components_from.orbitals.push_back(orbital(energy, 2.0, group, 1.0));
+        components_to.orbitals.push_back(orbital(energy - 0.02, 2.0, group, 1.0));
+        components_to.orbitals.push_back(orbital(energy + 0.02, 2.0, group, 1.0));
+    }
+    cov::OrbitalTrackingOptions component_options;
+    component_options.maximum_tracking_milliseconds = std::numeric_limits<double>::infinity();
+    const auto components = cov::track_orbital_subspaces(
+        components_from, components_to, component_options);
+    const auto optimizer_stage = static_cast<std::size_t>(
+        cov::OrbitalTrackingStage::CompositeOptimization);
+    std::size_t before_optimization = 0u;
+    for (std::size_t stage = 0u; stage < optimizer_stage; ++stage)
+        before_optimization += components.tracking_work_units_by_stage[stage];
+    component_options.maximum_tracking_work_units = before_optimization +
+        components.tracking_work_units_by_stage[optimizer_stage] * 3u / 4u;
+    const auto components_stopped = cov::track_orbital_subspaces(
+        components_from, components_to, component_options);
+    if (components.matches.size() != 2u || components.composite_components_completed != 2u ||
+        components_stopped.composite_components_completed != 1u ||
+        components_stopped.budget_exhausted_stage != cov::OrbitalTrackingStage::CompositeOptimization ||
+        !preserves_unresolved(components_stopped, 4u, 4u)) {
+        std::cerr << "independent conflict components did not share total budget\n";
+        return EXIT_FAILURE;
+    }
+
+    cov::OrbitalTrackingOptions no_time;
+    no_time.maximum_tracking_milliseconds = 0.0;
+    const auto timed_out = cov::track_orbital_subspaces(first, second, no_time);
+    if (!preserves_unresolved(timed_out, 2u, 2u) ||
+        timed_out.budget_exhaustion_reason != cov::OrbitalTrackingBudgetExhaustion::TimeLimit ||
+        timed_out.budget_exhausted_stage != cov::OrbitalTrackingStage::Descriptors) {
+        std::cerr << "tracking deadline did not preserve unresolved memberships\n";
+        return EXIT_FAILURE;
+    }
+    std::cout << "tracking work units: crossing=" << result.tracking_work_units
+              << ", packing=" << packing.tracking_work_units
+              << ", dense=" << dense.tracking_work_units
+              << ", chain=" << chain_first.tracking_work_units << '\n';
     std::cout << "orbital subspace tracking smoke test passed\n";
     return EXIT_SUCCESS;
 }

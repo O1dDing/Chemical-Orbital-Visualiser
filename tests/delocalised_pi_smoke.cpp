@@ -441,12 +441,18 @@ bool validate_cp_family(
         if (chemistry.delocalised_family_id!=reference.delocalised_family_id ||
             chemistry.delocalised_family_orbitals!=expected_orbitals ||
             chemistry.delocalised_participating_atom_indices!=expected_atoms ||
-            chemistry.channel.dominant!=cov::OrbitalAngularFamily::Pi) {
+            !std::isfinite(chemistry.delocalised_pi_weight) ||
+            chemistry.delocalised_pi_weight<=0.0 || chemistry.delocalised_pi_weight>1.0) {
             std::cerr<<context<<": family membership differs at MO"
                      <<(index+1u)<<'\n';
             return false;
         }
-        const auto annotation=cov::annotate_orbital(wf.orbitals[index]);
+        // Local bond-axis character and global p-family membership can differ.
+        // The annotation must preserve membership without rewriting that channel.
+        auto scoped=wf.orbitals[index];
+        scoped.chemistry.channel.dominant=cov::OrbitalAngularFamily::Sigma;
+        const auto annotation=cov::annotate_orbital(scoped);
+        if (scoped.chemistry.channel.dominant!=cov::OrbitalAngularFamily::Sigma) return false;
         if (!annotation.delocalised_pi.available ||
             annotation.delocalised_pi.label!=expected_label ||
             annotation.delocalised_pi.participating_atoms!=5u ||

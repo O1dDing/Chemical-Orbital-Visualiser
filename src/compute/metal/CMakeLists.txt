@@ -12,8 +12,12 @@ endif()
 
 set(COV_METAL_AIR "${CMAKE_CURRENT_BINARY_DIR}/orbital.air")
 set(COV_METAL_LIB "${CMAKE_CURRENT_BINARY_DIR}/orbital.metallib")
+set(COV_METAL_DEPLOYMENT_FLAGS)
+if(CMAKE_OSX_DEPLOYMENT_TARGET)
+    list(APPEND COV_METAL_DEPLOYMENT_FLAGS "-mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+endif()
 add_custom_command(OUTPUT "${COV_METAL_LIB}"
-    COMMAND xcrun -sdk macosx metal -c "${CMAKE_CURRENT_LIST_DIR}/orbital.metal" -o "${COV_METAL_AIR}"
+    COMMAND xcrun -sdk macosx metal ${COV_METAL_DEPLOYMENT_FLAGS} -c "${CMAKE_CURRENT_LIST_DIR}/orbital.metal" -o "${COV_METAL_AIR}"
     COMMAND xcrun -sdk macosx metallib "${COV_METAL_AIR}" -o "${COV_METAL_LIB}"
     DEPENDS "${CMAKE_CURRENT_LIST_DIR}/orbital.metal"
     VERBATIM)

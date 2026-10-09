@@ -5,6 +5,7 @@ const char* machine_bonding_class(const BondingClass value) noexcept {
         case BondingClass::Bonding: return "bonding";
         case BondingClass::Nonbonding: return "nonbonding";
         case BondingClass::Antibonding: return "antibonding";
+        case BondingClass::Mixed: return "mixed";
         default: return "unclassified";
     }
 }
@@ -300,6 +301,23 @@ bool write_mo_diagram_json(const MODiagramData& data,
             << (index+1u<data.local_geometries.size()?",":"") << "\n";
     }
     out << "  ],\n";
+    out << "  \"pi_partner_candidates\": " << pi_partner_candidates_json(data.pi_partner_candidates) << ",\n";
+    out << "  \"sigma_framework\": " << mo_sigma_framework_json(data.sigma_framework) << ",\n";
+    out << "  \"using_ro_common_energy\": " << (data.using_ro_common_energy?"true":"false") << ",\n";
+    out << "  \"ro_common_energy\": " << serialize_nbo_ro_common_energy_json(data.ro_common_energy) << ",\n";
+    out << "  \"pi_field_response\": " << pi_field_response_analysis_json(data.pi_field_response) << ",\n";
+    out << "  \"composition_scope\": {\"applicable\":" << (data.composition_scope.applicable?"true":"false")
+        << ",\"centres\":";
+    write_json_index_array(out,data.composition_scope.centre_atoms);
+    out << ",\"ligands\":";write_json_index_array(out,data.composition_scope.ligand_atoms);
+    out << ",\"other_atoms\":";write_json_index_array(out,data.composition_scope.other_atoms);
+    out << ",\"reason\":\"" << json_escape(data.composition_scope.detail) << "\"},\n";
+    out << "  \"pi_mode_networks\": [";
+    for(std::size_t i=0;i<data.pi_mode_networks.size();++i) {
+        if(i)out << ',';
+        out << pi_mode_network_assessment_json(data.pi_mode_networks[i]);
+    }
+    out << "],\n";
     out << "  \"pi_interactions\": " << orbital_energy_gap_array_json(data.pi_interactions,options.energy_unit) << ",\n";
     out << "  \"crystal_field_gaps\": " << orbital_energy_gap_array_json(data.crystal_field_gaps,options.energy_unit) << ",\n";
     out << "  \"delocalised_pi_families\": [\n";
@@ -360,6 +378,8 @@ bool write_mo_diagram_json(const MODiagramData& data,
         }
         const auto members=mo_diagram_member_views(data,level);
         out << ",\"symmetry_explanation\":" << orbital_symmetry_json(level.metadata.symmetry_view);
+        out << ",\"composition\":" << mo_group_composition_json(level.composition)
+            << ",\"display_decision\":" << mo_group_display_decision_json(level.display_decision);
         out << ",\"representative_metadata_index\":" << level.metadata.orbital_index
             << ",\"layout_energy_meaning\":\"row-layout-value-not-an-individual-MO-energy\""
             << ",\"energy_spread_hartree\":" << level.energy_spread_hartree
@@ -411,7 +431,9 @@ bool write_mo_diagram_json(const MODiagramData& data,
         out << "    {\n";
         out << "      \"index\": " << item.orbital_index << ",\n";
         out << "      \"raw_mo\": " << item.raw_mo_number << ",\n";
-        out << "      \"label\": \"" << json_escape(item.display_label) << "\",\n";
+        out << "      \"label\": \"" << json_escape(i<options.display_names.size()?options.display_names[i]:item.display_label) << "\",\n";
+        out << "      \"current_display_irrep\": \"" << json_escape(i<options.display_irreps.size()?options.display_irreps[i]:"?") << "\",\n";
+        out << "      \"current_display_point_group\": \"" << json_escape(i<options.display_point_groups.size()?point_group_display(options.display_point_groups[i]):"") << "\",\n";
         out << "      \"energy_hartree\": " << std::setprecision(17) << item.energy_hartree << ",\n";
         out << "      \"source_energy_hartree\": " << item.energy_hartree << ",\n";
         out << "      \"energy_display\": " << convert_hartree(item.energy_hartree, options.energy_unit) << ",\n";
@@ -538,7 +560,7 @@ bool write_mo_diagram_csv(const MODiagramData& data,
            "multicentre_source_subspace_id,multicentre_source_subspace_electron_count,"
            "stability_detail,source_title,source_route,enrichment_source,"
            "view_snapshot_id,view_origin,view_selection_anchor,view_inspected_orbital_index,"
-           "diagram_row_index,coordinate_scope,row_member_orbitals,row_spin_counterparts,delocalised_pi_topology_graph,crystal_field_gap_count,crystal_field_gaps_json,pi_partner_evidence_json\n";
+           "diagram_row_index,coordinate_scope,row_member_orbitals,row_spin_counterparts,delocalised_pi_topology_graph,crystal_field_gap_count,crystal_field_gaps_json,pi_partner_evidence_json,current_display_irrep,current_display_point_group,pi_partner_candidates_json\n";
     const std::string ligand_atoms = csv_index_list(data.ligand_field_ligand_atoms);
     const std::string pi_interactions = csv_pi_interaction_summary(data);
     const std::string local_geometries = csv_local_geometry_summary(data);
@@ -554,7 +576,7 @@ bool write_mo_diagram_csv(const MODiagramData& data,
             data.energy_transform);
         out << mo_diagram_mode_name(data.mode) << ','
             << item.orbital_index << ',' << item.raw_mo_number << ','
-            << csv_escape(item.display_label) << ',' << std::setprecision(17) << item.energy_hartree << ','
+            << csv_escape(i<options.display_names.size()?options.display_names[i]:item.display_label) << ',' << std::setprecision(17) << item.energy_hartree << ','
             << convert_hartree(item.energy_hartree, options.energy_unit) << ','
             << csv_escape(energy_unit_symbol(options.energy_unit)) << ',' << coordinate << ','
             << energy_axis_mode_name(options.energy_axis_mode) << ','
@@ -671,7 +693,10 @@ bool write_mo_diagram_csv(const MODiagramData& data,
         out << ',' << csv_escape(topology_evidence.str());
         out << ',' << data.crystal_field_gaps.size()
             << ',' << csv_escape(orbital_energy_gap_array_json(data.crystal_field_gaps,options.energy_unit))
-            << ',' << csv_escape(orbital_energy_gap_array_json(data.pi_interactions,options.energy_unit));
+            << ',' << csv_escape(orbital_energy_gap_array_json(data.pi_interactions,options.energy_unit))
+            << ',' << csv_escape(i<options.display_irreps.size()?options.display_irreps[i]:"?")
+            << ',' << csv_escape(i<options.display_point_groups.size()?point_group_display(options.display_point_groups[i]):"")
+            << ',' << csv_escape(pi_partner_candidates_json(data.pi_partner_candidates));
         out << '\n';
     }
     if (!out) {
@@ -682,7 +707,8 @@ bool write_mo_diagram_csv(const MODiagramData& data,
 }
 
 MODiagramExportResult export_mo_diagram_bundle(const MODiagramViewSnapshot& snapshot,
-                                               const std::filesystem::path& base_path) {
+                                               const std::filesystem::path& base_path,
+                                               const DiagramExportContent content) {
     static std::mutex bundle_mutex;
     static std::atomic<std::uint64_t> generation{0u};
     const std::lock_guard lock(bundle_mutex);
@@ -699,8 +725,13 @@ MODiagramExportResult export_mo_diagram_bundle(const MODiagramViewSnapshot& snap
     const std::array<std::filesystem::path,4> targets{
         result.svg_path,result.png_path,result.json_path,result.csv_path};
 
+    const bool images=content!=DiagramExportContent::AnalysisData;
+    const bool analysis=content!=DiagramExportContent::Images;
+    const std::array<bool,4> enabled{images,images,analysis,analysis};
     std::error_code ec;
-    for (const auto& target:targets) {
+    for (std::size_t i=0;i<targets.size();++i) {
+        if(!enabled[i]) continue;
+        const auto& target=targets[i];
         if (std::filesystem::exists(target,ec) &&
             !std::filesystem::is_regular_file(target,ec)) {
             result.error="Export target exists and is not a regular file: "+
@@ -727,10 +758,10 @@ MODiagramExportResult export_mo_diagram_bundle(const MODiagramViewSnapshot& snap
         }
     };
     std::string error;
-    if (!write_mo_diagram_svg(data,options,temporary[0],&error) ||
-        !write_mo_diagram_png(data,options,temporary[1],&error) ||
-        !write_mo_diagram_json(data,options,temporary[2],&error) ||
-        !write_mo_diagram_csv(data,options,temporary[3],&error)) {
+    if ((images && (!write_mo_diagram_svg(data,options,temporary[0],&error) ||
+                    !write_mo_diagram_png(data,options,temporary[1],&error))) ||
+        (analysis && (!write_mo_diagram_json(data,options,temporary[2],&error) ||
+                      !write_mo_diagram_csv(data,options,temporary[3],&error)))) {
         cleanup_temporaries();
         result.error=error;
         return result;
@@ -739,6 +770,7 @@ MODiagramExportResult export_mo_diagram_bundle(const MODiagramViewSnapshot& snap
     std::array<bool,4> backed_up{};
     std::array<bool,4> installed{};
     for (std::size_t i=0;i<targets.size();++i) {
+        if(!enabled[i]) continue;
         ec.clear();
         if (std::filesystem::exists(targets[i],ec)) {
             std::filesystem::rename(targets[i],backup[i],ec);
@@ -776,7 +808,8 @@ MODiagramExportResult export_mo_diagram_bundle(const MODiagramViewSnapshot& snap
         ec.clear();
         std::filesystem::remove(backup[i],ec);
     }
-    result.svg=result.png=result.json=result.csv=true;
+    result.svg=result.png=images;
+    result.json=result.csv=analysis;
     return result;
 }
 

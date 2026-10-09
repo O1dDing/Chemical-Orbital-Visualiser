@@ -1,0 +1,15 @@
+{
+  "id": "ne-atom-1S0",
+  "target_group": "atom (continuous rotational symmetry; outside finite molecular point-group classification)",
+  "actual_group_verification_status": "explicit atomic fixture; parent may test single-atom special case",
+  "geometry_kind": "constructed atomic test fixture",
+  "element": "Ne",
+  "atom_count": 1,
+  "charge": 0,
+  "multiplicity": 1,
+  "term_symbol": "1S0",
+  "source_url": "https://physics.nist.gov/cgi-bin/ASD/ie.pl?at_num_out=on&biblio=on&e_out=0&el_name_out=on&level_out=on&seq_out=on&shells_out=on&spectra=Ne&unc_out=on&units=1",
+  "coordinate_note": "Single atom placed at origin by convention; coordinates are not from a molecular coordinate source.",
+  "quantum_calculation_performed": false,
+  "xyz_sha256": "7637b671c6397b065d3a31634512e5b1ce37d53b42f787074383bf4d3f440c51"
+}

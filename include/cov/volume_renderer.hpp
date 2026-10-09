@@ -2,6 +2,7 @@
 
 #include "cov/model.hpp"
 #include "cov/molecule_style.hpp"
+#include "cov/molecular_overlay.hpp"
 
 #include <cstdint>
 #include <map>
@@ -54,14 +55,20 @@ public:
                        const OrbitCamera& camera,
                        float opacity = 1.0f,
                        OrbitalMaterial material = OrbitalMaterial::Standard,
-                       OrbitalSurfaceMode surface_mode = OrbitalSurfaceMode::Solid);
+                       OrbitalSurfaceMode surface_mode = OrbitalSurfaceMode::Solid,
+                       int phase_palette = 0);
 
     void render_geometry(const Wavefunction& wavefunction,
                          const GridBox& box,
                          int framebuffer_width,
                          int framebuffer_height,
                          const OrbitCamera& camera,
-                         const MoleculeRenderSettings& settings = {});
+                         const MoleculeRenderSettings& settings = {},
+                         const MoleculeOverlay* overlay = nullptr,
+                         const InteractionGraph* interactions = nullptr);
+
+    [[nodiscard]] const std::vector<GeometryTarget>& geometry_targets() const noexcept { return geometry_targets_; }
+    [[nodiscard]] std::optional<GeometryTarget> pick_geometry(float x, float y) const;
 
 private:
     unsigned int texture_ = 0;
@@ -70,10 +77,13 @@ private:
     int ny_ = 0;
     int nz_ = 0;
     const Wavefunction* geometry_cache_wavefunction_ = nullptr;
+    const InteractionGraph* geometry_graph_source_ = nullptr;
     std::vector<BondVisual> geometry_bonds_;
     std::map<std::pair<std::size_t,std::size_t>,std::size_t>
         geometry_bond_indices_;
     InteractionGraph geometry_interactions_;
+    std::vector<GeometryTarget> geometry_targets_;
+    int geometry_width_=1, geometry_height_=1;
 };
 
 } // namespace cov

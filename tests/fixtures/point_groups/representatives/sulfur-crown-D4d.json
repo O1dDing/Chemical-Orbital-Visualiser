@@ -1,0 +1,20 @@
+{
+  "id": "sulfur-crown-D4d",
+  "target": "D4d",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 8,
+  "element_counts": {
+    "S": 8
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6145"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Source calculator may print only proper rotation subgroup; independent full O(3) atom test recorded.",
+  "xyz_sha256": "6734fdfb03b769104733198a2e2f290e7df916ee7547d8104d5d5ab1ffdc1a84",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 1.3688699077271033e-05,
+  "source_xyz_sha256": "5b282b9cc00f501841a1d150602887f854136cd0812a2b2ed07e43f4734d9f3c"
+}

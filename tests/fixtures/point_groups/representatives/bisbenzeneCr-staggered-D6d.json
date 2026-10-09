@@ -1,0 +1,22 @@
+{
+  "id": "bisbenzeneCr-staggered-D6d",
+  "target": "D6d",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 25,
+  "element_counts": {
+    "C": 12,
+    "Cr": 1,
+    "H": 12
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6193"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Source calculator may print only proper rotation subgroup; independent full O(3) atom test recorded.",
+  "xyz_sha256": "01563da3fe10515291543a48647efe12e048edff79366cefb5b1a8bc7b6094f2",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 6.641060580867975e-05,
+  "source_xyz_sha256": "888026e1df92f13ac1de1b9faafce29f764f0c7202aabf593f1a10c461ba98ca"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "octamethyl-POSS-nonH-skeleton-Oh",
+  "target": "Oh",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 28,
+  "element_counts": {
+    "C": 8,
+    "O": 12,
+    "Si": 8
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6333"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Atoms deliberately omitted for full-vs-skeleton geometry contrast. Parent complete source preserved: octamethyl-POSS-O",
+  "xyz_sha256": "e140443fc3dba7bbc4bde702575ebf8aedf0ea1f3ef8d191b6cd7bbc0a528fdc",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 5.140704263513307e-15,
+  "source_xyz_sha256": "ec4eefc8176e49f9fb7f63fcec890b6f8346262e152591de5aa85ca6d51fa86b"
+}

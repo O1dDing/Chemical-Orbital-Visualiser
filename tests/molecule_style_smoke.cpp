@@ -86,7 +86,7 @@ int main(const int argc, char** argv) {
             cov::InteractionVisualStyle::OrdinaryBond ||
         cov::interaction_visual_style(cov::InteractionKind::CoordinationContact,
                                       defaults) !=
-            cov::InteractionVisualStyle::CoordinationDash ||
+            cov::InteractionVisualStyle::OrdinaryBond ||
         cov::interaction_visual_style(cov::InteractionKind::MulticentreSupport,
                                        defaults) !=
             cov::InteractionVisualStyle::Hidden ||
@@ -305,17 +305,59 @@ int main(const int argc, char** argv) {
         return 28;
     }
 
-    // Conversely, electronic availability with no supported pair must not
-    // silently re-enable a geometry bond and manufacture connectivity.
+    // Capability is per pair. A global provenance flag with no actual pair
+    // value describes missing evidence, rather than a measured zero.
     cov::Wavefunction electronic_none;
     electronic_none.atoms = {
         {"C", 6, 0.0, 0.0, 0.0},
         {"C", 6, 1.40 * cov::kAngstromToBohr, 0.0, 0.0},
     };
     electronic_none.bond_order_provenance = cov::DataProvenance::Derived;
+    const auto missing_pair_bonds=cov::analyse_bonds(electronic_none);
+    if (missing_pair_bonds.size()!=1u ||
+        missing_pair_bonds.front().provenance!=cov::DataProvenance::Unavailable) {
+        std::cerr << "missing pair was converted into an electronic zero\n";
+        return 32;
+    }
+
+    // An actual zero must veto geometry even at a conventional bond length.
+    // Keep this negative assertion distinct from the missing-data case.
+    electronic_none.bond_orders.push_back(
+        {0, 1, 0.0, cov::DataProvenance::Derived});
     if (!cov::analyse_bonds(electronic_none).empty()) {
-        std::cerr << "geometry fallback overrode an available electronic analysis\n";
+        std::cerr << "geometry fallback overrode an actual electronic zero\n";
         return 6;
+    }
+
+    // A partial matrix cannot suppress an unrelated missing neighbour. Once
+    // that neighbour receives an explicit zero, the same geometry is vetoed.
+    cov::Wavefunction partial_electronic;
+    partial_electronic.atoms = {
+        {"C", 6, 0.0, 0.0, 0.0},
+        {"C", 6, 1.40*cov::kAngstromToBohr, 0.0, 0.0},
+        {"C", 6, 2.80*cov::kAngstromToBohr, 0.0, 0.0},
+    };
+    partial_electronic.bond_order_provenance=cov::DataProvenance::Derived;
+    partial_electronic.bond_orders.push_back(
+        {0, 1, 1.0, cov::DataProvenance::Derived});
+    const auto partial_bonds=cov::analyse_bonds(partial_electronic);
+    if (partial_bonds.size()!=2u ||
+        std::count_if(partial_bonds.begin(),partial_bonds.end(),
+            [](const cov::BondVisual& bond) {
+                return bond.atom_a==1u && bond.atom_b==2u &&
+                    bond.provenance==cov::DataProvenance::Unavailable;
+            })!=1) {
+        std::cerr << "partial matrix suppressed a missing neighbouring pair\n";
+        return 33;
+    }
+    partial_electronic.bond_orders.push_back(
+        {1, 2, 0.0, cov::DataProvenance::Derived});
+    const auto partial_zero_bonds=cov::analyse_bonds(partial_electronic);
+    if (partial_zero_bonds.size()!=1u ||
+        partial_zero_bonds.front().atom_a!=0u ||
+        partial_zero_bonds.front().atom_b!=1u) {
+        std::cerr << "partial explicit zero lost its geometry veto\n";
+        return 34;
     }
 
     // Delocalised Mayer coupling is not structural adjacency. Even when every

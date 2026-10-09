@@ -305,19 +305,33 @@ void mark_conservative_ring_delocalisation(const Wavefunction& wavefunction,
 
 } // namespace
 
-std::vector<BondVisual> analyse_bonds(const Wavefunction& wavefunction) {
+std::vector<BondVisual> analyse_bonds(const Wavefunction& wavefunction,
+                                    const std::vector<InteractionBondEvidence>& nbo_bonds) {
     std::vector<BondVisual> bonds;
     const std::size_t atom_count = wavefunction.atoms.size();
 
-    if (wavefunction.bond_order_provenance != DataProvenance::Unavailable) {
+    using Pair=std::pair<std::size_t,std::size_t>;
+    struct Electronic {double value=0;DataProvenance provenance=DataProvenance::Unavailable;
+        std::string method,path;};
+    std::map<Pair,Electronic> electronic;
+    if(wavefunction.bond_order_provenance!=DataProvenance::Unavailable)
+        for(const auto& row:wavefunction.bond_orders)
+            if(row.atom_a<atom_count && row.atom_b<atom_count && row.atom_a!=row.atom_b &&
+               row.provenance!=DataProvenance::Unavailable && std::isfinite(row.mayer_order))
+                electronic[std::minmax(row.atom_a,row.atom_b)]={row.mayer_order,row.provenance,"Mayer",{}};
+    for(const auto& row:nbo_bonds)
+        if(row.atom_a<atom_count && row.atom_b<atom_count && row.atom_a!=row.atom_b &&
+           std::isfinite(row.wiberg_index) && row.wiberg_index>=0)
+            electronic[std::minmax(row.atom_a,row.atom_b)]={row.wiberg_index,DataProvenance::Derived,
+                "Wiberg (NAO)",row.source_path};
+    if (!electronic.empty() || wavefunction.bond_order_provenance!=DataProvenance::Unavailable) {
         // Electronic evidence is authoritative when available, while the
         // distance envelope determines whether that pair is a drawable
         // structural neighbour. This prevents delocalised Mayer coupling from
         // becoming chords across aromatic rings.
-        for (const auto& record : wavefunction.bond_orders) {
-            const std::size_t i = record.atom_a;
-            const std::size_t j = record.atom_b;
-            const double electronic_strength=std::abs(record.mayer_order);
+        for (const auto& [pair,record] : electronic) {
+            const auto [i,j]=pair;
+            const double electronic_strength=std::abs(record.value);
             if (i >= atom_count || j >= atom_count || i == j ||
                 electronic_strength < kMayerRenderFloor) {
                 continue;
@@ -331,7 +345,7 @@ std::vector<BondVisual> analyse_bonds(const Wavefunction& wavefunction) {
             // A negative pair contribution can rescue an obvious first-shell
             // skeleton edge, but it is not positive bonding evidence and must
             // never receive the relaxed electronic distance envelope.
-            const double adjacency_factor=record.mayer_order<0.0
+            const double adjacency_factor=record.value<0.0
                 ?kLocalLegRadiusFactor
                 :electronic_adjacency_factor(electronic_strength);
             const double sanity_bohr =
@@ -349,13 +363,20 @@ std::vector<BondVisual> analyse_bonds(const Wavefunction& wavefunction) {
             // adaptive envelope.
             bond.bond_order = electronic_strength;
             bond.provenance = record.provenance;
+            bond.connectivity_method=record.method;
+            bond.connectivity_source_path=record.path;
             bonds.push_back(bond);
         }
-    } else {
-        // Compatibility fallback for files where a complete overlap/density
-        // analysis cannot be obtained. This remains intentionally conservative.
+    }
+    {
+        // Capability is per pair: a partial electronic result cannot turn all
+        // omitted pairs into exact zeros. Only genuinely missing pair values
+        // use conservative geometry; an explicit zero stays authoritative.
         for (std::size_t i = 0; i < atom_count; ++i) {
             for (std::size_t j = i + 1; j < atom_count; ++j) {
+                // Per-pair capability fallback: an actual WBI=0 vetoes the
+                // geometry fallback; a missing NBO pair does not invent zero.
+                if(electronic.contains({i,j}))continue;
                 const Atom& a = wavefunction.atoms[i];
                 const Atom& b = wavefunction.atoms[j];
                 const double distance_bohr = atom_distance_bohr(a, b);
@@ -368,13 +389,14 @@ std::vector<BondVisual> analyse_bonds(const Wavefunction& wavefunction) {
                     bond.atom_b = j;
                     bond.distance_bohr = distance_bohr;
                     bond.provenance = DataProvenance::Unavailable;
+                    bond.connectivity_method="covalent-radius geometry";
                     bonds.push_back(bond);
                 }
             }
         }
     }
 
-    if (wavefunction.bond_order_provenance != DataProvenance::Unavailable) {
+    if (!electronic.empty() || wavefunction.bond_order_provenance != DataProvenance::Unavailable) {
         prune_two_hop_electronic_chords(wavefunction, bonds);
     }
     mark_conservative_ring_delocalisation(wavefunction, bonds);

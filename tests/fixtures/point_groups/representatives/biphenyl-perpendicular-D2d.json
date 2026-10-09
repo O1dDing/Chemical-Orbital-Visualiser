@@ -1,0 +1,21 @@
+{
+  "id": "biphenyl-perpendicular-D2d",
+  "target": "D2d",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 22,
+  "element_counts": {
+    "C": 12,
+    "H": 10
+  },
+  "source_urls": [
+    "https://www2.chem.wisc.edu/deptfiles/OrgLab/UWW/Expt1/job_125027.html"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Inter-ring dihedral fixed 90.0 degrees. Ring dimensions from full Wisconsin source; ring plane thickness removed, max 0.023291482 Angstrom; full 12 C and 10 H retained.",
+  "xyz_sha256": "81121255a2ffe0b9d411b9b408ce31e05cd96fae5a52f44991868fbc94c7415e",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 9.930136612989092e-16,
+  "source_xyz_sha256": "9b322dea9390cae6ccdd2f43be971001fb782ab33f92339b2ca84514351d38b3"
+}

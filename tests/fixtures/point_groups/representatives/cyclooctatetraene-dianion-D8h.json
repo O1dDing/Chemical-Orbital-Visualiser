@@ -1,0 +1,21 @@
+{
+  "id": "cyclooctatetraene-dianion-D8h",
+  "target": "D8h",
+  "charge": -2,
+  "multiplicity": 1,
+  "atom_count": 16,
+  "element_counts": {
+    "C": 8,
+    "H": 8
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6313"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Source calculator may print only proper rotation subgroup; independent full O(3) atom test recorded.",
+  "xyz_sha256": "cc0cd018450276a85f489f1039dd48505c4c9b015731163d7a022e63ef223323",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 8.097157336184324e-06,
+  "source_xyz_sha256": "9af5956cde084a424fc3a29126e3e5bb148200c9aa9c0d18994fb729ecb49c42"
+}

@@ -1,5 +1,7 @@
 #include "cov/symmetry.hpp"
+#include "cov/point_group_irreps.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -27,6 +29,15 @@ bool expect_group(const cov::Wavefunction& wf,
     if (result.operations.empty()) {
         std::cerr << label << ": no validated symmetry operations retained\n";
         return false;
+    }
+    if(!result.linear){
+        const auto table=cov::finite_point_group_irreps(result);
+        if(!table.valid||result.operations.size()!=cov::finite_point_group_order(expected)){
+            std::cerr<<label<<": finite geometry operations are incomplete or inconsistent: "<<table.reason<<'\n';return false;
+        }
+        for(const auto& op:result.operations)if(op.max_mapping_error_bohr>result.tolerance_bohr){
+            std::cerr<<label<<": group completion exceeded the original geometry tolerance\n";return false;
+        }
     }
     return true;
 }
@@ -83,6 +94,60 @@ cov::Wavefunction octahedral() {
     return wf;
 }
 
+cov::Wavefunction dihedral_rounded(bool staggered) {
+    cov::Wavefunction wf;
+    wf.atoms={atom("C",6,0,0,-.7654),atom("C",6,0,0,.7653)};
+    const auto rounded=[](double x){return std::round(x*10000)/10000;};
+    for(int side:{-1,1})for(int j=0;j<3;++j){
+        const double a=2*pi*j/3+(side==1&&staggered?pi/3:0);
+        wf.atoms.push_back(atom("H",1,rounded(1.0185*std::cos(a)),rounded(1.0185*std::sin(a)),side*1.1636));
+    }
+    return wf;
+}
+
+cov::Wavefunction perpendicular_terminal_planes() {
+    cov::Wavefunction wf;
+    wf.atoms={atom("C",6,0,0,0),atom("C",6,0,0,1.3024),atom("C",6,0,0,-1.3024)};
+    for(int sign:{-1,1}){
+        wf.atoms.push_back(atom("H",1,sign*.6557,sign*.6557,1.8669));
+        wf.atoms.push_back(atom("H",1,sign*.6557,-sign*.6557,-1.8669));
+    }
+    return wf;
+}
+
+cov::Wavefunction tetrahedral_water_planes() {
+    cov::Wavefunction wf;wf.atoms.push_back(atom("Mg",12,0,0,0));
+    for(int coordinate=0;coordinate<3;++coordinate)for(int sign:{-1,1}){
+        std::array<double,3> p{};p[coordinate]=sign*2.09;wf.atoms.push_back(atom("O",8,p[0],p[1],p[2]));
+        for(int hydrogen_sign:{-1,1}){
+            p[coordinate]=sign*2.6988;p[(coordinate+1)%3]=hydrogen_sign*.7934;
+            wf.atoms.push_back(atom("H",1,p[0],p[1],p[2]));
+        }
+    }return wf;
+}
+
+cov::Wavefunction rounded_polygon(int n) {
+    cov::Wavefunction wf;const auto rounded=[](double x){return std::round(x*10000)/10000;};
+    for(int j=0;j<n;++j){const double a=2*pi*j/n;wf.atoms.push_back(atom("C",6,rounded(1.6115*std::cos(a)),rounded(1.6115*std::sin(a)),0));}
+    return wf;
+}
+
+cov::Wavefunction rounded_icosahedron() {
+    cov::Wavefunction wf;const double phi=(1+std::sqrt(5.0))/2;
+    for(double a:{-1.0,1.0})for(double b:{-phi,phi}){
+        wf.atoms.push_back(atom("B",5,0,a,std::round(b*10000)/10000));
+        wf.atoms.push_back(atom("B",5,a,std::round(b*10000)/10000,0));
+        wf.atoms.push_back(atom("B",5,std::round(b*10000)/10000,0,a));
+    }return wf;
+}
+
+cov::Wavefunction rotated_reordered(cov::Wavefunction w) {
+    const double a=.371,b=.537,c=std::cos(a),s=std::sin(a),d=std::cos(b),t=std::sin(b);
+    for(auto& p:w.atoms){const double x=d*p.x+t*p.z,y=p.y,z=-t*p.x+d*p.z;
+        p.x=c*x-s*y+3.1;p.y=s*x+c*y-1.2;p.z=z+.9;}
+    std::reverse(w.atoms.begin(),w.atoms.end());return w;
+}
+
 } // namespace
 
 int main() {
@@ -91,6 +156,14 @@ int main() {
     if (!expect_group(pentagonal_planar(), "D5h", "D5h planar")) return EXIT_FAILURE;
     if (!expect_group(tetrahedral(), "Td", "Td tetrahedron")) return EXIT_FAILURE;
     if (!expect_group(octahedral(), "Oh", "Oh octahedron")) return EXIT_FAILURE;
+    const std::vector<std::pair<cov::Wavefunction,std::string>> regressions{
+        {perpendicular_terminal_planes(),"D2d"},{dihedral_rounded(true),"D3d"},
+        {dihedral_rounded(false),"D3h"},{tetrahedral_water_planes(),"Th"},
+        {rounded_polygon(7),"D7h"},{rounded_icosahedron(),"Ih"}};
+    for(const auto& [w,group]:regressions){
+        if(!expect_group(w,group,"consistent finite geometry"))return EXIT_FAILURE;
+        if(!expect_group(rotated_reordered(w),group,"3D rotated/reordered finite geometry"))return EXIT_FAILURE;
+    }
 
     cov::Wavefunction producer = tetrahedral();
     producer.point_group_detected = "PRODUCER-GROUP";

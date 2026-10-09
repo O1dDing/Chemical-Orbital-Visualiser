@@ -1,0 +1,18 @@
+{
+  "id": "ar-atom-1S0",
+  "target": "Kh",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 1,
+  "element_counts": {
+    "Ar": 1
+  },
+  "source_urls": [
+    "https://physics.nist.gov/cgi-bin/ASD/ie.pl?at_num_out=on&biblio=on&e_out=0&el_name_out=on&format=1&level_out=on&seq_out=on&shells_out=on&unc_out=on&units=1"
+  ],
+  "geometry_kind": "exact one-atom Cartesian origin",
+  "note": "Closed atomic 1S0: continuous spherical geometry, no finite molecular group.",
+  "xyz_sha256": "f1af0f7432a9c26c97761403c1ba37adae216def494f01c13a2ee2e7d303ac97",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true
+}

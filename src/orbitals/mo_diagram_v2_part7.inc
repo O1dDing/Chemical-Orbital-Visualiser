@@ -67,18 +67,16 @@ bool write_mo_diagram_png(const MODiagramData& data,
     const auto positioned = position_levels(data, width, height);
     Canvas canvas(width, height);
 
-    const char* diagram_title="VALENCE MO DIAGRAM";
-    if (data.mode==MODiagramMode::DelocalisedPiFamilyOnly) {
-        diagram_title="DELOCALISED PI MO DIAGRAM";
-    } else if (data.mode==MODiagramMode::MulticentreActiveSpaceOnly) {
-        diagram_title="MULTICENTRE ACTIVE-SPACE MO DIAGRAM";
-    }
-    draw_text(canvas, 36, 28, diagram_title, 24, 34, 49, 2);
-    draw_text(canvas, 36, 55,
-              options.energy_axis_mode == EnergyAxisMode::Linear
-                  ? "ENERGY AXIS: LINEAR"
-                  : "ENERGY AXIS: ADAPTIVE NONLINEAR LOG-GAP V3",
-              92, 106, 126, 1);
+    const auto text=[&](int x,int y,const std::string& value,
+                       std::uint8_t r,std::uint8_t g,std::uint8_t b,int scale) {
+        if(options.raster_text) options.raster_text(canvas.rgba,width,height,x,y,value,r,g,b,scale);
+        else draw_text(canvas,x,y,value,r,g,b,scale);
+    };
+    const auto text_width=[&](const std::string& value,int scale) {
+        return options.raster_text_width ? options.raster_text_width(value,scale) : bitmap_text_width(value,scale);
+    };
+    text(36,28,options.figure_title.empty()?mo_diagram_mode_title(data.mode):options.figure_title,24,34,49,2);
+    text(36,60,export_axis_title(options),92,106,126,1);
 
     const int axis_x = 70;
     canvas.line(axis_x, 110, axis_x, height - 62, 45, 55, 69, 2);
@@ -93,7 +91,7 @@ bool write_mo_diagram_png(const MODiagramData& data,
         const std::string tick = format_energy(
             energy, options.energy_unit,
             options.energy_unit == EnergyUnit::JoulePerMol ? 0 : 3);
-        draw_text(canvas, axis_x + 10, y - 4, tick, 105, 119, 138, 1);
+        text(axis_x + 10, y - 6, tick, 105, 119, 138, 1);
     }
 
     for (const auto& item : positioned) {
@@ -115,13 +113,8 @@ bool write_mo_diagram_png(const MODiagramData& data,
             if (member.electrons.beta>0) draw_electron(canvas,x+5,y-2,false);
         }
 
-        // Human-facing export: orbital type directly below each level; MO
-        // identifiers intentionally stay out of the figure. Collapse the
-        // fully-unavailable pair to a single N/A to reduce visual noise.
-        std::string type = orbital_type_plain(level.annotation);
-        if (type == "N/A | N/A") type = "N/A";
-        const int type_x = static_cast<int>(item.x) - bitmap_text_width(type, 1) / 2;
-        draw_text(canvas, type_x, y + 13, type, 67, 81, 102, 1);
+        const std::string name=export_level_name(data,level,options);
+        text(static_cast<int>(item.x)-text_width(name,1)/2,y+9,name,67,81,102,1);
         if (level.annotation.delocalised_pi.available) {
             std::ostringstream pi;
             pi << "PI";
@@ -138,16 +131,12 @@ bool write_mo_diagram_png(const MODiagramData& data,
                 pi << " " << topology_suffix;
             }
             const std::string value = pi.str();
-            draw_text(canvas,
-                      static_cast<int>(item.x) - bitmap_text_width(value, 1) / 2,
-                      y + 25, value, 91, 101, 117, 1);
+            text(static_cast<int>(item.x)-text_width(value,1)/2,
+                 y+25,value,91,101,117,1);
         }
     }
 
     draw_pi_interactions_png(canvas, data, positioned);
 
-    draw_text(canvas, 36, height - 32,
-              "FIGURE LABELS: ORBITAL TYPE / BONDING CLASS; MO NUMBERS ARE IN HOVER + JSON/CSV",
-              113, 126, 144, 1);
     return write_png_rgba(canvas,path,error,data.view?data.view->id:std::string{});
 }
