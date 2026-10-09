@@ -91,6 +91,28 @@ class PackageChecks(unittest.TestCase):
                     release.package(args)
             self.assertFalse(args.output.exists())
 
+    def test_source_directory_alias_is_accepted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, args = self.fixture(directory, "linux")
+            alias = root / ".." / root.name
+            self.assertNotEqual(alias, root.resolve())
+            with patch.object(release, "ROOT", alias), patch.object(release, "run", self.checkout), \
+                    patch.object(release, "inspect_linux"), patch.object(release, "runtime_notices"):
+                release.package(args)
+            self.assertTrue(next(args.output.glob("*.tar.gz")).is_file())
+
+    def test_different_source_directory_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, args = self.fixture(directory, "linux")
+            other = root.parent / "different checkout"
+            other.mkdir()
+            cache = args.build / "CMakeCache.txt"
+            cache.write_text(cache.read_text(encoding="utf-8").replace(str(root), str(other)), encoding="utf-8")
+            with patch.object(release, "ROOT", root), patch.object(release, "run", self.checkout):
+                with self.assertRaisesRegex(RuntimeError, "does not belong"):
+                    release.package(args)
+            self.assertFalse(args.output.exists())
+
     def test_linux_rejects_runtime_or_baseline_mismatch(self):
         with tempfile.TemporaryDirectory() as directory:
             binary = Path(directory) / "cov"

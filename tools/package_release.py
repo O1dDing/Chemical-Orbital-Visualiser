@@ -251,16 +251,20 @@ def prepare_macos(app, audit, version):
 
 def package(args):
     build = args.build.resolve()
-    actual_commit = run("git", "-C", ROOT, "rev-parse", "HEAD").strip()
+    source_root = ROOT.resolve(strict=True)
+    actual_commit = run("git", "-C", source_root, "rev-parse", "HEAD").strip()
     if not re.fullmatch(r"[0-9a-f]{40}", args.commit) or actual_commit != args.commit:
         raise RuntimeError("Requested source commit does not match the checkout")
-    if run("git", "-C", ROOT, "status", "--porcelain", "--untracked-files=normal").strip():
+    if run("git", "-C", source_root, "status", "--porcelain", "--untracked-files=normal").strip():
         raise RuntimeError("Release packaging requires a clean source checkout")
     if not re.fullmatch(r"v\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?", args.version):
         raise RuntimeError("Invalid release version")
     cache = (build / "CMakeCache.txt").read_text(encoding="utf-8")
     home = re.search(r"^CMAKE_HOME_DIRECTORY:INTERNAL=(.+)$", cache, re.MULTILINE)
-    if not home or Path(home.group(1).strip()).resolve() != ROOT:
+    # Resolve both paths: macOS /var aliases /private/var, and Windows runner
+    # temporary paths may use short names. Comparing only one resolved side
+    # rejects a build that belongs to the very same directory.
+    if not home or Path(home.group(1).strip()).resolve(strict=True) != source_root:
         raise RuntimeError("Build tree does not belong to this source checkout")
     expected = {"COV_BUILD_VIEWER": "ON", "COV_ENABLE_VALIDATION": "OFF",
                 "COV_ENABLE_CUDA": "ON" if args.platform == "windows" else "OFF"}
