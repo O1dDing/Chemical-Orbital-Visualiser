@@ -13,6 +13,16 @@
 #include <initializer_list>
 #include <string>
 
+#ifdef __APPLE__
+#include <CoreGraphics/CoreGraphics.h>
+#include <CoreText/CoreText.h>
+#include <cmath>
+#include <cstdio>
+#include <memory>
+#include <type_traits>
+#include <vector>
+#endif
+
 namespace cov::ui {
 namespace {
 
@@ -264,6 +274,129 @@ void merge_font_if_available(const std::string& path,
     if (ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), pixel_size, &cfg, ranges)) loaded = true;
 }
 
+#ifdef __APPLE__
+struct CFReleaseOwned {
+    void operator()(const void* value) const { if (value) CFRelease(value); }
+};
+template<class T> using CFOwned = std::unique_ptr<std::remove_pointer_t<T>, CFReleaseOwned>;
+
+std::string core_text_string(CFStringRef value) {
+    if (!value) return {};
+    const auto capacity = CFStringGetMaximumSizeForEncoding(CFStringGetLength(value), kCFStringEncodingUTF8) + 1;
+    std::string text(static_cast<std::size_t>(capacity), '\0');
+    if (!CFStringGetCString(value, text.data(), capacity, kCFStringEncodingUTF8)) return {};
+    text.resize(std::char_traits<char>::length(text.c_str()));
+    return text;
+}
+
+struct SystemGlyphBitmap {
+    int rectangle = -1;
+    int width = 0;
+    int height = 0;
+    std::vector<unsigned char> pixels;
+};
+
+// CoreText selects the actual installed font and collection face. Rendering
+// through the system also handles Apple's variable/nonstandard glyph tables,
+// which a readable PingFang.ttc plus stb_truetype cannot reliably represent.
+bool add_system_glyphs(ImFont* primary, const float pixel_size, const ImWchar* ranges,
+                       CFStringRef language, CFStringRef preferred_name,
+                       ImFontGlyphRangesBuilder& pending,
+                       std::vector<SystemGlyphBitmap>& bitmaps, std::string& source_name) {
+    auto* atlas = primary->ContainerAtlas;
+    CFOwned<CTFontRef> preferred(CTFontCreateWithName(preferred_name, pixel_size, nullptr));
+    if (!preferred) return false;
+    bool complete = true;
+    bool reported = false;
+    for (const ImWchar* range = ranges; range[0]; range += 2) {
+        for (unsigned int codepoint = range[0]; codepoint <= range[1]; ++codepoint) {
+            if (codepoint <= 0x20 || primary->FindGlyphNoFallback(static_cast<ImWchar>(codepoint)) || pending.GetBit(codepoint)) continue;
+            const UniChar character = static_cast<UniChar>(codepoint);
+            CFOwned<CFStringRef> text(CFStringCreateWithCharacters(kCFAllocatorDefault, &character, 1));
+            CFOwned<CTFontRef> font(CTFontCreateForStringWithLanguage(preferred.get(), text.get(), CFRangeMake(0, 1), language));
+            CGGlyph glyph = 0;
+            CFOwned<CFStringRef> postscript(font ? CTFontCopyPostScriptName(font.get()) : nullptr);
+            const auto name = core_text_string(postscript.get());
+            if (!font || name.find("LastResort") != std::string::npos ||
+                !CTFontGetGlyphsForCharacters(font.get(), &character, &glyph, 1) || glyph == 0) {
+                std::fprintf(stderr, "System font missing %s U+%04X\n", core_text_string(language).c_str(), codepoint);
+                complete = false;
+                continue;
+            }
+            CGRect bounds{};
+            CGSize advance{};
+            CTFontGetBoundingRectsForGlyphs(font.get(), kCTFontOrientationHorizontal, &glyph, &bounds, 1);
+            CTFontGetAdvancesForGlyphs(font.get(), kCTFontOrientationHorizontal, &glyph, &advance, 1);
+            const bool whitespace = codepoint == 0xA0 || (codepoint >= 0x2000 && codepoint <= 0x200A) ||
+                                    codepoint == 0x202F || codepoint == 0x205F || codepoint == 0x3000;
+            const int left = static_cast<int>(std::floor(CGRectGetMinX(bounds))) - 1;
+            const int bottom = static_cast<int>(std::floor(CGRectGetMinY(bounds))) - 1;
+            const int top = static_cast<int>(std::ceil(CGRectGetMaxY(bounds))) + 1;
+            const int right = static_cast<int>(std::ceil(CGRectGetMaxX(bounds))) + 1;
+            SystemGlyphBitmap bitmap;
+            bitmap.width = std::max(1, right - left);
+            bitmap.height = std::max(1, top - bottom);
+            bitmap.pixels.resize(static_cast<std::size_t>(bitmap.width) * bitmap.height, 0);
+            CFOwned<CGColorSpaceRef> gray(CGColorSpaceCreateDeviceGray());
+            CFOwned<CGContextRef> context(CGBitmapContextCreate(bitmap.pixels.data(), bitmap.width, bitmap.height,
+                                                              8, bitmap.width, gray.get(), kCGImageAlphaNone));
+            if (!context) { complete = false; continue; }
+            CGContextSetAllowsAntialiasing(context.get(), true);
+            CGContextSetShouldAntialias(context.get(), true);
+            CGContextSetShouldSmoothFonts(context.get(), false);
+            CGContextSetTextDrawingMode(context.get(), kCGTextFill);
+            CGContextSetGrayFillColor(context.get(), 1.0, 1.0);
+            const CGPoint origin = CGPointMake(-left, -bottom);
+            CTFontDrawGlyphs(font.get(), &glyph, &origin, 1, context.get());
+            CGContextFlush(context.get());
+            if (!whitespace && std::none_of(bitmap.pixels.begin(), bitmap.pixels.end(), [](unsigned char pixel) { return pixel != 0; })) {
+                std::fprintf(stderr, "System font produced no pixels for %s U+%04X\n", name.c_str(), codepoint);
+                complete = false;
+                continue;
+            }
+            bitmap.rectangle = atlas->AddCustomRectFontGlyph(primary, static_cast<ImWchar>(codepoint),
+                bitmap.width, bitmap.height, static_cast<float>(advance.width),
+                ImVec2(static_cast<float>(left), std::round(primary->Ascent) - static_cast<float>(top)));
+            pending.SetBit(codepoint);
+            bitmaps.push_back(std::move(bitmap));
+            if ((!reported && codepoint >= 0x3000) || codepoint == 0x6742) {
+                source_name = name;
+                CFOwned<CFTypeRef> attribute(CTFontCopyAttribute(font.get(), kCTFontURLAttribute));
+                CFOwned<CFStringRef> path(attribute && CFGetTypeID(attribute.get()) == CFURLGetTypeID()
+                    ? CFURLCopyFileSystemPath(static_cast<CFURLRef>(attribute.get()), kCFURLPOSIXPathStyle) : nullptr);
+                std::fprintf(stderr, "COV system font %s U+%04X: %s [%s]\n", core_text_string(language).c_str(), codepoint, name.c_str(), core_text_string(path.get()).c_str());
+                reported = true;
+            }
+        }
+    }
+    return complete;
+}
+
+bool build_system_glyph_atlas(ImFont* primary, const float pixel_size,
+                              const ImWchar* chinese, const ImWchar* japanese,
+                              bool& zh_loaded, bool& ja_loaded,
+                              std::string& chinese_name, std::string& japanese_name) {
+    auto* atlas = primary->ContainerAtlas;
+    if (!atlas->Build()) return false;
+    ImFontGlyphRangesBuilder pending;
+    std::vector<SystemGlyphBitmap> bitmaps;
+    zh_loaded = add_system_glyphs(primary, pixel_size, chinese, CFSTR("zh-Hans"), CFSTR("PingFangSC-Regular"), pending, bitmaps, chinese_name);
+    ja_loaded = add_system_glyphs(primary, pixel_size, japanese, CFSTR("ja"), CFSTR("HiraginoSans-W3"), pending, bitmaps, japanese_name);
+    if (!atlas->Build()) return false;
+    // Custom rectangles own atlas locations; local bitmaps are copied into the
+    // atlas before its RGBA upload is generated. No native pointers survive.
+    for (const auto& bitmap : bitmaps) {
+        const auto* rectangle = atlas->GetCustomRectByIndex(bitmap.rectangle);
+        if (!rectangle || !rectangle->IsPacked()) return false;
+        for (int row = 0; row < bitmap.height; ++row) {
+            std::copy_n(bitmap.pixels.data() + row * bitmap.width, bitmap.width,
+                        atlas->TexPixelsAlpha8 + (rectangle->Y + row) * atlas->TexWidth + rectangle->X);
+        }
+    }
+    return zh_loaded && ja_loaded;
+}
+#endif
+
 const char* localised(const LocalisedString& value, const Language language) noexcept {
     switch (language) {
         case Language::ChineseSimplified: return value.zh;
@@ -394,8 +527,8 @@ bool configure_fonts(const float pixel_size) {
     const std::string japanese = first_existing({"C:/Windows/Fonts/YuGothM.ttc", "C:/Windows/Fonts/YuGothR.ttc", "C:/Windows/Fonts/meiryo.ttc", "C:/Windows/Fonts/msgothic.ttc"});
 #elif defined(__APPLE__)
     const std::string base = first_existing({"/System/Library/Fonts/SFNS.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf"});
-    const std::string chinese = first_existing({"/System/Library/Fonts/PingFang.ttc", "/Library/Fonts/NotoSansCJK-Regular.ttc"});
-    const std::string japanese = first_existing({"/Library/Fonts/NotoSansCJK-Regular.ttc", "/System/Library/Fonts/AppleGothic.ttf"});
+    std::string chinese = "macOS Chinese";
+    std::string japanese = "macOS Japanese";
 #else
     const std::string base = first_existing({"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"});
     const std::string chinese = first_existing({"/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf"});
@@ -459,9 +592,14 @@ bool configure_fonts(const float pixel_size) {
 
     bool zh_loaded = false;
     bool ja_loaded = false;
+#ifdef __APPLE__
+    const bool built = build_system_glyph_atlas(primary, pixel_size, zh_ranges.Data, ja_ranges.Data,
+                                               zh_loaded, ja_loaded, chinese, japanese);
+#else
     merge_font_if_available(chinese, pixel_size, zh_ranges.Data, zh_loaded);
     merge_font_if_available(japanese, pixel_size, ja_ranges.Data, ja_loaded);
     const bool built = io.Fonts->Build();
+#endif
     g_font_status = file_name_or_default(base, "ImGui default");
     g_font_status += " + ";
     g_font_status += zh_loaded ? file_name_or_default(chinese, "CJK") : "ZH fallback missing";

@@ -9,12 +9,100 @@
 #include <initializer_list>
 #include <iostream>
 #include <string_view>
+#ifdef __APPLE__
+#include <filesystem>
+#include <fstream>
+#endif
 
 namespace {
 
 bool font_contains(const ImFont* font, const ImWchar codepoint) {
     return font != nullptr && font->FindGlyphNoFallback(codepoint) != nullptr;
 }
+
+#ifdef __APPLE__
+bool glyph_has_pixels(const ImFont* font, const ImWchar codepoint) {
+    const auto* glyph = font ? font->FindGlyphNoFallback(codepoint) : nullptr;
+    if (!glyph || !glyph->Visible || glyph->AdvanceX <= 0) return false;
+    unsigned char* pixels = nullptr;
+    int width = 0, height = 0;
+    ImGui::GetIO().Fonts->GetTexDataAsAlpha8(&pixels, &width, &height);
+    if (!pixels || width <= 0 || height <= 0) return false;
+    const int left = std::clamp(static_cast<int>(std::lround(glyph->U0 * width)), 0, width);
+    const int right = std::clamp(static_cast<int>(std::lround(glyph->U1 * width)), 0, width);
+    const int top = std::clamp(static_cast<int>(std::lround(glyph->V0 * height)), 0, height);
+    const int bottom = std::clamp(static_cast<int>(std::lround(glyph->V1 * height)), 0, height);
+    for (int y = top; y < bottom; ++y)
+        for (int x = left; x < right; ++x)
+            if (pixels[y * width + x]) return true;
+    return false;
+}
+
+bool mac_system_font_rebuild_and_preview() {
+    constexpr int width = 1000, height = 270;
+    std::vector<std::uint8_t> preview(width * height * 3, 255);
+    float previous_advance = 0;
+    for (int size : {15, 30, 15}) {
+        if (!cov::ui::configure_fonts(static_cast<float>(size)) ||
+            std::strstr(cov::ui::font_status(), "fallback missing")) return false;
+        auto* font = ImGui::GetIO().Fonts->Fonts[0];
+        for (ImWchar codepoint : {0x6742, 0x8F68, 0x30DE, 0x8A2D, 0x6E96}) {
+            if (!glyph_has_pixels(font, codepoint)) {
+                std::cerr << "macOS glyph has no pixels U+" << std::hex << static_cast<unsigned>(codepoint) << std::dec << '\n';
+                return false;
+            }
+        }
+        const float advance = font->FindGlyphNoFallback(0x6742)->AdvanceX;
+        if (size == 30 && (advance / previous_advance < 1.8f || advance / previous_advance > 2.2f)) {
+            std::cerr << "macOS glyph advance was scaled more than once\n";
+            return false;
+        }
+        previous_advance = advance;
+        unsigned char* alpha = nullptr;
+        unsigned char* rgba = nullptr;
+        int aw = 0, ah = 0;
+        ImGui::GetIO().Fonts->GetTexDataAsAlpha8(&alpha, &aw, &ah);
+        ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&rgba, nullptr, nullptr);
+        for (int i = 0; i < aw * ah; ++i) {
+            if (rgba[i * 4 + 3] != alpha[i]) {
+                std::cerr << "macOS custom glyph pixels were lost on RGBA conversion\n";
+                return false;
+            }
+        }
+        auto& io = ImGui::GetIO();
+        io.DisplaySize = {static_cast<float>(width), static_cast<float>(height)};
+        io.DeltaTime = 1.0f / 60;
+        ImGui::NewFrame();
+        // raster_text's integer sizes are multiples of 12px. Render at 60px,
+        // then sample the integer enlargement back to the baked 15/30px size.
+        // This exercises the same atlas/export renderer without editing metrics.
+        const int enlargement = 60 / size;
+        const int canvas_width = width * enlargement;
+        const int canvas_height = 3 * (size + 10) * enlargement;
+        std::vector<std::uint8_t> canvas(static_cast<std::size_t>(canvas_width) * canvas_height * 4, 255);
+        const std::string lines[] = {
+            std::to_string(size) + " px: English molecular orbitals  σ π ∞",
+            "杂 分子轨道 能量 占据 α β σ π ∞",
+            "分子軌道 エネルギー 設定 σ π ∞",
+        };
+        for (int line = 0; line < 3; ++line)
+            cov::ui::raster_text(canvas, canvas_width, canvas_height, 12 * enlargement,
+                (5 + line * (size + 10)) * enlargement, lines[line], 20, 20, 20, 5);
+        ImGui::Render();
+        const int offset = size == 30 ? 95 : 0;
+        for (int y = 0; y < canvas_height / enlargement; ++y)
+            for (int x = 0; x < width; ++x)
+                for (int channel = 0; channel < 3; ++channel)
+                    preview[((y + offset) * width + x) * 3 + channel] =
+                        canvas[(static_cast<std::size_t>(y * enlargement) * canvas_width + x * enlargement) * 4 + channel];
+    }
+    std::filesystem::create_directories("visual_artifacts");
+    std::ofstream output("visual_artifacts/macos-font-preview.ppm", std::ios::binary);
+    output << "P6\n" << width << ' ' << height << "\n255\n";
+    output.write(reinterpret_cast<const char*>(preview.data()), static_cast<std::streamsize>(preview.size()));
+    return static_cast<bool>(output);
+}
+#endif
 
 bool expect_glyphs(const ImFont* font,
                    const ImWchar* codepoints,
@@ -266,6 +354,13 @@ int main() {
        *std::max_element(dense->IdxBuffer.begin(),dense->IdxBuffer.end())<=65535u) {
         std::cerr<<"dense diagram indices lost high vertices\n";return 17;
     }
+#ifdef __APPLE__
+    if (!mac_system_font_rebuild_and_preview()) {
+        std::cerr << "macOS system font rebuild/preview failed\n";
+        ImGui::DestroyContext();
+        return 18;
+    }
+#endif
     ImGui::DestroyContext();
     std::cout << "ui_smoke ok\n";
     return 0;

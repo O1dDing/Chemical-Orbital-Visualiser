@@ -214,6 +214,12 @@ if(COV_BUILD_VIEWER OR COV_BUILD_TESTS)
         ${imgui_SOURCE_DIR}
     )
     target_link_libraries(cov_ui PUBLIC cov_imgui_core cov_orbitals cov_molecule)
+    if(APPLE)
+        find_library(COV_CORETEXT_FRAMEWORK CoreText REQUIRED)
+        find_library(COV_COREGRAPHICS_FRAMEWORK CoreGraphics REQUIRED)
+        find_library(COV_COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+        target_link_libraries(cov_ui PRIVATE ${COV_CORETEXT_FRAMEWORK} ${COV_COREGRAPHICS_FRAMEWORK} ${COV_COREFOUNDATION_FRAMEWORK})
+    endif()
     target_compile_features(cov_ui PUBLIC cxx_std_20)
     target_include_directories(cov_ui SYSTEM PRIVATE ${cov_eigen_SOURCE_DIR})
     target_compile_options(cov_ui PRIVATE

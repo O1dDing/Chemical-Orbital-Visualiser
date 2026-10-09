@@ -83,9 +83,8 @@ def quickstart(platform, version):
                    "GPU operation needs an NVIDIA driver compatible with CUDA "
                    "12.8; installing the CUDA toolkit is optional. UI fonts come from Windows.",
         "macos": "macOS 12 or newer, on Apple silicon or Intel, with OpenGL 2.1. "
-                 "The app includes the native Metal module and CPU fallback. UI fonts "
-                 "come from macOS; Japanese text can use Noto Sans CJK installed as "
-                 "`/Library/Fonts/NotoSansCJK-Regular.ttc`.",
+                 "The app includes the native Metal module and CPU fallback. "
+                 "UI fonts come from macOS.",
         "linux": "Linux x86_64 with glibc 2.35 or newer, an X11 display (or XWayland), "
                  "and OpenGL 2.1. This CPU build is made on Ubuntu 22.04. The C++ runtime "
                  "is linked into the executable; display and system libraries come from "
@@ -96,6 +95,7 @@ def quickstart(platform, version):
     }[platform]
     docs = "Chemical Orbital Visualiser.app/Contents/Resources/docs" if platform == "macos" else "docs"
     examples = "Chemical Orbital Visualiser.app/Contents/Resources/examples" if platform == "macos" else "examples"
+    browse_help = " In Finder, choose Show Package Contents to browse the app's included help and examples." if platform == "macos" else ""
     return (
         f"# Chemical Orbital Visualiser (COV) {version}\n\n"
         "Explore orbital energies, occupations, energy-level diagrams, orbital "
@@ -109,7 +109,7 @@ def quickstart(platform, version):
         "Gaussian CHK conversion requires your separately installed `formchk`. "
         "Gaussian and NBO programs are not included. NBO shapes and composition "
         "require the matching report, `.47` archive, and orbital matrices.\n\n"
-        f"User help is in `{docs}`. Library notices and the COV licence are included.\n"
+        f"User help is in `{docs}`.{browse_help} Library notices and the COV licence are included.\n"
     )
 
 
