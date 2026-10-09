@@ -1,6 +1,7 @@
 #include "cov/overlap.hpp"
 #include "cov/ao_angular_basis.hpp"
 #include "cov/analysis_threads.hpp"
+#include "cov/threading.hpp"
 
 #include <Eigen/Eigenvalues>
 
@@ -174,7 +175,7 @@ BasisOverlapResult derive_ao_overlap_from_basis(const Wavefunction& wf) {
         };
         const auto workers=std::min(analysis_thread_budget(),pairs.size());
         {
-            std::vector<std::jthread> threads;
+            std::vector<cov::jthread> threads;
             for (std::size_t i=1;i<workers;++i) threads.emplace_back(work);
             work();
         }

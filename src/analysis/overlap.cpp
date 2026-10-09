@@ -1,5 +1,6 @@
 #include "cov/overlap.hpp"
 #include "cov/analysis_threads.hpp"
+#include "cov/threading.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -41,7 +42,7 @@ void parallel_chunks(const std::size_t count,
         function(0u,0u,count);
         return;
     }
-    std::vector<std::jthread> threads;
+    std::vector<cov::jthread> threads;
     threads.reserve(workers);
     for (std::size_t worker=0u;worker<workers;++worker) {
         threads.emplace_back([&,worker] {
@@ -467,7 +468,7 @@ bool invert_square(std::vector<double>& a,
     const std::size_t workers=dense_worker_count(n);
     std::atomic<bool> stop{false};
     std::size_t active_column=0u;
-    std::vector<std::jthread> elimination_threads;
+    std::vector<cov::jthread> elimination_threads;
     std::unique_ptr<std::barrier<>> phase;
     std::latch launch_gate(1u);
     if (workers>1u) {

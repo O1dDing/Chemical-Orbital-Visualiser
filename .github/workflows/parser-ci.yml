@@ -2,6 +2,7 @@ name: core-ci
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
@@ -9,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -19,8 +20,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes fonts-noto-cjk
           test -f /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
+      - name: Select Xcode 16.2
+        if: runner.os == 'macOS'
+        run: echo "DEVELOPER_DIR=/Applications/Xcode_16.2.app/Contents/Developer" >> "$GITHUB_ENV"
       - name: Configure CPU core build
-        run: cmake -S . -B build -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_TESTS=ON
+        run: cmake -S . -B build -DCOV_BUILD_VIEWER=OFF -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_TESTS=ON
       - name: Build parser, orbital chemistry, diagram and UI targets
         run: cmake --build build --config Release --parallel
       - name: Download pinned real Gaussian 16 FCHK regression
@@ -55,18 +59,17 @@ jobs:
           cuda: '12.8.2'
           method: network
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "cusolver", "cusolver_dev", "cusparse", "cusparse_dev", "cuobjdump", "visual_studio_integration"]'
-      - name: Configure Blackwell Release viewer
+      - name: Configure multi-architecture CUDA viewer
         shell: pwsh
         run: >-
           cmake -S . -B build-cuda
           -G "Visual Studio 17 2022" -A x64
           -DCOV_ENABLE_CUDA=ON
           -DCOV_BUILD_TESTS=OFF
-          -DCMAKE_CUDA_ARCHITECTURES="120-real;120-virtual"
       - name: Build cov.exe
         shell: pwsh
         run: cmake --build build-cuda --config Release --parallel
-      - name: Verify Blackwell payload
+      - name: Verify CUDA architectures and startup dependencies
         shell: pwsh
         run: |
           $exe = "build-cuda/Release/cov.exe"
@@ -74,7 +77,9 @@ jobs:
           $cuobjdump = Join-Path $env:CUDA_PATH "bin/cuobjdump.exe"
           if (-not (Test-Path $cuobjdump)) { throw "cuobjdump.exe is missing" }
           & $cuobjdump --list-elf $exe | Tee-Object -FilePath build-cuda/cuobjdump.txt
-          if (-not (Select-String -Path build-cuda/cuobjdump.txt -Pattern "sm_120" -Quiet)) { throw "sm_120 cubin missing" }
+          foreach ($arch in 60,61,70,75,80,86,89,90,100,120) {
+            if (-not (Select-String -Path build-cuda/cuobjdump.txt -Pattern "sm_$arch\b" -Quiet)) { throw "sm_$arch cubin missing" }
+          }
           & $cuobjdump --dump-ptx $exe | Tee-Object -FilePath build-cuda/ptx.txt
           if (-not (Select-String -Path build-cuda/ptx.txt -Pattern "\.target sm_120" -Quiet)) { throw "compute_120 PTX missing" }
           $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
@@ -89,7 +94,7 @@ jobs:
       - name: Upload Windows CUDA executable
         uses: actions/upload-artifact@v4
         with:
-          name: cov-windows-sm120-${{ github.sha }}
+          name: cov-windows-cuda-${{ github.sha }}
           path: build-cuda/Release/cov.exe
           if-no-files-found: error
           retention-days: 30

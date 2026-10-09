@@ -9,7 +9,11 @@
 #endif
 #include <Windows.h>
 #endif
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
 #include <GL/gl.h>
+#endif
 
 #ifndef APIENTRY
 #define APIENTRY
@@ -18,6 +22,8 @@
 namespace cov::gl {
 
 bool load();
+GLenum volume_external_format();
+GLint volume_internal_format();
 
 extern GLuint (APIENTRY* CreateShader)(GLenum);
 extern void (APIENTRY* ShaderSource)(GLuint, GLsizei, const char* const*, const GLint*);
@@ -40,5 +46,7 @@ extern void (APIENTRY* Uniform3f)(GLint, GLfloat, GLfloat, GLfloat);
 extern void (APIENTRY* ActiveTexture)(GLenum);
 extern void (APIENTRY* TexImage3D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLsizei,
                                    GLint, GLenum, GLenum, const void*);
+extern void (APIENTRY* TexSubImage3D)(GLenum, GLint, GLint, GLint, GLint,
+                                    GLsizei, GLsizei, GLsizei, GLenum, GLenum, const void*);
 
 } // namespace cov::gl

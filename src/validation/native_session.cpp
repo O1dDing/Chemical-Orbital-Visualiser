@@ -192,8 +192,11 @@ std::string quote(const std::string& v) {
 }
 bool configure(int argc, char** argv) {
     std::filesystem::path plan;
-    for(int i=2;i<argc;++i) {
+    bool input_seen = false;
+    for(int i=1;i<argc;++i) {
         const std::string a=argv[i];
+        if(a.starts_with("--compute-backend=") || a.starts_with("--compute-device=")) continue;
+        if(!a.starts_with("--") && !input_seen) { input_seen=true; continue; }
         if(a=="--validation-plan" && i+1<argc) plan=std::filesystem::u8path(argv[++i]);
         else if(a=="--validation-output" && i+1<argc) output=std::filesystem::u8path(argv[++i]);
         else if(a=="--validation-background") hidden_window=true;

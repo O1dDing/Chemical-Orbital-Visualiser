@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <locale>
 #include <map>
 #include <optional>
 #include <set>
@@ -140,9 +141,12 @@ std::optional<double> parse_real(const std::string_view raw) {
     std::string value=trim(std::string(raw));
     if (value.empty()) return std::nullopt;
     double parsed=0.0;
-    const auto result=std::from_chars(
-        value.data(),value.data()+value.size(),parsed);
-    if (result.ec!=std::errc{} || result.ptr!=value.data()+value.size() ||
+    // Apple's libc++ does not provide floating-point from_chars in every SDK.
+    // The classic locale preserves the manifest's decimal-dot syntax.
+    if (value.front()=='+') return std::nullopt;
+    std::istringstream input(value);
+    input.imbue(std::locale::classic());
+    if (!(input >> std::noskipws >> parsed) || input.peek()!=std::char_traits<char>::eof() ||
         !std::isfinite(parsed)) {
         return std::nullopt;
     }

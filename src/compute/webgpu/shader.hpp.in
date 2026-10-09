@@ -1,0 +1,3 @@
+#pragma once
+// Embedded at configure time so loading does not depend on the working directory.
+static constexpr char cov_webgpu_shader[] = R"COV_WGSL(@COV_WGSL_SOURCE@)COV_WGSL";
