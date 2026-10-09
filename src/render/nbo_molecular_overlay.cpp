@@ -164,7 +164,7 @@ MoleculeOverlay make_nbo_molecule_overlay(const NboIntegration& data,const Inter
             // literal integer together with its source identity. A later total
             // record cannot replace it. Default total connectivity is unchanged.
             if(source.kind=="bond" && source.atoms.size()==2 && source.lewis_bond_count &&
-                std::minmax(source.atoms[0],source.atoms[1])==key)
+                std::pair<std::size_t,std::size_t>(std::minmax(source.atoms[0],source.atoms[1]))==key)
                 b.lewis_bond_count=source.lewis_bond_count;
         }
         if(bond_mode==NboBondDisplayMode::LewisStructure)
