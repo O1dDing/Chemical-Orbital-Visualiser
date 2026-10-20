@@ -916,6 +916,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
                 state.salc_model->fragments.end(),[&](const auto& f){return f.id==orbital.fragment_id;});
             NboAomoNode node;
             node.id="salc:"+orbital.id;node.label=orbital.label;
+            node.label_atom_indices=orbital.atoms.size()==1;
             node.detail=orbital.label+"; "+orbital.detail;
             node.energy_semantics=orbital.energy_semantics;
             if(orbital.terms.size()==1 && !orbital.atoms.empty() &&
@@ -927,7 +928,6 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
                     while(!direction.empty()&&std::isdigit(static_cast<unsigned char>(direction.front())))direction.erase(direction.begin());
                     if(!direction.empty()&&direction.front()==shell.back())angular=shell+direction.substr(1);
                 }
-                node.label_atom_indices=true;
                 node.label=canonical.atoms[orbital.atoms.front()].symbol+
                     atom_number(orbital.atoms.front())+" "+angular;
             }
@@ -1137,6 +1137,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
             const auto& first=state.salc_model->orbitals[family.first];
             NboAomoNode header;
             header.id="user-fragment:"+std::to_string(id);header.group_header=true;
+            header.label_atom_indices=true;
             header.label="+ F"+(state.show_fragment_numbers?std::to_string(id):std::string{})+" ("+
                 std::to_string(family.subspaces)+" "+aomo_text(state.language,"spaces")+")";
             header.detail="User-defined atom set used for folding, not a fixed orbital or SALC. "
