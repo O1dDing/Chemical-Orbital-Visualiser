@@ -5,6 +5,14 @@
 #include <sstream>
 
 namespace cov {
+std::string pi_partner_candidates_json(const std::vector<PiPartnerAssessment>& candidates) {
+    std::ostringstream out;out << '[';
+    for(std::size_t i=0;i<candidates.size();++i) {
+        if(i)out << ',';
+        out << pi_partner_assessment_json(candidates[i]);
+    }
+    out << ']';return out.str();
+}
 namespace {
 void number(std::ostream& out, double value) {
     if (std::isfinite(value)) out << value;
@@ -62,7 +70,18 @@ std::string orbital_energy_gap_json(const OrbitalEnergyGapDescriptor& gap, Energ
     out << ",\"splitting_display\":";number(out,convert_hartree(gap.splitting_hartree,unit));
     out << ",\"display_unit\":";quoted(out,energy_unit_symbol(unit));
     out << ",\"confidence\":";number(out,gap.confidence);
-    out << ",\"score_meaning\":\"heuristic-support-not-probability\"";
+    const bool verified_channel=gap.orbital_evidence&&gap.orbital_evidence->channel.same_operator_verified;
+    out << ",\"score_meaning\":";quoted(out,verified_channel?
+        "minimum-endpoint-cross-Fock-magnitude-not-probability":"heuristic-support-not-probability");
+    out << ",\"score_unit\":";quoted(out,verified_channel?"hartree":"dimensionless");
+    out << ",\"ranking_score\":";
+    if(verified_channel)number(out,gap.orbital_evidence->ranking_score);else out<<"null";
+    out << ",\"display_strength_hartree\":";number(out,gap.display_strength_hartree);
+    out << ",\"display_strength_definition\":";
+    quoted(out,"minimum-absolute-cross-Fock-trace-of-complete-endpoint-groups; display-priority-only");
+    out << ",\"equivalent_channel_ids\":[";
+    for(std::size_t i=0;i<gap.equivalent_channel_ids.size();++i){if(i)out<<',';quoted(out,gap.equivalent_channel_ids[i]);}
+    out << ']';
     out << ",\"lower_energy_hartree\":";number(out,gap.lower_energy_hartree);
     out << ",\"upper_energy_hartree\":";number(out,gap.upper_energy_hartree);
     out << ",\"lower_energy_spread_hartree\":";number(out,gap.lower_energy_spread_hartree);

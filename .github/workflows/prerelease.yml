@@ -1,0 +1,161 @@
+name: Prerelease packages
+
+on:
+  push:
+    branches: [feat/nbo-evidence-integration]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Every job checks out this run's immutable commit. Publishing is a separate,
+# reviewed operation; this workflow never creates a tag or GitHub Release.
+concurrency:
+  group: prerelease-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  COV_RELEASE_VERSION: v0.4.0-pre.4
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned CMake
+        run: python -m pip install cmake==3.31.6
+      - name: Check archive and source safeguards
+        run: python -m unittest discover -s tools/release -p test_package_release.py -v
+      - name: Configure CPU scientific tests
+        run: cmake -S . -B build-core -G "Visual Studio 17 2022" -A x64 -DCOV_BUILD_VIEWER=OFF -DCOV_ENABLE_CUDA=OFF -DCOV_BUILD_TESTS=ON
+      - name: Build CPU scientific tests
+        run: cmake --build build-core --config Release --parallel 3
+      - name: Fetch pinned FCHK regression input
+        run: python tools/package_release.py fetch-regression --build build-core
+      - name: Run CPU scientific suite
+        run: ctest --test-dir build-core -C Release --output-on-failure --no-tests=error
+      - name: Install CUDA 12.8.2 build toolkit
+        uses: Jimver/cuda-toolkit@v0.2.36
+        with:
+          cuda: '12.8.2'
+          method: network
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "cusolver", "cusolver_dev", "cusparse", "cusparse_dev", "cuobjdump", "visual_studio_integration"]'
+      - name: Configure CUDA viewer with CPU fallback
+        run: cmake -S . -B build-release -G "Visual Studio 17 2022" -A x64 -DCOV_ENABLE_CUDA=ON -DCOV_BUILD_TESTS=OFF -DCOV_ENABLE_VALIDATION=OFF "-DCMAKE_CUDA_ARCHITECTURES=60-real;61-real;70-real;75-real;80-real;86-real;89-real;90-real;100-real;120-real;120-virtual"
+      - name: Build Windows viewer
+        run: cmake --build build-release --config Release --parallel 3
+      - name: Inspect and package Windows viewer
+        run: python tools/package_release.py package --platform windows --build build-release --version $env:COV_RELEASE_VERSION --commit $env:GITHUB_SHA
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cov-prerelease-Windows-x64-${{ github.sha }}
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cov-prerelease-review-Windows-${{ github.sha }}
+          path: build-release/release-audit/
+          if-no-files-found: error
+          retention-days: 30
+
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Select Xcode with Metal compiler
+        run: |
+          test -d /Applications/Xcode_16.2.app/Contents/Developer
+          echo "DEVELOPER_DIR=/Applications/Xcode_16.2.app/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Install pinned CMake
+        run: python -m pip install cmake==3.31.6
+      - name: Check archive and source safeguards
+        run: python -m unittest discover -s tools/release -p test_package_release.py -v
+      - name: Configure universal viewer and scientific tests
+        run: >-
+          cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+          '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          -DCOV_ENABLE_CUDA=OFF -DCOV_ENABLE_METAL=ON -DCOV_BUILD_TESTS=ON
+          -DCOV_ENABLE_VALIDATION=OFF -DBUILD_SHARED_LIBS=OFF
+          '-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath,@loader_path -Wl,-headerpad_max_install_names'
+          '-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-rpath,@loader_path -Wl,-headerpad_max_install_names'
+      - name: Build both architectures and embedded Metal shader
+        run: cmake --build build-release --config Release --parallel 3
+      - name: Fetch pinned FCHK regression input
+        run: python tools/package_release.py fetch-regression --build build-release
+      - name: Run CPU scientific suite on runner architecture
+        run: ctest --test-dir build-release -C Release --output-on-failure --no-tests=error
+      - name: Inspect, sign locally and package universal app
+        run: python tools/package_release.py package --platform macos --build build-release --version "$COV_RELEASE_VERSION" --commit "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cov-prerelease-macOS-universal-${{ github.sha }}
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cov-prerelease-review-macOS-${{ github.sha }}
+          path: build-release/release-audit/
+          if-no-files-found: error
+          retention-days: 30
+
+  linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install X11, OpenGL and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev xvfb fonts-dejavu-core fonts-noto-cjk
+      - name: Install pinned CMake
+        run: python -m pip install cmake==3.31.6
+      - name: Check archive and source safeguards
+        run: python -m unittest discover -s tools/release -p test_package_release.py -v
+      - name: Configure Ubuntu 22.04 CPU viewer and scientific tests
+        run: >-
+          cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+          -DCOV_ENABLE_CUDA=OFF -DCOV_ENABLE_METAL=OFF -DCOV_BUILD_TESTS=ON
+          -DCOV_TEST_VIEWER_COMPUTE=ON -DCOV_ENABLE_VALIDATION=OFF
+          -DGLFW_BUILD_WAYLAND=OFF -DBUILD_SHARED_LIBS=OFF
+          '-DCMAKE_EXE_LINKER_FLAGS=-static-libstdc++ -static-libgcc'
+      - name: Build CPU viewer
+        run: cmake --build build-release --config Release --parallel 3
+      - name: Fetch pinned FCHK regression input
+        run: python tools/package_release.py fetch-regression --build build-release
+      - name: Run scientific and OpenGL CPU suite
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run -a ctest --test-dir build-release -C Release --output-on-failure --no-tests=error
+      - name: Inspect and package Linux viewer
+        run: python tools/package_release.py package --platform linux --build build-release --version "$COV_RELEASE_VERSION" --commit "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cov-prerelease-Linux-x86_64-${{ github.sha }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cov-prerelease-review-Linux-${{ github.sha }}
+          path: build-release/release-audit/
+          if-no-files-found: error
+          retention-days: 30

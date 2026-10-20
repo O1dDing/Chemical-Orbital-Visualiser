@@ -658,6 +658,9 @@ void propagate_pi_partner_labels(
                 {lower.energy,lower.metal[2],lower.ligand_p,lower.pi_fraction,lower.metal_ligand_overlap},
                 {upper.energy,upper.metal[2],upper.ligand_p,upper.pi_fraction,upper.metal_ligand_overlap},prior));
             if(!evidence->accepted)continue;
+            // Weak scalar similarity is not a whole-subspace irrep proof.
+            // Only the independent metric/symmetry analyses may fill a label.
+            if(evidence->channel.channel_id.empty())continue;
             candidates.push_back({a_known?first:second,a_known?second:first,evidence->ranking_score,evidence});
         }
     }

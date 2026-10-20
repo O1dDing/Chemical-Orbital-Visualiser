@@ -1,0 +1,29 @@
+{
+  "id": "octamethyl-POSS-O",
+  "group_id": 6333,
+  "target": "O",
+  "phase": "Small proper octahedral model",
+  "note": "Rotated octamethylsilsesquioxane preset; preserve this coordinate conformer.",
+  "title": "Octamethylsilsesquioxane (rotated)",
+  "source_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6333",
+  "source_sha256": "fc3d807ca52fc291c7af5c22fabbef584a9f3f553e1b50af2020bd3439a1d3a6",
+  "result_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Angstrom&unit2=Degree&n1=Dummy&n2=Si&x2=2.753400&n3=Si&x3=2.753400&y3=109.471220&na3=1&nb3=2&n4=Si&x4=2.753400&y4=109.471220&z4=120.000000&na4=1&nb4=2&nc4=3&n5=Si&x5=2.753400&y5=109.471220&z5=240.000000&na5=1&nb5=2&nc5=3&n6=Si&x6=2.753400&y6=70.528780&z6=180.000000&na6=1&nb6=4&nc6=5&n7=Si&x7=2.753400&y7=70.528780&z7=180.000000&na7=1&nb7=5&nc7=4&n8=Si&x8=2.753400&y8=70.528780&z8=180.000000&na8=1&nb8=2&nc8=3&n9=Si&x9=2.753400&y9=70.528780&z9=180.000000&na9=1&nb9=3&nc9=2&n10=O&x10=2.677000&y10=35.264390&z10=120.000000&na10=1&nb10=2&nc10=8&n11=O&x11=2.677000&y11=35.264390&z11=120.000000&na11=1&nb11=6&nc11=4&n12=O&x12=2.677000&y12=35.264390&z12=120.000000&na12=1&nb12=3&nc12=9&n13=O&x13=2.677000&y13=35.264390&z13=120.000000&na13=1&nb13=7&nc13=5&n14=O&x14=2.677000&y14=35.264390&z14=120.000000&na14=1&nb14=8&nc14=2&n15=O&x15=2.677000&y15=35.264390&z15=120.000000&na15=1&nb15=4&nc15=6&n16=O&x16=2.677000&y16=35.264390&z16=120.000000&na16=1&nb16=9&nc16=3&n17=O&x17=2.677000&y17=35.264390&z17=120.000000&na17=1&nb17=5&nc17=7&n18=O&x18=2.677000&y18=35.264390&z18=120.000000&na18=1&nb18=4&nc18=8&n19=O&x19=2.677000&y19=35.264390&z19=120.000000&na19=1&nb19=3&nc19=7&n20=O&x20=2.677000&y20=35.264390&z20=120.000000&na20=1&nb20=5&nc20=9&n21=O&x21=2.677000&y21=35.264390&z21=120.000000&na21=1&nb21=2&nc21=6&n22=C&x22=4.602600&y22=109.471220&z22=0.000000&na22=1&nb22=3&nc22=2&n23=C&x23=4.602600&y23=109.471220&z23=0.000000&na23=1&nb23=2&nc23=3&n24=C&x24=4.602600&y24=109.471220&z24=120.000000&na24=1&nb24=2&nc24=3&n25=C&x25=4.602600&y25=109.471220&z25=240.000000&na25=1&nb25=2&nc25=3&n26=C&x26=4.602600&y26=70.528780&z26=180.000000&na26=1&nb26=4&nc26=5&n27=C&x27=4.602600&y27=70.528780&z27=180.000000&na27=1&nb27=5&nc27=4&n28=C&x28=4.602600&y28=70.528780&z28=180.000000&na28=1&nb28=2&nc28=3&n29=C&x29=4.602600&y29=70.528780&z29=180.000000&na29=1&nb29=3&nc29=2&n30=H&x30=1.092600&y30=110.693000&z30=147.500000&na30=22&nb30=2&nc30=6&n31=H&x31=1.092600&y31=110.693000&z31=120.000000&na31=22&nb31=2&nc31=30&n32=H&x32=1.092600&y32=110.693000&z32=240.000000&na32=22&nb32=2&nc32=30&n33=H&x33=1.092600&y33=110.693000&z33=147.500000&na33=23&nb33=3&nc33=7&n34=H&x34=1.092600&y34=110.693000&z34=120.000000&na34=23&nb34=3&nc34=33&n35=H&x35=1.092600&y35=110.693000&z35=240.000000&na35=23&nb35=3&nc35=33&n36=H&x36=1.092600&y36=110.693000&z36=147.500000&na36=24&nb36=4&nc36=8&n37=H&x37=1.092600&y37=110.693000&z37=120.000000&na37=24&nb37=4&nc37=36&n38=H&x38=1.092600&y38=110.693000&z38=240.000000&na38=24&nb38=4&nc38=36&n39=H&x39=1.092600&y39=110.693000&z39=147.500000&na39=25&nb39=5&nc39=9&n40=H&x40=1.092600&y40=110.693000&z40=120.000000&na40=25&nb40=5&nc40=39&n41=H&x41=1.092600&y41=110.693000&z41=240.000000&na41=25&nb41=5&nc41=39&n42=H&x42=1.092600&y42=110.693000&z42=147.500000&na42=26&nb42=6&nc42=4&n43=H&x43=1.092600&y43=110.693000&z43=120.000000&na43=26&nb43=6&nc43=42&n44=H&x44=1.092600&y44=110.693000&z44=240.000000&na44=26&nb44=6&nc44=42&n45=H&x45=1.092600&y45=110.693000&z45=147.500000&na45=27&nb45=7&nc45=5&n46=H&x46=1.092600&y46=110.693000&z46=120.000000&na46=27&nb46=7&nc46=45&n47=H&x47=1.092600&y47=110.693000&z47=240.000000&na47=27&nb47=7&nc47=45&n48=H&x48=1.092600&y48=110.693000&z48=147.500000&na48=28&nb48=8&nc48=2&n49=H&x49=1.092600&y49=110.693000&z49=120.000000&na49=28&nb49=8&nc49=48&n50=H&x50=1.092600&y50=110.693000&z50=240.000000&na50=28&nb50=8&nc50=48&n51=H&x51=1.092600&y51=110.693000&z51=147.500000&na51=29&nb51=9&nc51=3&n52=H&x52=1.092600&y52=110.693000&z52=120.000000&na52=29&nb52=9&nc52=51&n53=H&x53=1.092600&y53=110.693000&z53=240.000000&na53=29&nb53=9&nc53=51",
+  "result_sha256": "b93e1d4972d70bb0d530bddba22f72523916582be106bdc0273d13ef82e166e6",
+  "source_reported_group": "O",
+  "atom_count": 52,
+  "bond_count": 56,
+  "element_counts": {
+    "C": 8,
+    "H": 24,
+    "O": 12,
+    "Si": 8
+  },
+  "filename": "octamethyl-POSS-O.xyz",
+  "sidecar": "octamethyl-POSS-O.json",
+  "source_page_type": "Symmetry site internal-coordinate starting structure; converted to Cartesian by same site group=6300 endpoint",
+  "source_reported_group_scope": "site calculator label recorded verbatim; may be the proper-rotation subgroup and is not accepted as full-group verification",
+  "full_point_group_status": "Verified on the unchanged Cartesian fixture by point_group_geometry_smoke; includes rigid rotation and atom-order checks. Geometric tolerance is not a wavefunction symmetry certificate.",
+  "coordinate_precision": "source MOL DATA coordinates retained verbatim (4 decimal places)",
+  "charge_multiplicity": "not encoded in coordinate source; chemistry-state bookkeeping not verified",
+  "cov_regression_test": "tests/point_group_geometry_smoke.cpp"
+}

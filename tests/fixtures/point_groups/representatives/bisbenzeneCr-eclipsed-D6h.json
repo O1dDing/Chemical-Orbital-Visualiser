@@ -1,0 +1,22 @@
+{
+  "id": "bisbenzeneCr-eclipsed-D6h",
+  "target": "D6h",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 25,
+  "element_counts": {
+    "C": 12,
+    "Cr": 1,
+    "H": 12
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6194"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Source calculator may print only proper rotation subgroup; independent full O(3) atom test recorded.",
+  "xyz_sha256": "e9419ff943b108cad820dcb43154a8b46ce6c586423113c6c451643a767b5a88",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 2.962507720860396e-05,
+  "source_xyz_sha256": "f1199b4d9c2d39612969545449b29c3caf9a1a91cbb8d804694977a92fa0b1c1"
+}

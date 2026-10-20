@@ -1,0 +1,27 @@
+{
+  "id": "dodecaborate-Ih",
+  "group_id": 6139,
+  "target": "Ih",
+  "phase": "Icosahedral cage",
+  "note": "closo-[B12H12]2− source preset; source reports rotational subgroup I.",
+  "title": "[B12H12]2--Ion",
+  "source_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6139",
+  "source_sha256": "1ab2de95ca089fb562048db8739e954711a6e98296c1613f729d648dc20fe6af",
+  "result_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Angstrom&unit2=Degree&n1=Dummy&n2=Dummy&x2=1.000000&n3=B&x3=1.699200&y3=90.000000&na3=1&nb3=2&n4=B&x4=1.699200&y4=90.000000&z4=180.000000&na4=1&nb4=2&nc4=3&n5=B&x5=1.699200&y5=63.434949&z5=0.000000&na5=1&nb5=3&nc5=2&n6=B&x6=1.699200&y6=63.434949&z6=72.000000&na6=1&nb6=3&nc6=5&n7=B&x7=1.699200&y7=63.434949&z7=144.000000&na7=1&nb7=3&nc7=5&n8=B&x8=1.699200&y8=63.434949&z8=-72.000000&na8=1&nb8=3&nc8=5&n9=B&x9=1.699200&y9=63.434949&z9=-144.000000&na9=1&nb9=3&nc9=5&n10=B&x10=1.699200&y10=63.434949&z10=180.000000&na10=1&nb10=4&nc10=2&n11=B&x11=1.699200&y11=63.434949&z11=72.000000&na11=1&nb11=4&nc11=10&n12=B&x12=1.699200&y12=63.434949&z12=144.000000&na12=1&nb12=4&nc12=10&n13=B&x13=1.699200&y13=63.434949&z13=-72.000000&na13=1&nb13=4&nc13=10&n14=B&x14=1.699200&y14=63.434949&z14=-144.000000&na14=1&nb14=4&nc14=10&n15=H&x15=2.900500&y15=90.000000&z15=0.000000&na15=1&nb15=2&nc15=5&n16=H&x16=2.900500&y16=90.000000&z16=180.000000&na16=1&nb16=2&nc16=15&n17=H&x17=2.900500&y17=63.434949&z17=0.000000&na17=1&nb17=3&nc17=2&n18=H&x18=2.900500&y18=63.434949&z18=72.000000&na18=1&nb18=3&nc18=5&n19=H&x19=2.900500&y19=63.434949&z19=144.000000&na19=1&nb19=3&nc19=5&n20=H&x20=2.900500&y20=63.434949&z20=-72.000000&na20=1&nb20=3&nc20=5&n21=H&x21=2.900500&y21=63.434949&z21=-144.000000&na21=1&nb21=3&nc21=5&n22=H&x22=2.900500&y22=63.434949&z22=180.000000&na22=1&nb22=4&nc22=2&n23=H&x23=2.900500&y23=63.434949&z23=72.000000&na23=1&nb23=4&nc23=10&n24=H&x24=2.900500&y24=63.434949&z24=144.000000&na24=1&nb24=4&nc24=10&n25=H&x25=2.900500&y25=63.434949&z25=-72.000000&na25=1&nb25=4&nc25=10&n26=H&x26=2.900500&y26=63.434949&z26=-144.000000&na26=1&nb26=4&nc26=10",
+  "result_sha256": "2dcd5a66a19f1bf1dfdd44c521722006774999aa7c58f8beb3ca4a289f875bbd",
+  "source_reported_group": "I",
+  "atom_count": 24,
+  "bond_count": 42,
+  "element_counts": {
+    "B": 12,
+    "H": 12
+  },
+  "filename": "dodecaborate-Ih.xyz",
+  "sidecar": "dodecaborate-Ih.json",
+  "source_page_type": "Symmetry site internal-coordinate starting structure; converted to Cartesian by same site group=6300 endpoint",
+  "source_reported_group_scope": "site calculator label recorded verbatim; may be the proper-rotation subgroup and is not accepted as full-group verification",
+  "full_point_group_status": "Verified on the unchanged Cartesian fixture by point_group_geometry_smoke; includes rigid rotation and atom-order checks. Geometric tolerance is not a wavefunction symmetry certificate.",
+  "coordinate_precision": "source MOL DATA coordinates retained verbatim (4 decimal places)",
+  "charge_multiplicity": "not encoded in coordinate source; chemistry-state bookkeeping not verified",
+  "cov_regression_test": "tests/point_group_geometry_smoke.cpp"
+}

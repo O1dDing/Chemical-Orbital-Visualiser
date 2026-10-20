@@ -1,3 +1,6 @@
+#include "cov/molecular_point_group_frame.hpp"
+#include "cov/nbo_salc.hpp"
+#include <Eigen/Core>
 #include "cov/orbital_symmetry.hpp"
 
 // Keep the already-tested finite/linear machinery in one translation unit so
@@ -9,103 +12,6 @@
 #undef derive_orbital_symmetry
 
 namespace cov {
-namespace {
-
-SymmetryOperation square_operation(const SymmetryOperation& op) {
-    SymmetryOperation squared = op;
-    squared.kind = SymmetryOperationKind::ProperRotation;
-    squared.order = 2;
-    squared.power = 2;
-
-    std::array<double, 9> matrix{};
-    for (int row = 0; row < 3; ++row) {
-        for (int col = 0; col < 3; ++col) {
-            for (int k = 0; k < 3; ++k) {
-                matrix[3 * row + col] +=
-                    op.matrix[3 * row + k] * op.matrix[3 * k + col];
-            }
-        }
-    }
-    squared.matrix = matrix;
-
-    squared.atom_permutation.assign(op.atom_permutation.size(), 0u);
-    for (std::size_t i = 0; i < op.atom_permutation.size(); ++i) {
-        const std::size_t middle = op.atom_permutation[i];
-        if (middle >= op.atom_permutation.size()) {
-            squared.atom_permutation.clear();
-            break;
-        }
-        squared.atom_permutation[i] = op.atom_permutation[middle];
-    }
-    return squared;
-}
-
-std::optional<std::string> classify_oh_native(
-    const Wavefunction& wavefunction,
-    const MolecularSymmetry& symmetry,
-    const std::vector<std::size_t>& group,
-    const OrbitalSymmetryOptions& options,
-    double& retention) {
-    if (symmetry.point_group != "Oh") return std::nullopt;
-
-    const auto* c4 = find_operation(
-        symmetry, SymmetryOperationKind::ProperRotation, 4);
-    const auto* inversion = find_operation(
-        symmetry, SymmetryOperationKind::Inversion, 2);
-    if (!c4 || !inversion) return std::nullopt;
-
-    // COV's geometry engine may identify Oh from the three C4 axes before a
-    // body-diagonal C3 candidate is explicitly materialised.  C4, C4^2 and
-    // inversion are nevertheless a complete discriminator for the five O
-    // irreps at their known dimensions and also reject the common accidental
-    // A+E three-dimensional reducible subspace via the C4^2 character.
-    const SymmetryOperation c2_axis = square_operation(*c4);
-    if (c2_axis.atom_permutation.size() != wavefunction.atoms.size()) {
-        return std::nullopt;
-    }
-
-    const auto c4_character = character(wavefunction, *c4, group);
-    const auto c2_character = character(wavefunction, c2_axis, group);
-    const auto parity_character = character(wavefunction, *inversion, group);
-    if (!c4_character.valid || !c2_character.valid ||
-        !parity_character.valid) {
-        return std::nullopt;
-    }
-
-    retention = std::min({c4_character.retention,
-                          c2_character.retention,
-                          parity_character.retention});
-    if (retention < options.minimum_subspace_retention) return std::nullopt;
-
-    const int dimension = static_cast<int>(group.size());
-    const double tolerance = options.character_tolerance;
-    if (std::abs(std::abs(parity_character.value) -
-                 static_cast<double>(dimension)) > tolerance) {
-        return std::nullopt;
-    }
-    const char parity = parity_character.value >= 0.0 ? 'g' : 'u';
-
-    std::string base;
-    if (dimension == 1 &&
-        std::abs(c2_character.value - 1.0) <= tolerance) {
-        if (std::abs(c4_character.value - 1.0) <= tolerance) base = "A1";
-        else if (std::abs(c4_character.value + 1.0) <= tolerance) base = "A2";
-    } else if (dimension == 2 &&
-               std::abs(c4_character.value) <= tolerance &&
-               std::abs(c2_character.value - 2.0) <= tolerance) {
-        base = "E";
-    } else if (dimension == 3 &&
-               std::abs(c2_character.value + 1.0) <= tolerance) {
-        if (std::abs(c4_character.value - 1.0) <= tolerance) base = "T1";
-        else if (std::abs(c4_character.value + 1.0) <= tolerance) base = "T2";
-    }
-
-    if (base.empty()) return std::nullopt;
-    return base + parity;
-}
-
-} // namespace
-
 OrbitalSymmetryResult derive_orbital_symmetry(
     Wavefunction& wavefunction,
     const OrbitalSymmetryOptions& options) {
@@ -118,41 +24,40 @@ OrbitalSymmetryResult derive_orbital_symmetry(
 
     const MolecularSymmetry symmetry = analyse_molecular_symmetry(wavefunction);
 
-    // Oh is handled before the legacy finite-group path so no provisional
-    // Derived label can block the deterministic COV-native classifier. Producer
-    // labels remain immutable because group_unlabelled() rejects such groups.
-    if (symmetry.point_group == "Oh") {
-        OrbitalSymmetryResult result;
-        result.point_group = symmetry.point_group;
-        if (!symmetry.available()) return result;
-
-        for (const auto& group :
-             energy_groups(wavefunction, options.degeneracy_tolerance_hartree)) {
-            if (!group_unlabelled(wavefunction, group)) continue;
-            ++result.groups_examined;
-
-            double retention = 1.0;
-            const auto label = classify_oh_native(
-                wavefunction, symmetry, group, options, retention);
-            result.worst_subspace_retention =
-                std::min(result.worst_subspace_retention, retention);
-            if (!label) continue;
-
-            DerivedOrbitalSymmetryAssignment evidence;
-            evidence.point_group=symmetry.point_group;
-            evidence.label=*label;
-            evidence.orbital_indices=group;
-            evidence.subspace_retention=retention;
-            evidence.centre_bohr=symmetry.centre_bohr;
-            wavefunction.derived_orbital_symmetry_assignments.push_back(std::move(evidence));
-
-            ++result.groups_labelled;
-            for (const std::size_t index : group) {
-                wavefunction.orbitals[index].symmetry = *label;
-                wavefunction.orbitals[index].symmetry_provenance =
-                    DataProvenance::Derived;
-                ++result.orbitals_labelled;
+    if(!symmetry.linear){
+        OrbitalSymmetryResult result;result.point_group=symmetry.point_group;
+        const auto complete=complete_molecular_point_group(wavefunction,symmetry);
+        const auto table=molecular_point_group_irreps(wavefunction,complete);
+        if(!table.valid)return result;
+        using Matrix=Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic,Eigen::RowMajor>;
+        const auto n=std::size_t(wavefunction.basis_count),m=wavefunction.orbitals.size();Matrix q=Matrix::Zero(n,m);
+        for(std::size_t c=0;c<m;++c){if(wavefunction.orbitals[c].coefficients.size()!=n)return result;
+            for(std::size_t r=0;r<n;++r)q(r,c)=wavefunction.orbitals[c].coefficients[r];}
+        const Matrix sq=Eigen::Map<const Matrix>(wavefunction.ao_overlap.data(),n,n)*q;
+        const auto groups=energy_groups(wavefunction,options.degeneracy_tolerance_hartree);
+        std::vector<std::vector<double>> measured(groups.size());std::vector<double> retention(groups.size(),1);
+        std::vector<bool> eligible(groups.size());for(std::size_t b=0;b<groups.size();++b){eligible[b]=group_unlabelled(wavefunction,groups[b]);if(eligible[b])++result.groups_examined;}
+        const std::vector<double> packed(q.data(),q.data()+q.size());
+        for(const auto& operation:complete.operations){const auto transformed=apply_orbital_symmetry_operation(wavefunction,operation,packed,m);
+            if(transformed.size()!=n*m)return result;const Eigen::Map<const Matrix> tq(transformed.data(),n,m);
+            const Matrix d=sq.transpose()*tq;const Matrix stq=Eigen::Map<const Matrix>(wavefunction.ao_overlap.data(),n,n)*tq;
+            for(std::size_t b=0;b<groups.size();++b){if(!eligible[b])continue;double chi=0;
+                for(auto i:groups[b]){chi+=d(i,i);double projected=0;for(auto j:groups[b])projected+=d(j,i)*d(j,i);
+                    const double norm=tq.col(i).dot(stq.col(i));if(!std::isfinite(norm)||norm<=1e-12){eligible[b]=false;break;}
+                    retention[b]=std::min(retention[b],projected/norm);}
+                measured[b].push_back(chi);
             }
+        }
+        for(std::size_t b=0;b<groups.size();++b){if(!eligible[b])continue;result.worst_subspace_retention=std::min(result.worst_subspace_retention,retention[b]);
+            if(retention[b]<options.minimum_subspace_retention)continue;
+            std::string label;double maximum_error=0;for(const auto& row:table.rows){if(row.dimension!=groups[b].size()||row.characters.size()!=measured[b].size())continue;
+                bool same=true;for(std::size_t g=0;g<row.characters.size();++g)if(!std::isfinite(measured[b][g])||std::abs(measured[b][g]-row.characters[g])>options.character_tolerance){same=false;break;}
+                if(same){if(!label.empty()){label.clear();break;}label=row.label;for(std::size_t g=0;g<row.characters.size();++g)maximum_error=std::max(maximum_error,std::abs(measured[b][g]-row.characters[g]));}}
+            if(label.empty())continue;
+            DerivedOrbitalSymmetryAssignment evidence;evidence.point_group=symmetry.point_group;evidence.label=label;evidence.orbital_indices=groups[b];evidence.subspace_retention=retention[b];evidence.centre_bohr=symmetry.centre_bohr;
+            evidence.maximum_character_error=maximum_error;evidence.axes_available=true;evidence.principal_axis=table.principal_axis;evidence.secondary_axis=table.reference_axis;evidence.axis_convention=table.axis_detail;
+            wavefunction.derived_orbital_symmetry_assignments.push_back(std::move(evidence));++result.groups_labelled;
+            for(auto i:groups[b]){wavefunction.orbitals[i].symmetry=label;wavefunction.orbitals[i].symmetry_provenance=DataProvenance::Derived;++result.orbitals_labelled;}
         }
         return result;
     }

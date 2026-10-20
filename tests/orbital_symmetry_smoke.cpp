@@ -206,6 +206,19 @@ cov::Wavefunction oh_central_p() {
 } // namespace
 
 int main() {
+    // A square site basis plus an off-plane, different element has C4v.
+    // The alternating site combination is B1 relative to atom-supported
+    // mirrors, including after a general rigid rotation and atom reversal.
+    for(bool rotated:{false,true}){
+        auto wf=even_ring(4,false,rotated);std::array<double,3> centre{};
+        for(const auto& a:wf.atoms){centre[0]+=a.x/4;centre[1]+=a.y/4;centre[2]+=a.z/4;}
+        const std::array<double,3> a{wf.atoms[0].x-centre[0],wf.atoms[0].y-centre[1],wf.atoms[0].z-centre[2]},b{wf.atoms[1].x-centre[0],wf.atoms[1].y-centre[1],wf.atoms[1].z-centre[2]};
+        const std::array<double,3> normal{a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]};
+        wf.atoms.push_back(atom("N",7,centre[0]+normal[0]/2,centre[1]+normal[1]/2,centre[2]+normal[2]/2));
+        const auto result=cov::derive_orbital_symmetry(wf);
+        if(result.point_group!="C4v"||result.orbitals_labelled!=4){std::cerr<<"C4v finite classifier incomplete\n";return 1;}
+        if(!all_label(wf,0,1,"A1")||!all_label(wf,1,3,"E")||!all_label(wf,3,4,"B1"))return 1;
+    }
     {
         auto wf=d3h_ring();
         const auto r=cov::derive_orbital_symmetry(wf);

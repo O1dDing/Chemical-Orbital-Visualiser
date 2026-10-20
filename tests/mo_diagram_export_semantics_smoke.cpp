@@ -412,6 +412,33 @@ int main() {
         }
     }
 
+    // Canonical display identity must be independent of the row's local
+    // label and the original producer spelling; no relabelling by dimension.
+    options.display_names={"1πg","2πg"};
+    options.display_irreps={"πg","πg"};
+    options.display_point_groups={"Dinfh","Dinfh"};
+    const auto raw_before=data.metadata[0].symmetry;
+    const auto scoped_before=data.metadata[0].symmetry_view.label;
+    if (!cov::write_mo_diagram_json(data,options,json_path,&error) ||
+        !cov::write_mo_diagram_csv(data,options,csv_path,&error) ||
+        !cov::write_mo_diagram_svg(data,options,svg_path,&error)) return 12;
+    const auto named_json=read_all(json_path);
+    const auto named_csv=read_all(csv_path);
+    const auto named_svg=read_all(svg_path);
+    if(named_json.find("\"label\": \"1πg\"")==std::string::npos ||
+       named_json.find("\"current_display_irrep\": \"πg\"")==std::string::npos ||
+       named_json.find("\"current_display_point_group\": \"D∞h\"")==std::string::npos ||
+       named_json.find("\"source_symmetry\": \"T2g\"")==std::string::npos ||
+       named_csv.find("current_display_irrep,current_display_point_group")==std::string::npos ||
+       named_csv.find("πg,D∞h")==std::string::npos ||
+       named_svg.find("1πg")==std::string::npos ||
+       named_svg.find("data-symmetry=\"T2g\"")==std::string::npos ||
+       data.metadata[0].symmetry!=raw_before || data.metadata[0].symmetry_view.label!=scoped_before ||
+       cov::point_group_display("Cinfv")!="C∞v" || cov::point_group_display("D5h")!="D5h") {
+        std::cerr<<"current canonical display and raw/local evidence were conflated\n";
+        return 13;
+    }
+
     std::error_code ec;
     std::filesystem::remove(svg_path, ec);
     std::filesystem::remove(png_path, ec);

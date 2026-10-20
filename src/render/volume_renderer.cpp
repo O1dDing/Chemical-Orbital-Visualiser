@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <set>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -137,6 +139,7 @@ uniform float uIso;
 uniform float uOpacity;
 uniform int uMaterial;
 uniform int uSurfaceMode;
+uniform int uPhasePalette;
 uniform vec3 uCameraPos;
 uniform vec3 uCameraForward;
 uniform vec3 uCameraRight;
@@ -233,8 +236,8 @@ void main() {
             vec3 n = gradient(hit);
             if (dot(n, rd) > 0.0) n = -n;
 
-            vec3 positive = vec3(0.92, 0.20, 0.17);
-            vec3 negative = vec3(0.16, 0.38, 0.95);
+            vec3 positive = uPhasePalette==0 ? vec3(0.92, 0.20, 0.17) : vec3(0.12,0.85,0.65);
+            vec3 negative = uPhasePalette==0 ? vec3(0.16, 0.38, 0.95) : vec3(0.98,0.66,0.15);
             vec3 base = cur >= 0.0 ? positive : negative;
 
             // Camera-relative soft key + weak fill. It follows the view so the
@@ -554,6 +557,7 @@ VolumeRenderer::~VolumeRenderer() {
 
 void VolumeRenderer::invalidate_geometry_cache() noexcept {
     geometry_cache_wavefunction_ = nullptr;
+    geometry_graph_source_ = nullptr;
     geometry_bonds_.clear();
     geometry_bond_indices_.clear();
     geometry_interactions_ = {};
@@ -585,7 +589,8 @@ void VolumeRenderer::render_volume(const int framebuffer_width,
                                    const OrbitCamera& camera,
                                    const float opacity,
                                    const OrbitalMaterial material,
-                                   const OrbitalSurfaceMode surface_mode) {
+                                   const OrbitalSurfaceMode surface_mode,
+                                   const int phase_palette) {
     if (nx_ <= 0 || ny_ <= 0 || nz_ <= 0) return;
 
     const CameraBasis b = camera_basis(camera);
@@ -601,6 +606,7 @@ void VolumeRenderer::render_volume(const int framebuffer_width,
     gl::UseProgram(program_);
 
     gl::Uniform1i(gl::GetUniformLocation(program_, "uVolume"), 0);
+    gl::Uniform1i(gl::GetUniformLocation(program_, "uPhasePalette"), phase_palette);
     gl::Uniform1f(gl::GetUniformLocation(program_, "uIso"), isovalue);
     gl::Uniform1f(gl::GetUniformLocation(program_, "uOpacity"),
                   std::clamp(opacity, 0.02f, 1.0f));
@@ -655,7 +661,12 @@ void VolumeRenderer::render_geometry(const Wavefunction& wavefunction,
                                      const int framebuffer_width,
                                      const int framebuffer_height,
                                      const OrbitCamera& camera,
-                                     const MoleculeRenderSettings& settings) {
+                                     const MoleculeRenderSettings& settings,
+                                     const MoleculeOverlay* overlay,
+                                     const InteractionGraph* routed_graph) {
+    geometry_targets_.clear();
+    geometry_width_=std::max(1,framebuffer_width);
+    geometry_height_=std::max(1,framebuffer_height);
     if (wavefunction.atoms.empty()) return;
 
     const CameraBasis b = camera_basis(camera);
@@ -666,11 +677,12 @@ void VolumeRenderer::render_geometry(const Wavefunction& wavefunction,
     std::vector<Vec3> points;
     points.reserve(wavefunction.atoms.size());
     for (const Atom& atom : wavefunction.atoms) points.push_back(to_texture(atom, box));
-    if (geometry_cache_wavefunction_ != &wavefunction) {
+    if (geometry_cache_wavefunction_ != &wavefunction ||
+        geometry_graph_source_ != routed_graph) {
         auto bonds = analyse_bonds(wavefunction);
-        auto interactions = build_interaction_graph(wavefunction);
+        auto routed_interactions = routed_graph?*routed_graph:build_interaction_graph(wavefunction);
         geometry_bonds_ = std::move(bonds);
-        geometry_interactions_ = std::move(interactions);
+        geometry_interactions_ = std::move(routed_interactions);
         geometry_bond_indices_.clear();
         for (std::size_t index=0;index<geometry_bonds_.size();++index) {
             const auto& bond=geometry_bonds_[index];
@@ -678,6 +690,7 @@ void VolumeRenderer::render_geometry(const Wavefunction& wavefunction,
                 bond.atom_a,bond.atom_b)]=index;
         }
         geometry_cache_wavefunction_ = &wavefunction;
+        geometry_graph_source_ = routed_graph;
     }
     const auto& bonds = geometry_bonds_;
     const auto& interactions = geometry_interactions_;
@@ -709,10 +722,44 @@ void VolumeRenderer::render_geometry(const Wavefunction& wavefunction,
     const Vec3 noncovalent_colour{0.61f, 0.69f, 0.81f};
     const Vec3 ionic_colour{0.77f, 0.55f, 0.98f};
 
+    auto project=[&](Vec3 p) {
+        const auto delta=p-b.position;
+        const float z=dot(delta,b.forward);
+        return Vec3{0.5f+dot(delta,b.right)/(2*std::max(z,kNearPlane)*tan_half_fov*aspect),
+                    0.5f-dot(delta,b.up)/(2*std::max(z,kNearPlane)*tan_half_fov),z};
+    };
+    auto target=[&](GeometryTargetKind kind,std::size_t index,Vec3 a,Vec3 c,float radius,bool segment) {
+        const auto pa=project(a),pc=project(c);
+        if(pa.z<=kNearPlane || pc.z<=kNearPlane)return;
+        geometry_targets_.push_back({kind,index,pa.x,pa.y,pc.x,pc.y,radius,(pa.z+pc.z)/2,segment});
+    };
+    auto center=[&](const std::vector<std::size_t>& ids) {
+        Vec3 result{};std::size_t count=0;
+        for(auto id:ids)if(id<points.size()){result=result+points[id];++count;}
+        return count?result/static_cast<float>(count):Vec3{0.5f,0.5f,0.5f};
+    };
+    std::map<std::pair<std::size_t,std::size_t>,const MoleculeOverlayBond*> enhanced;
+    if(overlay) {
+        for(const auto& bond:overlay->bonds) {
+            if(bond.style==OverlayBondStyle::Coordination && !settings.show_coordination_contacts)continue;
+            if(bond.style==OverlayBondStyle::Multicentre && !settings.show_multicentre_support)continue;
+            enhanced[ordered_atom_pair(bond.atom_a,bond.atom_b)]=&bond;
+        }
+    }
+
     for (const auto& interaction : interactions.edges) {
         if (interaction.atom_a >= wavefunction.atoms.size() ||
             interaction.atom_b >= wavefunction.atoms.size()) {
             continue;
+        }
+        const auto pair=ordered_atom_pair(interaction.atom_a,interaction.atom_b);
+        // A hyperedge is an additional analysis layer, not an all-pairs mask
+        // that erases ordinary connectivity between its members.
+        if(const auto replacement=enhanced.find(pair);replacement!=enhanced.end()) {
+            const auto style=replacement->second->style;
+            if((interaction.kind==InteractionKind::CovalentConnectivity &&
+                (style==OverlayBondStyle::Covalent || style==OverlayBondStyle::Delocalised)) ||
+               (interaction.kind==InteractionKind::CoordinationContact && style==OverlayBondStyle::Coordination))continue;
         }
         const auto visual_style = interaction_visual_style(interaction.kind, settings);
         if (visual_style == InteractionVisualStyle::Hidden) continue;
@@ -783,7 +830,74 @@ void VolumeRenderer::render_geometry(const Wavefunction& wavefunction,
         }
     }
 
-    if (settings.style == MoleculeStyle::MediumBallAndStick) {
+    if(overlay) {
+        for(const auto& bond:overlay->bonds) {
+            if(bond.style==OverlayBondStyle::Coordination && !settings.show_coordination_contacts)continue;
+            if(bond.style==OverlayBondStyle::Multicentre && !settings.show_multicentre_support)continue;
+            if(bond.atom_a>=points.size() || bond.atom_b>=points.size())continue;
+            if(!settings.show_hydrogens && (wavefunction.atoms[bond.atom_a].atomic_number==1 ||
+                                           wavefunction.atoms[bond.atom_b].atomic_number==1))continue;
+            const auto a=points[bond.atom_a],c=points[bond.atom_b];
+            const auto existing=geometry_bond_indices_.find(ordered_atom_pair(bond.atom_a,bond.atom_b));
+            const bool delocalised=bond.style==OverlayBondStyle::Delocalised ||
+                ((bond.style==OverlayBondStyle::Covalent || bond.style==OverlayBondStyle::Unresolved) &&
+                 existing!=geometry_bond_indices_.end() &&
+                 geometry_bonds_[existing->second].delocalised);
+            const Vec3 colour=bond.selected?Vec3{1,0.85f,0.2f}:bond.style==OverlayBondStyle::Coordination?
+                coordination_colour:delocalised?delocalised_colour:bond_colour;
+            const float r=bond_radius*(bond.selected?1.25f:1.0f);
+            Vec3 transverse=cross(c-a,b.forward);
+            if(length(transverse)<1e-6f)transverse=b.right;
+            transverse=normalise(transverse);
+            if(bond.style==OverlayBondStyle::Multicentre ||
+               (bond.style==OverlayBondStyle::Unresolved && !delocalised)) {
+                draw_dashed_cylinder(a,c,r,colour,opacity,b,8,
+                    bond.style==OverlayBondStyle::Unresolved?0.35f:0.6f);
+            } else {
+                // Preserve the validated delocalised-network representation.
+                // A particular NBO Lewis structure remains inspectable as evidence.
+                const int count=delocalised?1:std::clamp(bond.multiplicity,1,6);
+                for(int line=0;line<count;++line){
+                    const auto offset=transverse*((line-0.5f*(count-1))*r*3.5f);
+                    draw_cylinder(a+offset,c+offset,r,colour,opacity,b);
+                }
+                if(delocalised)
+                    draw_dashed_cylinder(a+transverse*(r*3.5f),c+transverse*(r*3.5f),r*0.6f,
+                                         delocalised_colour,opacity,b,10,0.45f);
+            }
+            target(GeometryTargetKind::Bond,bond.evidence_index,a,c,10.0f,true);
+        }
+        for(const auto& group:overlay->multicentre) {
+            if(!settings.show_multicentre_support)continue;
+            if(group.atoms.size()<3)continue;
+            const auto hub=center(group.atoms);
+            const auto colour=group.selected?Vec3{1,0.85f,0.2f}:multicentre_colour;
+            for(auto atom:group.atoms)if(atom<points.size() &&
+                (settings.show_hydrogens || wavefunction.atoms[atom].atomic_number!=1))
+                draw_dashed_cylinder(points[atom],hub,bond_radius*0.7f,colour,opacity,b,9,0.55f);
+            draw_sphere(hub,bond_radius*1.8f,colour,opacity,b);
+            target(GeometryTargetKind::Multicentre,group.evidence_index,hub,hub,14.0f,false);
+        }
+        for(const auto& relation:overlay->relations) {
+            if(relation.donor_atoms.empty() || relation.acceptor_atoms.empty())continue;
+            auto a=center(relation.donor_atoms),c=center(relation.acceptor_atoms);
+            // A visible offset separates an interaction arrow from the skeleton.
+            const auto offset=b.up*(bond_radius*7.0f);
+            a=a+offset;c=c+offset;
+            if(length(c-a)<bond_radius*3)c=c+b.right*(bond_radius*14);
+            const auto direction=normalise(c-a);
+            auto side=normalise(cross(direction,b.forward));
+            if(length(side)<0.1f)side=b.right;
+            const float head=std::min(length(c-a)*0.22f,bond_radius*9);
+            const auto colour=relation.selected?Vec3{1,0.86f,0.18f}:Vec3{0.2f,0.92f,0.65f};
+            draw_dashed_cylinder(a,c,bond_radius*0.55f,colour,opacity,b,12,0.75f);
+            draw_cylinder(c,c-direction*head+side*head*0.4f,bond_radius*0.55f,colour,opacity,b);
+            draw_cylinder(c,c-direction*head-side*head*0.4f,bond_radius*0.55f,colour,opacity,b);
+            target(GeometryTargetKind::Relation,relation.evidence_index,a,c,9.0f,true);
+        }
+    }
+
+    {
         for (std::size_t i = 0; i < wavefunction.atoms.size(); ++i) {
             const Atom& atom = wavefunction.atoms[i];
             if (!settings.show_hydrogens && atom.atomic_number == 1) continue;
@@ -792,7 +906,22 @@ void VolumeRenderer::render_geometry(const Wavefunction& wavefunction,
             const float sphere_radius = std::clamp(
                 (0.0275f + 0.0200f * covalent) * settings.atom_scale,
                 0.030f, 0.108f);
-            draw_sphere(points[i], sphere_radius, atom_colour(atom.atomic_number), opacity, b);
+            Vec3 colour=atom_colour(atom.atomic_number);
+            if(overlay && overlay->colour_mode!=AtomScalarMode::Element &&
+               i<overlay->atom_values.size() && overlay->atom_values[i]) {
+                const auto v=std::clamp(*overlay->atom_values[i]/std::max(1e-12,overlay->scalar_range),-1.0,1.0);
+                const Vec3 neutral{0.88f,0.88f,0.80f};
+                const Vec3 end=v<0?Vec3{0.52f,0.23f,0.78f}:Vec3{0.96f,0.70f,0.13f};
+                colour=neutral*(1-static_cast<float>(std::abs(v)))+end*static_cast<float>(std::abs(v));
+            }
+            const bool selected=overlay && std::find(overlay->selected_atoms.begin(),overlay->selected_atoms.end(),i)!=overlay->selected_atoms.end();
+            if(selected)draw_sphere(points[i],sphere_radius*1.17f,{1,0.83f,0.15f},opacity*0.7f,b);
+            if(settings.style==MoleculeStyle::MediumBallAndStick || selected ||
+               (overlay && overlay->colour_mode!=AtomScalarMode::Element))
+                draw_sphere(points[i],sphere_radius,colour,opacity,b);
+            const auto projected=project(points[i]);
+            const float hit_radius=std::max(7.0f,sphere_radius*framebuffer_height/(2*std::max(projected.z,kNearPlane)*tan_half_fov));
+            target(GeometryTargetKind::Atom,i,points[i],points[i],hit_radius,false);
         }
     }
 
@@ -804,6 +933,23 @@ void VolumeRenderer::render_geometry(const Wavefunction& wavefunction,
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+std::optional<GeometryTarget> VolumeRenderer::pick_geometry(float x,float y) const {
+    std::optional<GeometryTarget> result;
+    float best=std::numeric_limits<float>::infinity();
+    for(const auto& target:geometry_targets_) {
+        const float ax=target.x*geometry_width_,ay=target.y*geometry_height_;
+        const float dx=(target.end_x-target.x)*geometry_width_,dy=(target.end_y-target.y)*geometry_height_;
+        const float px=x*geometry_width_,py=y*geometry_height_;
+        const float t=target.segment?std::clamp(((px-ax)*dx+(py-ay)*dy)/std::max(dx*dx+dy*dy,1e-12f),0.0f,1.0f):0.0f;
+        const float distance=std::hypot(px-ax-t*dx,py-ay-t*dy);
+        if(distance>target.radius)continue;
+        const float priority=target.kind==GeometryTargetKind::Atom?0.0f:target.kind==GeometryTargetKind::Relation?2.0f:4.0f;
+        const float score=priority+distance/std::max(target.radius,1.0f)+target.depth*0.001f;
+        if(score<best){best=score;result=target;}
+    }
+    return result;
 }
 
 } // namespace cov

@@ -482,6 +482,17 @@ bool validate_pi_topology_and_two_sided_composition() {
     cov::MODiagramOptions options;
     options.selected_index=0u;
     options.max_levels=0u;
+    const auto unverified_candidate=[](const cov::MODiagramData& data) {
+        return data.pi_interactions.empty() &&
+            std::any_of(data.pi_partner_candidates.begin(),data.pi_partner_candidates.end(),
+                [](const auto& candidate) {
+                    return candidate.input_valid && !candidate.accepted && !candidate.weak &&
+                        candidate.direction==cov::PiPairDirection::Unresolved &&
+                        candidate.channel.channel_id.empty() &&
+                        !candidate.channel.frozen_operator.available &&
+                        candidate.detail=="composition-only-candidate-needs-verified-local-channel-and-calibrated-sensitivity";
+                });
+    };
     const auto one_sided=cov::build_mo_diagram_data(
         synthetic_oh_pi_pair(6,7,1.50,0.70,0.10,0.10,0.12),options);
     if (!one_sided.pi_interactions.empty()) {
@@ -490,24 +501,20 @@ bool validate_pi_topology_and_two_sided_composition() {
     }
     const auto alkyl=cov::build_mo_diagram_data(
         synthetic_oh_pi_pair(6,6,0.80,0.10,0.70,0.70,0.10),options);
-    const bool alkyl_donor=alkyl.pi_interactions.size()==1u &&
-        alkyl.pi_interactions.front().kind==cov::PiInteractionKind::Donor;
-    if (!alkyl_donor) {
-        std::cerr<<"single-bonded carbon donor was hard-coded as acceptor\n";
+    if (!unverified_candidate(alkyl)) {
+        std::cerr<<"carbon composition certified a direction without a verified local operator\n";
         return false;
     }
     const auto terminal_n=cov::build_mo_diagram_data(
         synthetic_oh_pi_pair(7,0,0.0,0.10,0.70,0.70,0.10),options);
-    const bool terminal_n_donor=terminal_n.pi_interactions.size()==1u &&
-        terminal_n.pi_interactions.front().kind==cov::PiInteractionKind::Donor;
-    if (!terminal_n_donor) {
-        std::cerr<<"low-coordinate terminal nitrogen was forced sigma-only\n";
+    if (!unverified_candidate(terminal_n)) {
+        std::cerr<<"terminal nitrogen candidate lacked an explicit unverified-operator decision\n";
         return false;
     }
     // Controlled P-centred call-path evidence. Three external single bonds
-    // trigger the catalogue's sigma-only prior, while the supplied MO pair
-    // independently carries either donor or acceptor mixing. This fixture
-    // makes no electronic-structure claim about a physical phosphine.
+    // trigger the catalogue's sigma-only prior. Neither orientation of the
+    // supplied composition contrast establishes a physical direction without
+    // an independently verified local operator.
     for (const bool donor:{true,false}) {
         auto phosphorus=synthetic_oh_pi_pair(15,0,0.0,
             donor?0.10:0.70,donor?0.70:0.10,
@@ -527,12 +534,10 @@ bool validate_pi_topology_and_two_sided_composition() {
             }
         }
         const auto data=cov::build_mo_diagram_data(phosphorus,options);
-        const auto wanted=donor?cov::PiInteractionKind::Donor:cov::PiInteractionKind::Acceptor;
-        if (data.pi_interactions.size()!=1u || data.pi_interactions.front().kind!=wanted ||
-            !data.pi_interactions.front().orbital_evidence ||
-            data.pi_interactions.front().orbital_evidence->prior!=cov::LigandPiPrior::SigmaOnly ||
-            !data.pi_interactions.front().orbital_evidence->accepted) {
-            std::cerr<<"P-centred catalogue prior overrode the supplied orbital evidence\n";
+        if (!unverified_candidate(data) ||
+            std::none_of(data.pi_partner_candidates.begin(),data.pi_partner_candidates.end(),
+                [](const auto& candidate){return candidate.prior==cov::LigandPiPrior::SigmaOnly;})) {
+            std::cerr<<"P-centred composition or catalogue prior invented a directed counterpart\n";
             return false;
         }
         for (auto& orbital:phosphorus.orbitals) {
@@ -819,6 +824,15 @@ bool inspect_real_fchk(const std::filesystem::path& path) {
     }
     options.max_levels=0u;
     const auto data=cov::build_mo_diagram_data(wf,options);
+    // This path reads FCHK only and deliberately supplies no independently
+    // validated local Fock channels. Directed-pair acceptance belongs to the
+    // saved-package routed tests; geometry, sigma, spin and weak checks below remain.
+    if(std::any_of(data.pi_interactions.begin(),data.pi_interactions.end(),[](const auto& pair){
+        return pair.kind==cov::PiInteractionKind::Donor||pair.kind==cov::PiInteractionKind::Acceptor;
+    })) {
+        std::cerr<<path.filename().string()<<": FCHK-only data asserted a strong directed pi pair\n";
+        return false;
+    }
     const auto browser_metadata=cov::build_orbital_metadata(
         wf,options.selected_index,options.degeneracy,options.filter);
     if (wf.delocalised_pi_assignments.empty()) {
@@ -1348,40 +1362,22 @@ bool inspect_real_fchk(const std::filesystem::path& path) {
                data.spin_counterpart_unmatched_visible==0u;
     };
     if (filename.find("TiF6")!=std::string::npos) {
-        const auto pair=expected_pair(cov::PiInteractionKind::Donor,"T2g");
-        if (!expected_shell("Oh",6u,22,9) ||
-            data.pi_interactions.size()!=1u || pair==data.pi_interactions.end() ||
-            !pair->lower_visible || !pair->upper_visible ||
-            pair->splitting_hartree<0.35 || pair->splitting_hartree>0.40 ||
-            !all_members_have(pair->lower_orbitals,"T2g") ||
-            !all_members_have(pair->upper_orbitals,"T2g")) {
-            std::cerr<<filename<<": expected resolved T2g pi-donor pair\n";
+        if (!expected_shell("Oh",6u,22,9)) {
+            std::cerr<<filename<<": FCHK-only donor geometry regression\n";
             return false;
         }
     } else if (filename.find("ZnCl4")!=std::string::npos) {
-        const auto pair=expected_pair(
-            cov::PiInteractionKind::WeakNearNonbonding,"E/T2");
+        // FCHK composition and a close E/T2 gap do not provide the frozen
+        // local operator needed to certify a negligible pi relation.
         if (!expected_shell("Td",4u,30,17) ||
-            data.pi_interactions.size()!=1u || pair==data.pi_interactions.end() ||
-            pair->lower_visible==pair->upper_visible ||
-            pair->splitting_hartree>options.weak_pi_split_hartree ||
-            pair->retained_level>=data.levels.size() ||
-            !data.levels[pair->retained_level].approximate_nonbonding ||
-            data.levels[pair->retained_level].metadata.symmetry!="E" ||
-            !all_members_have(pair->lower_orbitals,"T2") ||
-            !all_members_have(pair->upper_orbitals,"E")) {
+            !data.pi_interactions.empty() ||
+            std::any_of(data.pi_partner_candidates.begin(),data.pi_partner_candidates.end(),
+                [](const auto& candidate){return candidate.accepted||candidate.weak;})) {
             std::cerr<<filename
-                     <<": expected reduced approximately-nonbonding E/T2 split\n";
+                     <<": FCHK-only close E/T2 gap invented a calibrated weak pi relation\n";
             return false;
         }
     } else if (filename.find("CrCO6")!=std::string::npos) {
-        const auto pair=expected_pair(cov::PiInteractionKind::Acceptor,"T2g");
-        const bool compact_pair=std::any_of(
-            compact.pi_interactions.begin(),compact.pi_interactions.end(),
-            [](const auto& item) {
-                return item.kind==cov::PiInteractionKind::Acceptor &&
-                       item.symmetry=="T2g";
-            });
         const bool sigma_bonding=std::any_of(
             compact.levels.begin(),compact.levels.end(),[](const auto& level) {
                 return level.sigma_fraction>=0.55 &&
@@ -1395,14 +1391,8 @@ bool inspect_real_fchk(const std::filesystem::path& path) {
                        level.metal_ligand_overlap<0.0;
             });
         if (!expected_shell("Oh",6u,24,6) ||
-            data.pi_interactions.size()!=1u || pair==data.pi_interactions.end() ||
-            !pair->lower_visible || !pair->upper_visible ||
-            pair->splitting_hartree<0.24 || pair->splitting_hartree>0.28 ||
-            compact.levels.size()>10u || !compact_pair ||
-            !sigma_bonding || !sigma_antibonding ||
-            !all_members_have(pair->lower_orbitals,"T2g") ||
-            !all_members_have(pair->upper_orbitals,"T2g")) {
-            std::cerr<<filename<<": expected resolved T2g pi-acceptor pair\n";
+            compact.levels.size()>10u || !sigma_bonding || !sigma_antibonding) {
+            std::cerr<<filename<<": FCHK-only carbonyl geometry/sigma regression\n";
             return false;
         }
     } else if (filename.find("CrNH3_6")!=std::string::npos) {
@@ -1510,27 +1500,15 @@ bool inspect_real_fchk(const std::filesystem::path& path) {
             return false;
         }
     } else if (filename.find("23_NiCO4")!=std::string::npos) {
-        const auto pair=expected_pair(cov::PiInteractionKind::Acceptor,"E");
         if (!expected_shell("Td",4u,28,6) ||
-            data.pi_interactions.size()!=1u || pair==data.pi_interactions.end() ||
-            !pair->lower_visible || !pair->upper_visible ||
-            pair->splitting_hartree<=options.weak_pi_split_hartree ||
-            !all_members_have(pair->lower_orbitals,"E") ||
-            !all_members_have(pair->upper_orbitals,"E") ||
             compact.levels.size()>8u) {
             std::cerr<<filename
                      <<": strong-field Td pi-acceptor regression\n";
             return false;
         }
     } else if (filename.find("24_CrCN6")!=std::string::npos) {
-        const auto pair=expected_pair(cov::PiInteractionKind::Acceptor,"T2g");
         if (!expected_shell("Oh",6u,24,6) ||
             !fully_collapsed_open_shell() ||
-            data.pi_interactions.size()!=1u || pair==data.pi_interactions.end() ||
-            !pair->lower_visible || !pair->upper_visible ||
-            pair->splitting_hartree<=0.10 ||
-            !all_members_have(pair->lower_orbitals,"T2g") ||
-            !all_members_have(pair->upper_orbitals,"T2g") ||
             compact_group("Eg",2u)==compact.levels.end() ||
             compact_group("T2g",3u)==compact.levels.end() ||
             compact.levels.size()>11u) {
@@ -1560,40 +1538,25 @@ bool inspect_real_fchk(const std::filesystem::path& path) {
             return false;
         }
     } else if (filename.find("27_FeCO5")!=std::string::npos) {
-        const auto pair=expected_pair(cov::PiInteractionKind::Acceptor,"E''");
         if (!expected_shell("D3h",5u,26,6) ||
             data.ligand_field_geometry_id!="TBPY-5" ||
-            pair==data.pi_interactions.end() ||
-            !pair->lower_visible || !pair->upper_visible ||
-            !all_members_have(pair->lower_orbitals,"E''") ||
-            !all_members_have(pair->upper_orbitals,"E''") ||
             compact.levels.size()>10u) {
             std::cerr<<filename
                      <<": trigonal-bipyramidal CN5 pi-acceptor regression\n";
             return false;
         }
     } else if (filename.find("28_ZrF7")!=std::string::npos) {
-        const auto pair=expected_pair(cov::PiInteractionKind::Donor,"E1''");
         if (!expected_shell("D5h",7u,40,9) ||
             data.ligand_field_geometry_id!="PBPY-7" ||
-            pair==data.pi_interactions.end() ||
-            !pair->lower_visible || !pair->upper_visible ||
-            !all_members_have(pair->lower_orbitals,"E1''") ||
-            !all_members_have(pair->upper_orbitals,"E1''") ||
             compact.levels.size()>11u) {
             std::cerr<<filename
                      <<": pentagonal-bipyramidal CN7 pi-donor regression\n";
             return false;
         }
     } else if (filename.find("29_MoCN8")!=std::string::npos) {
-        const auto pair=expected_pair(cov::PiInteractionKind::Acceptor,"A1");
         if (!expected_shell("D4d",8u,42,6) ||
             data.ligand_field_geometry_id!="SAPR-8" ||
             !fully_collapsed_open_shell() ||
-            pair==data.pi_interactions.end() ||
-            !pair->lower_visible || !pair->upper_visible ||
-            !all_members_have(pair->lower_orbitals,"A1") ||
-            !all_members_have(pair->upper_orbitals,"A1") ||
             compact.levels.size()>11u) {
             std::cerr<<filename
                      <<": square-antiprismatic CN8 open-shell regression\n";
@@ -1747,6 +1710,7 @@ int main(int argc,char** argv) {
         chemistry.channel.dominant=cov::OrbitalAngularFamily::Pi;
         chemistry.channel.status=cov::ChemistryStatus::Determined;
         chemistry.multicentre_label="3c2e";
+        chemistry.multicentre_assignment_available=true;
         chemistry.multicentre_participating_atoms=3u;
         chemistry.multicentre_participating_electrons=2.0;
         chemistry.multicentre_participating_atom_indices={0u,1u,3u};
@@ -1757,6 +1721,7 @@ int main(int argc,char** argv) {
         chemistry.delocalised_participating_electrons=4.0;
         chemistry.delocalised_participating_atom_indices={0u,1u,2u,3u};
         chemistry.delocalised_pi_confidence=0.93;
+        chemistry.delocalised_pi_weight=0.8;
         const auto annotation=cov::annotate_orbital(overlap);
         if (!annotation.multicentre.available ||
             annotation.multicentre.centres!=3u ||
@@ -1840,10 +1805,16 @@ int main(int argc,char** argv) {
         std::cerr << "electron population failed\n";
         return 4;
     }
-    if (data.levels[0].annotation.family != "sigma" ||
-        data.levels[0].annotation.bonding_class != cov::BondingClass::Bonding ||
+    // Preserve producer text as parsed metadata, but this fixture supplies no
+    // coefficients/operator that could certify the displayed group's role.
+    const auto parsed_occupied=cov::annotate_orbital(occupied);
+    if (parsed_occupied.bonding_class!=cov::BondingClass::Bonding ||
+        parsed_occupied.bonding_source!=cov::AnnotationSource::ParsedLabel ||
+        data.levels[0].annotation.family != "sigma" ||
+        data.levels[0].annotation.bonding_class != cov::BondingClass::Unclassified ||
+        data.levels[0].annotation.bonding_source != cov::AnnotationSource::Unavailable ||
         data.levels[1].annotation.family != "pi") {
-        std::cerr << "explicit family/bonding annotation failed\n";
+        std::cerr << "parsed family metadata or missing-operator group-role separation failed\n";
         return 5;
     }
     if (!data.levels[3].annotation.multicentre.available ||
@@ -2158,7 +2129,8 @@ int main(int argc,char** argv) {
     svg_buffer << svg_file.rdbuf();
     const std::string svg = svg_buffer.str();
     if (svg.find("Valence MO diagram") == std::string::npos ||
-        svg.find("MO numbering is intentionally omitted") == std::string::npos ||
+        svg.find("MO numbering is intentionally omitted") != std::string::npos ||
+        svg.find("data-orbital-index=") == std::string::npos ||
         svg.find(">3-a<") != std::string::npos) {
         std::cerr << "human export policy failed\n";
         return 9;

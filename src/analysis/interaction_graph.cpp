@@ -616,7 +616,9 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
     std::map<AtomPair, const BondOrderRecord*> records;
     for (const auto& record : wf.bond_orders) {
         if (record.atom_a >= wf.atoms.size() || record.atom_b >= wf.atoms.size() ||
-            record.atom_a == record.atom_b) {
+            record.atom_a == record.atom_b ||
+            record.provenance==DataProvenance::Unavailable ||
+            !std::isfinite(record.mayer_order)) {
             continue;
         }
         const AtomPair pair = ordered_pair(record.atom_a, record.atom_b);
@@ -628,6 +630,17 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
     }
 
     EdgeIndicesByPair edge_by_pair;
+    std::map<AtomPair,const InteractionBondEvidence*> nbo_pairs;
+    for(const auto& row:resolved_evidence.bonds)
+        if(row.atom_a<wf.atoms.size() && row.atom_b<wf.atoms.size() && row.atom_a!=row.atom_b &&
+           std::isfinite(row.wiberg_index) && row.wiberg_index>=0)
+            nbo_pairs[ordered_pair(static_cast<std::uint32_t>(row.atom_a),
+                                   static_cast<std::uint32_t>(row.atom_b))]=&row;
+    const auto support_value=[&](const AtomPair& pair) {
+        if(const auto nbo=nbo_pairs.find(pair);nbo!=nbo_pairs.end())return nbo->second->wiberg_index;
+        if(const auto old=records.find(pair);old!=records.end())return old->second->mayer_order;
+        return 0.0;
+    };
     std::vector<InteractionEdge> coordination_candidates;
     std::vector<InteractionEdge> deferred_covalent_candidates;
     std::vector<std::vector<std::uint32_t>> covalent_adjacency(wf.atoms.size());
@@ -654,7 +667,7 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
     // envelope, while assigning richer semantics here. Determine X-H ligand
     // membership from the complete structural skeleton before classifying any
     // M...H edge, so the result cannot depend on bond-record iteration order.
-    const auto structural_bonds=analyse_bonds(wf);
+    const auto structural_bonds=analyse_bonds(wf,resolved_evidence.bonds);
     std::set<std::uint32_t> ligand_bound_hydrogens;
     for (const auto& bond:structural_bonds) {
         const auto a=static_cast<std::uint32_t>(bond.atom_a);
@@ -690,12 +703,13 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
             (is_electropositive_main_group_metal(wf.atoms[b].atomic_number) &&
              is_coordination_donor_element(wf.atoms[a].atomic_number));
 
-        DataProvenance provenance = DataProvenance::Unavailable;
-        const double mayer = mayer_for_pair(records, a, b, provenance);
+        DataProvenance provenance=DataProvenance::Unavailable;
+        (void)mayer_for_pair(records,a,b,provenance);
+        const double support=support_value(ordered_pair(a,b));
         const bool charge_separated_weak_pair =
             electropositive_main_group_pair &&
             opposite_atomic_charge_pair(resolved_evidence, wf.atoms.size(), a, b, options) &&
-            mayer < options.ionic_strong_bond_override_mayer;
+            support < options.ionic_strong_bond_override_mayer;
         if (charge_separated_weak_pair) continue;
 
         InteractionEdge edge = make_edge(
@@ -708,7 +722,7 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
             coordination_candidates.push_back(std::move(edge));
         } else if (resolved_evidence.has_atomic_charges(wf.atoms.size()) &&
                    provenance != DataProvenance::Unavailable &&
-                   mayer < options.ionic_strong_bond_override_mayer) {
+                   support < options.ionic_strong_bond_override_mayer) {
             // Borderline electronic links are evaluated only after a seed
             // graph of high-confidence molecular fragments exists. This
             // prevents a single H...F salt contact from erasing the very
@@ -723,10 +737,14 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
 
     // Supplement electronically supported low-order coordination edges that
     // deliberately fall below analyse_bonds()' ordinary renderer threshold.
-    for (const auto& [pair, record] : records) {
+    std::set<AtomPair> electronic_pairs;
+    for(const auto& [pair,_]:records)electronic_pairs.insert(pair);
+    for(const auto& [pair,_]:nbo_pairs)electronic_pairs.insert(pair);
+    for (const auto& pair : electronic_pairs) {
+        const double support=support_value(pair);
         if (has_pair(edge_by_pair, pair.first, pair.second) ||
             suppressed_multicentre_pairs.count(pair) != 0u ||
-            record->mayer_order < options.coordination_mayer_floor) {
+            support < options.coordination_mayer_floor) {
             continue;
         }
         const bool a_centre = is_coordination_centre_element(
@@ -762,7 +780,7 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
                 wf,records,centre,donor,
                 InteractionKind::CovalentConnectivity,
                 InteractionStrength::StrongConnectivity,
-                std::clamp(0.55+0.8*record->mayer_order,0.55,0.82));
+                std::clamp(0.55+0.8*support,0.55,0.82));
             add_or_replace_strong_edge(graph,edge_by_pair,std::move(edge));
             covalent_adjacency[centre].push_back(donor);
             covalent_adjacency[donor].push_back(centre);
@@ -772,13 +790,13 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
         if (is_electropositive_main_group_metal(
                 wf.atoms[centre].atomic_number) &&
             opposite_atomic_charge_pair(resolved_evidence, wf.atoms.size(), centre, donor, options) &&
-            record->mayer_order < options.ionic_strong_bond_override_mayer) {
+            support < options.ionic_strong_bond_override_mayer) {
             continue;
         }
         coordination_candidates.push_back(make_edge(
             wf, records, centre, donor, InteractionKind::CoordinationContact,
             InteractionStrength::StrongConnectivity,
-            std::clamp(0.55 + 0.8 * record->mayer_order, 0.55, 0.82)));
+            std::clamp(0.55 + 0.8 * support, 0.55, 0.82)));
     }
 
     // A more distant atom hidden behind its ordinary covalent neighbour is not
@@ -855,16 +873,16 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
             for (const auto& strong : graph.edges) {
                 if (strong.strength != InteractionStrength::StrongConnectivity) continue;
                 if (strong.atom_a == edge.atom_a || strong.atom_b == edge.atom_a) {
-                    strongest_a = std::max(strongest_a, std::abs(strong.mayer_order));
+                    strongest_a = std::max(strongest_a, std::abs(support_value(ordered_pair(strong.atom_a,strong.atom_b))));
                 }
                 if (strong.atom_a == edge.atom_b || strong.atom_b == edge.atom_b) {
-                    strongest_b = std::max(strongest_b, std::abs(strong.mayer_order));
+                    strongest_b = std::max(strongest_b, std::abs(support_value(ordered_pair(strong.atom_a,strong.atom_b))));
                 }
             }
             const bool relatively_weak_at_both_ends = strongest_a > 0.0 &&
                 strongest_b > 0.0 &&
-                std::abs(edge.mayer_order) < 0.45 * strongest_a &&
-                std::abs(edge.mayer_order) < 0.45 * strongest_b;
+                std::abs(support_value(ordered_pair(edge.atom_a,edge.atom_b))) < 0.45 * strongest_a &&
+                std::abs(support_value(ordered_pair(edge.atom_a,edge.atom_b))) < 0.45 * strongest_b;
             ionic_bridge = opposite_fragments &&
                 (edge.covalent_radius_ratio > 1.30 || relatively_weak_at_both_ends);
         }
@@ -968,6 +986,18 @@ InteractionGraph build_interaction_graph(const Wavefunction& wf,
             .push_back(edge_index);
     }
 
+    for(auto& edge:graph.edges) {
+        const auto pair=ordered_pair(edge.atom_a,edge.atom_b);
+        if(const auto nbo=nbo_pairs.find(pair);nbo!=nbo_pairs.end()) {
+            edge.wiberg_index=nbo->second->wiberg_index;
+            edge.wiberg_source_path=nbo->second->source_path;
+            edge.connectivity_method="Wiberg (NAO) and structural-neighbour geometry";
+            edge.connectivity_source_path=nbo->second->source_path;
+        } else {
+            edge.connectivity_method=edge.electronic_provenance!=DataProvenance::Unavailable?
+                "Mayer and structural-neighbour geometry":"covalent-radius geometry";
+        }
+    }
     // Re-derive once weak edges exist so interfragment edge indices are stable
     // and fragment charges remain attached to the final graph.
     graph.fragment_analysis = derive_fragments(

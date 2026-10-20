@@ -132,6 +132,12 @@ DiagramSelectionPlan build_valence_selection_plan(
     }
 
     std::sort(chosen.begin(), chosen.end());
+    if(options.aomo_scope>=2) {
+        chosen.clear();
+        for(std::size_t i=0;i<metadata.size();++i)
+            if(options.aomo_scope==3 || options.show_core_background ||
+               metadata[i].region!=OrbitalRegion::Core)chosen.push_back(i);
+    }
     chosen.erase(std::unique(chosen.begin(), chosen.end()), chosen.end());
     const auto labels = build_orbital_labels(
         wavefunction.orbitals,

@@ -131,6 +131,40 @@ struct FchkRecords {
     std::unordered_map<std::string, std::vector<double>> real_arrays;
 };
 
+void reject_unsupported_wavefunction_record(const Header& header,
+                                            const std::size_t line_number) {
+    std::string label = header.label;
+    std::transform(label.begin(), label.end(), label.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    // Unknown auxiliary fields remain legal. Only explicit wavefunction data
+    // that cannot be represented by our real scalar orbitals is rejected;
+    // e.g. an imaginary-frequency diagnostic is not a complex wavefunction.
+    const bool orbital_data = label.find("mo coefficient") != std::string::npos ||
+                              label.find("orbital coefficient") != std::string::npos ||
+                              label.find("spinor coefficient") != std::string::npos ||
+                              label.find("scf density") != std::string::npos ||
+                              label.find("density matrix") != std::string::npos;
+    const bool unsupported_representation = label.find("imaginary") != std::string::npos ||
+                                            label.find("complex") != std::string::npos ||
+                                            label.find("spinor") != std::string::npos;
+    if (orbital_data && unsupported_representation) {
+        throw std::runtime_error("Unsupported FCHK complex/spinor wavefunction data" +
+                                 field_context(header.label, line_number));
+    }
+    // FCHK canonical occupations currently come from integer spin counts.
+    // Do not silently discard an explicit contrary occupation specification.
+    for (const auto* prefix : {"", "alpha ", "beta "}) {
+        for (const auto* name : {"orbital occupations", "orbital occupancies",
+                                 "orbital occupation numbers", "mo occupations",
+                                 "mo occupancies", "mo occupation numbers"}) {
+            if (label == std::string(prefix) + name) {
+                throw std::runtime_error("Unsupported explicit FCHK orbital occupations" +
+                                         field_context(header.label, line_number));
+            }
+        }
+    }
+}
+
 FchkRecords read_records(std::ifstream& input) {
     FchkRecords records;
     std::string line;
@@ -139,6 +173,7 @@ FchkRecords read_records(std::ifstream& input) {
         ++line_number;
         Header header;
         if (!parse_header(line, header)) continue;
+        reject_unsupported_wavefunction_record(header, line_number);
 
         if (!header.array) {
             if (header.type == 'I') {

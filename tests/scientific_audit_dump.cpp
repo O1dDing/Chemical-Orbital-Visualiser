@@ -222,7 +222,8 @@ int main(int argc, char** argv) {
             numeric_array(row.annotation.delocalised_pi.orbital_indices);
             std::cout << '}';
         }
-        std::cout << "],\"pi_interactions\":" << cov::orbital_energy_gap_array_json(diagram.pi_interactions)
+        std::cout << "],\"pi_partner_candidates\":" << cov::pi_partner_candidates_json(diagram.pi_partner_candidates)
+                  << ",\"pi_interactions\":" << cov::orbital_energy_gap_array_json(diagram.pi_interactions)
                   << ",\"crystal_field_gaps\":" << cov::orbital_energy_gap_array_json(diagram.crystal_field_gaps) << "}\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

@@ -1,6 +1,7 @@
 #include "cov/orbital_ui_text.hpp"
 
 #include <array>
+#include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
@@ -74,6 +75,16 @@ int main() {
         }
         require_contains(cov::ui::orbital_tr(OrbitalText::LevelGroupContainsMOs, language),
                          "%zu", "level group member count format");
+        const std::string_view representative=cov::ui::orbital_tr(OrbitalText::GroupRepresentativeData,language);
+        require_contains(representative,"%s","level group representative name format");
+        require(representative.find("%zu")==std::string_view::npos,
+                "representative name must not use an integer format");
+        std::array<char,512> representative_text{};
+        const auto length=std::snprintf(representative_text.data(),representative_text.size(),
+            representative.data(),"2a1 [beta]");
+        require(length>0 && static_cast<std::size_t>(length)<representative_text.size(),
+                "representative name formatting failed");
+        require_contains(representative_text.data(),"2a1 [beta]","representative name and spin");
     }
 
     // A group can have a measured zero overlap from opposite signed member
@@ -169,7 +180,7 @@ int main() {
             "orbital bonding role is not localised");
     require(std::string_view(cov::ui::localised_pi_interaction_kind(
                 PiInteractionKind::Acceptor,
-                Language::Japanese)).find("アクセプター") != std::string_view::npos,
+                Language::Japanese)).find("逆供与") != std::string_view::npos,
             "pi interaction is not localised");
 
     require(cov::ui::localised_geometry_name(
@@ -190,7 +201,7 @@ int main() {
     require_contains(cov::ui::localised_chemistry_note(
                          "No stable atom-pair interaction frame; chemistry remains UND",
                          Language::French),
-                     "UND", "French chemistry note");
+                     "indéterminée", "French chemistry note");
     require(cov::ui::localised_chemistry_note(
                 "future backend note", Language::ChineseSimplified) ==
                 "future backend note",
@@ -228,7 +239,7 @@ int main() {
                          Language::ChineseSimplified),
                      "斯芬诺冠形", "Chinese glyph seed");
     require_contains(cov::ui::orbital_ui_glyph_seed(Language::Japanese),
-                     "アクセプター", "Japanese glyph seed");
+                     "逆供与", "Japanese glyph seed");
     require_contains(cov::ui::orbital_ui_glyph_seed(Language::French),
                      "tétradécaédrique", "French glyph seed");
 

@@ -52,4 +52,4 @@ Une faible contribution peut être masquée par le seuil d’isosurface actuel. 
 
 ## Exporter
 
-**Exporter le diagramme complet** enregistre les fichiers `.aomo.svg`, `.aomo.png`, `.aomo.json` et `.aomo.csv`. SVG/PNG sont des figures statiques ; JSON/CSV conservent les sélections, les groupes et les valeurs. L’exploration interactive en 3D reste dans COV.
+**Exporter les images** enregistre les figures PNG et SVG. **Données d’analyse (avancé) → Exporter les données d’analyse** enregistre séparément les fichiers JSON/CSV et les analyses associées. L’exploration interactive en 3D reste dans COV.

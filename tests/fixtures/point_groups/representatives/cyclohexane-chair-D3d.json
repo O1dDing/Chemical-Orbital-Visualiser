@@ -1,0 +1,22 @@
+{
+  "id": "cyclohexane-chair-D3d",
+  "target": "D3d",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 18,
+  "element_counts": {
+    "C": 6,
+    "H": 12
+  },
+  "source_urls": [
+    "https://www.chemtube3d.com/model/michaelmodels/cyclohexane.sdf",
+    "https://www.chemtube3d.com/Sym-D3dcyclohexane/"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Public 18-atom chair preserves axial/equatorial H; no skeleton-only point-group assumption.",
+  "xyz_sha256": "b60e16430e7cb49b5a494fd9b06f29a2cfc61f25970f8523141a03c533b8c1c3",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 7.075605540480582e-05,
+  "source_xyz_sha256": "aa4d5e72c9b81a2d2aa46197d5780c39725043be7e44e9176ac97055afcf1a5f"
+}

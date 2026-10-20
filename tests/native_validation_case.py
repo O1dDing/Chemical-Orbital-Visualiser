@@ -179,7 +179,7 @@ def main():
              'click "diagram.linear"','hover "scene.viewport"','capture "linear"','click "diagram.nonlinear"',
              'seek "panel.browser"','click "browser.unit"','key "Home"','key "Down"','key "Enter"','seek "panel.diagram"','hover "scene.viewport"','capture "electron-volts"',
              'seek "panel.browser"','click "browser.unit"','key "Home"','key "Enter"',
-             'seek "panel.diagram"','click "diagram.export"','hover "scene.viewport"','capture "export-state"']
+             'seek "panel.diagram"','click "diagram.export"','seek "diagram.export_options"','click "diagram.export_options"','seek "diagram.export_data"','click "diagram.export_data"','click "diagram.export_options"','hover "scene.viewport"','capture "export-state"']
     for language in range(1,4):
         plan += ['click "language"','key "Home"']+['key "Down"']*language+['key "Enter"','hover "scene.viewport"',command('capture',f'language-{language}')]
     plan += ['click "language"','key "Home"','key "Enter"','hover "scene.viewport"','capture "language-0"',

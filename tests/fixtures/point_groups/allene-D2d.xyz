@@ -1,0 +1,9 @@
+7
+source=https://symmetry.constructor.university/cgi-bin/group.cgi?group=6122 target_full_point_group=D2d source_reported_group=D status=pending_parent_COV_operation_check
+C      -0.0000     -0.0000      0.0000
+C      -0.0000      0.0000      1.3024
+H       0.6557     -0.6557      1.8669
+H      -0.6557      0.6557      1.8669
+C      -0.0000      0.0000     -1.3024
+H       0.6557      0.6557     -1.8669
+H      -0.6557     -0.6557     -1.8669

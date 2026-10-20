@@ -153,7 +153,11 @@ def make_plan(production):
                             command('hover',f'diagram.mo.{i}'),
                             command('capture',f'linear-member-{i+1:04}')]
                     if primary: expanded += [command('click',f'diagram.mo.{primary[0]}')]
-    plan=expanded
+    plan=[]
+    for line in expanded:
+        plan.append(line)
+        if line=='click "diagram.export"':
+            plan += ['seek "diagram.export_options"','click "diagram.export_options"','seek "diagram.export_data"','click "diagram.export_data"','click "diagram.export_options"']
     details_mo=primary[0] if primary else selected
     if primary:
         # Navigate through actual controls and wheel events; preserve both ends

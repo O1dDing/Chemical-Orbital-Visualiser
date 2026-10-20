@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
-
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX

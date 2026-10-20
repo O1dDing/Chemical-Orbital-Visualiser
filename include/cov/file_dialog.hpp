@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <string>
+#include "cov/ui.hpp"
 
 namespace cov {
 
@@ -17,7 +18,8 @@ struct FileDialogResult {
     }
 };
 
-[[nodiscard]] FileDialogResult open_wavefunction_file_dialog();
+[[nodiscard]] FileDialogResult open_wavefunction_file_dialog(
+    ui::Language language = ui::Language::English, bool nbo_input = false);
 
 // Compatibility alias for the PR #2 viewer call-site. FCHK is now included in
 // the dialog and the function may be removed once all callers use the generic name.

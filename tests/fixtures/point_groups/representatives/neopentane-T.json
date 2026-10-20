@@ -1,0 +1,21 @@
+{
+  "id": "neopentane-T",
+  "target": "T",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 17,
+  "element_counts": {
+    "C": 5,
+    "H": 12
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6133"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Source calculator may print only proper rotation subgroup; independent full O(3) atom test recorded.",
+  "xyz_sha256": "3b5b298f12fd55305148bc067ce6043b4cf8d3eeacd2bf2bad51d8039049cf3b",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 2.7194799110210365e-16,
+  "source_xyz_sha256": "13fccfa9ff524c0681303a1a16bdca20471ee63d8ffeae859baa7d294cf38624"
+}

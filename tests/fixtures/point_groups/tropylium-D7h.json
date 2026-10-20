@@ -1,0 +1,27 @@
+{
+  "id": "tropylium-D7h",
+  "group_id": 6127,
+  "target": "D7h",
+  "phase": "High-order planar ring",
+  "note": "Tropylium cation preset; source reports rotational subgroup D.",
+  "title": "Tropylium Cation",
+  "source_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6127",
+  "source_sha256": "c3c3b8c9ea3c84dcc2607c1b4e51098d0491a8c08bc83628aa6d6d13437002fd",
+  "result_url": "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Angstrom&unit2=Degree&n1=Dummy&n2=C&x2=1.611500&n3=C&x3=1.611500&y3=51.428571&na3=1&nb3=2&n4=C&x4=1.611500&y4=51.428571&z4=180.000000&na4=1&nb4=3&nc4=2&n5=C&x5=1.611500&y5=51.428571&z5=180.000000&na5=1&nb5=4&nc5=3&n6=C&x6=1.611500&y6=51.428571&z6=180.000000&na6=1&nb6=5&nc6=4&n7=C&x7=1.611500&y7=51.428571&z7=180.000000&na7=1&nb7=6&nc7=5&n8=C&x8=1.611500&y8=51.428571&z8=180.000000&na8=1&nb8=7&nc8=6&n9=H&x9=1.087300&y9=115.714290&z9=180.000000&na9=2&nb9=3&nc9=1&n10=H&x10=1.087300&y10=115.714290&z10=180.000000&na10=3&nb10=4&nc10=1&n11=H&x11=1.087300&y11=115.714290&z11=180.000000&na11=4&nb11=5&nc11=1&n12=H&x12=1.087300&y12=115.714290&z12=180.000000&na12=5&nb12=6&nc12=1&n13=H&x13=1.087300&y13=115.714290&z13=180.000000&na13=6&nb13=7&nc13=1&n14=H&x14=1.087300&y14=115.714290&z14=180.000000&na14=7&nb14=8&nc14=1&n15=H&x15=1.087300&y15=115.714290&z15=180.000000&na15=8&nb15=2&nc15=1",
+  "result_sha256": "4e317bd36c8d4f8995691984496a28f7fea39d04877f197e15cec455f59ab2c5",
+  "source_reported_group": "D",
+  "atom_count": 14,
+  "bond_count": 14,
+  "element_counts": {
+    "C": 7,
+    "H": 7
+  },
+  "filename": "tropylium-D7h.xyz",
+  "sidecar": "tropylium-D7h.json",
+  "source_page_type": "Symmetry site internal-coordinate starting structure; converted to Cartesian by same site group=6300 endpoint",
+  "source_reported_group_scope": "site calculator label recorded verbatim; may be the proper-rotation subgroup and is not accepted as full-group verification",
+  "full_point_group_status": "Verified on the unchanged Cartesian fixture by point_group_geometry_smoke; includes rigid rotation and atom-order checks. Geometric tolerance is not a wavefunction symmetry certificate.",
+  "coordinate_precision": "source MOL DATA coordinates retained verbatim (4 decimal places)",
+  "charge_multiplicity": "not encoded in coordinate source; chemistry-state bookkeeping not verified",
+  "cov_regression_test": "tests/point_group_geometry_smoke.cpp"
+}

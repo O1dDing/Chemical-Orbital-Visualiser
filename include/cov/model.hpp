@@ -271,6 +271,9 @@ struct OrbitalChemistry {
     std::vector<OrbitalPairInteraction> interactions;
 
     std::string multicentre_label;
+    // True only when an actual non-unavailable MulticentreAssignment names
+    // this MO. A generic label/population fallback remains a candidate.
+    bool multicentre_assignment_available = false;
     std::string family_symbol;
     std::size_t multicentre_participating_atoms = 0;
     double multicentre_participating_electrons = 0.0;
@@ -292,6 +295,9 @@ struct OrbitalChemistry {
     std::size_t delocalised_orientation_channels = 0;
     bool delocalised_cyclic_topology = false;
     double delocalised_pi_confidence = 0.0;
+    // Projection onto this member's oriented-p active family. This is not
+    // the atom-pair-axis channel distribution above. NaN means unavailable.
+    double delocalised_pi_weight = std::numeric_limits<double>::quiet_NaN();
 
     // FCHK-only canonical-MO evidence cannot always define a unique
     // donor/acceptor direction. In that case this remains "UND".

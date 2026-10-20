@@ -1,0 +1,22 @@
+{
+  "id": "mixed-arene-Cr-C6v",
+  "target": "C6v",
+  "charge": 0,
+  "multiplicity": 1,
+  "atom_count": 43,
+  "element_counts": {
+    "C": 18,
+    "Cr": 1,
+    "H": 24
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6194"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Cr(C6H6)(C6(CH3)6), 43 atoms C18H24Cr, neutral 18-electron singlet candidate. Ring R1.4, z +/-1.65, aryl-CH1.08, aryl-CMe1.5, Me-H1.09 Angstrom. Methyl local phase 0 degrees; C6v only for reflection-compatible methyl orientations. Source bisbenzeneCr calibrates chemistry scaffold, not mixed-arene Cartesian dimensions.",
+  "xyz_sha256": "c4825f4f46df7d7bea456ca8e2744fcaee9938585e431cfab30f16c348481ed4",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 3.011959563148489e-15,
+  "source_xyz_sha256": "5a94090e44dc86ec7f97b8f2c255abd2c6fdc9a91b5c7476a489d6d8b9800460"
+}

@@ -1,0 +1,26 @@
+{
+  "id": "co-en3-source",
+  "target": "D3",
+  "charge": 3,
+  "multiplicity": 1,
+  "atom_count": 37,
+  "element_counts": {
+    "C": 6,
+    "Co": 1,
+    "H": 24,
+    "N": 6
+  },
+  "source_urls": [
+    "https://www.chemtube3d.com/model/gallery/Co(enH2)3calc.sdf",
+    "https://www.chemtube3d.com/coen33_/",
+    "https://old.iupac.org/reports/provisional/abstract04/RB-prs310804/Chap9-3.04.pdf",
+    "https://goldbook.iupac.org/terms/view/14213"
+  ],
+  "geometry_kind": "independent exact group-averaged conformation",
+  "note": "Full CoC6N6H24, with three complete N-C-C-N chelate paths. The source and its x-reflection form a Delta/Lambda pair; complete nuclear symmetry is checked independently of the metal coordination skeleton.",
+  "xyz_sha256": "f9f097d9197c65cbfb82d61487da1f51f5bb14ad69290350ea61a0997d2658d5",
+  "verification_scope": "Independent exact ideal conformation geometry fixture; not evidence of a wavefunction or an equilibrium structure",
+  "includes_all_supplied_nuclei": true,
+  "idealization_max_displacement_angstrom": 0.0001038505341602254,
+  "source_xyz_sha256": "ceec8f777d49d16f72b5cd73bd12885885480c49c2ec1268cc20a0f59ff24723"
+}
