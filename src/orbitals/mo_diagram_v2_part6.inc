@@ -348,9 +348,16 @@ bool write_mo_diagram_svg(const MODiagramData& data,
         out << "</g>\n";
 
         // Names come from the same canonical naming table as the live viewer.
-        out << "<text x=\"" << item.x << "\" y=\"" << item.y + 16
-            << "\" text-anchor=\"middle\" fill=\"#435166\" font-family=\"" << kSvgFontFamily << "\" "
-               "font-size=\"10\">" << xml_escape(export_level_name(data,level,options)) << "</text>\n";
+        const auto name=export_level_name(data,level,options);
+        const auto typography=layout_scientific_text(name,10.0f,[](const std::string& text,float scale) {
+            std::size_t glyphs=0;for(unsigned char c:text)if((c&0xc0)!=0x80)++glyphs;
+            return static_cast<float>(glyphs)*6.0f*scale;
+        });
+        out << "<text fill=\"#435166\" font-family=\"" << kSvgFontFamily
+            << "\" font-size=\"10\" dominant-baseline=\"text-before-edge\" aria-label=\""
+            << xml_escape(name) << "\">"
+            << scientific_svg_spans(typography,static_cast<float>(item.x)-typography.width*.5f,
+                static_cast<float>(item.y)+6.0f,10.0f) << "</text>\n";
         if (level.annotation.delocalised_pi.available) {
             write_svg_delocalised_pi(out, item.x, item.y + 29,
                                      level.annotation.delocalised_pi, "#5b6575");

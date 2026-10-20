@@ -5,6 +5,7 @@
 #include "cov/orbital_symmetry_components.hpp"
 #include "cov/validation.hpp"
 #include <imgui.h>
+#include "cov/ui_scientific_text.hpp"
 #include <cmath>
 #include <string>
 
@@ -44,7 +45,7 @@ inline void draw_symmetry_composition(const Wavefunction& canonical,const NboAom
     if(!name || !name->decomposition_verified || name->verified)return;
     ImGui::TextUnformatted(inspection_text(language,"Symmetry composition","对称性组成",
         "対称性の組成","Composition de symétrie"));
-    if(!name->point_group.empty())ImGui::SameLine(),ImGui::TextUnformatted(point_group_display(name->point_group).c_str());
+    if(!name->point_group.empty())ImGui::SameLine(),scientific_text(point_group_display(name->point_group),ImGui::GetColorU32(ImGuiCol_Text),false,true);
     validation::field("details.symmetry.composition",serialize_orbital_name_json(*name));
     for(std::size_t i=0;i<name->components.size();++i) {
         const auto& part=name->components[i];
@@ -53,7 +54,8 @@ inline void draw_symmetry_composition(const Wavefunction& canonical,const NboAom
         if(part.weight<1e-10)continue;
         NboAomoName display;display.verified=true;display.irrep=part.irrep;display.point_group=name->point_group;
         ImGui::PushID(static_cast<int>(i));
-        ImGui::Text("%s: %.8g%%",orbital_irrep_display_label(display).c_str(),100*part.weight);
+        scientific_text(orbital_irrep_display_label(display)+":");
+        ImGui::SameLine();ImGui::Text("%.8g%%",100*part.weight);
         if(interactive && state.nbo_ui) {
             const auto selected=symmetry_component_selection(canonical,state.nbo_ui->integration,
                 state.nbo_ui->aomo.salc_model.get(),*name,i,canonical_index,salc_index);
@@ -90,7 +92,7 @@ inline void draw_inspection_details(const Wavefunction& canonical,OrbitalUIState
     const auto* descriptor=single && integration?nbo_orbital(*integration,s->terms[0].orbital):nullptr;
     const bool base_side=s && (s->semantic_kind=="salc" ||
         s->semantic_kind=="spin_averaged_spatial_orbital");
-    ImGui::TextWrapped("%s",view.label.c_str());
+    scientific_text(view.label,ImGui::GetColorU32(ImGuiCol_Text),true,false,true);
     validation::field("details.active.semantic",view.semantic_kind);
     validation::field("details.active.selection",inspection_copy_metadata(view));
     if(s){
@@ -107,8 +109,8 @@ inline void draw_inspection_details(const Wavefunction& canonical,OrbitalUIState
             const auto target=*s->target_canonical_index;
             const auto* target_name=state.nbo_ui && state.nbo_ui->aomo.names &&
                 target<state.nbo_ui->aomo.names->canonical.size()?&state.nbo_ui->aomo.names->canonical[target]:nullptr;
-            ImGui::TextWrapped("%s: %s",inspection_text(language,"Target","目标","対象","Cible"),
-                canonical_mo_display_label(canonical,target,target_name).c_str());
+            scientific_text(std::string(inspection_text(language,"Target","目标","対象","Cible"))+": "+
+                canonical_mo_display_label(canonical,target,target_name),ImGui::GetColorU32(ImGuiCol_Text),true);
         }
     }
     // Display only physical values attached to this object, never a target MO's values.
@@ -120,8 +122,8 @@ inline void draw_inspection_details(const Wavefunction& canonical,OrbitalUIState
         format_energy(*energy,state.energy_unit,6).c_str());
     if(occupation && std::isfinite(*occupation))ImGui::Text("%s: %.8g",tr(Text::Occupation,language),*occupation);
     if(base_side && name && name->verified && !name->irrep.empty()) {
-        ImGui::Text("%s: %s",tr(Text::Symmetry,language),orbital_irrep_display_label(*name).c_str());
-        if(!name->point_group.empty())ImGui::TextUnformatted(point_group_display(name->point_group).c_str());
+        scientific_text(std::string(tr(Text::Symmetry,language))+": "+orbital_irrep_display_label(*name));
+        if(!name->point_group.empty())scientific_text(point_group_display(name->point_group),ImGui::GetColorU32(ImGuiCol_Text),false,true);
     }
     if(base_side && side_index)draw_symmetry_composition(canonical,name,state,language,{},side_index);
     if(s && is_symmetry_component(*s) && s->target_canonical_index && state.nbo_ui) {

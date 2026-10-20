@@ -1,3 +1,4 @@
+#include "cov/ui_scientific_text.hpp"
 #include "cov/orbital_ui.hpp"
 #include "cov/orbital_inspection_ui.hpp"
 #include "cov/nbo_ui.hpp"
@@ -65,7 +66,7 @@ void continue_text(const std::string& value, const float spacing = 0.0f) {
 
 void inline_text(const std::string& value, const ImU32 colour, const bool first = false) {
     if (!first) continue_text(value);
-    ImGui::TextColored(text_colour(colour), "%s", value.c_str());
+    scientific_text(value,colour,true);
 }
 
 void inline_plain(const std::string& value, const bool first = false) {
@@ -285,7 +286,7 @@ std::string bonding_text(const OrbitalBondingDistribution& value,
 void draw_label_value(const char* label, const std::string& value, const ImU32 colour) {
     ImGui::Text("%s:", label);
     continue_text(value,ImGui::GetStyle().ItemSpacing.x);
-    ImGui::TextColored(text_colour(colour), "%s", value.c_str());
+    scientific_text(value,colour,true);
 }
 
 void draw_channel_value(const char* label, const OrbitalChannelDistribution& value,

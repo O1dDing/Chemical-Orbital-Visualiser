@@ -6,26 +6,27 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "cov/ui_scientific_text.hpp"
 
 namespace cov::ui {
 
 inline int raster_text_width(const std::string& text, int scale) {
     if(!ImGui::GetCurrentContext() || !ImGui::GetFont()) return 0;
-    return static_cast<int>(std::ceil(ImGui::GetFont()->CalcTextSizeA(
-        12.0f*scale,1.0e6f,0,text.c_str()).x));
+    return static_cast<int>(std::ceil(scientific_text_layout(text,12.0f*scale).width));
 }
 
 // Use the viewer's loaded scientific and CJK glyphs in exported raster images.
-inline void raster_text(std::vector<std::uint8_t>& rgba,int width,int height,
-                        int x,int y,const std::string& text,
-                        std::uint8_t r,std::uint8_t g,std::uint8_t b,int size) {
+inline void raster_plain_text(std::vector<std::uint8_t>& rgba,int width,int height,
+                        float x,float y,const std::string& text,
+                        std::uint8_t r,std::uint8_t g,std::uint8_t b,float size,
+                        std::size_t* missing=nullptr) {
     if(!ImGui::GetCurrentContext() || !ImGui::GetFont()) return;
     unsigned char* atlas=nullptr; int aw=0,ah=0;
     ImGui::GetIO().Fonts->GetTexDataAsAlpha8(&atlas,&aw,&ah);
     const ImFont* font=ImGui::GetFont();
     if(!atlas || aw<=0 || ah<=0) return;
-    const float scale=12.0f*size/std::max(1.0f,font->FontSize);
-    float cursor=static_cast<float>(x);
+    const float scale=size/std::max(1.0f,font->FontSize);
+    float cursor=x;
     for(std::size_t p=0;p<text.size();) {
         const auto c=static_cast<unsigned char>(text[p]);
         unsigned cp=c; std::size_t length=1;
@@ -36,7 +37,8 @@ inline void raster_text(std::vector<std::uint8_t>& rgba,int width,int height,
         else for(std::size_t k=1;k<length;++k)
             cp=(cp<<6)|(static_cast<unsigned char>(text[p+k])&0x3f);
         p+=length;
-        const auto* glyph=font->FindGlyph(static_cast<ImWchar>(cp));
+        const auto* glyph=font->FindGlyphNoFallback(static_cast<ImWchar>(cp));
+        if(!glyph){if(missing)++*missing;glyph=font->FindGlyph('?');}
         if(!glyph)continue;
         const int x0=static_cast<int>(std::floor(cursor+glyph->X0*scale));
         const int x1=static_cast<int>(std::ceil(cursor+glyph->X1*scale));
@@ -56,5 +58,20 @@ inline void raster_text(std::vector<std::uint8_t>& rgba,int width,int height,
             }
         cursor+=glyph->AdvanceX*scale;
     }
+}
+inline void raster_scientific_text(std::vector<std::uint8_t>& rgba,int width,int height,
+                        float x,float y,const std::string& text,
+                        std::uint8_t r,std::uint8_t g,std::uint8_t b,float size,
+                        std::size_t* missing=nullptr,bool atom_indices=false) {
+    if(!ImGui::GetCurrentContext() || !ImGui::GetFont())return;
+    for(const auto& run:scientific_text_layout(text,size,false,atom_indices).runs)
+        raster_plain_text(rgba,width,height,x+run.x,y+run.y,run.text,
+                          r,g,b,size*run.scale,missing);
+}
+inline void raster_text(std::vector<std::uint8_t>& rgba,int width,int height,
+                        int x,int y,const std::string& text,
+                        std::uint8_t r,std::uint8_t g,std::uint8_t b,int size) {
+    raster_scientific_text(rgba,width,height,static_cast<float>(x),
+        static_cast<float>(y),text,r,g,b,12.0f*size);
 }
 } // namespace cov::ui

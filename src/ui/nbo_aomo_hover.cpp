@@ -103,7 +103,7 @@ std::string basis_title(const Wavefunction& wf,const NboNao& row,NboSpin spin) {
 }
 void symmetry_line(std::vector<std::string>& lines,const NboAomoNode& node,Language language) {
     if(node.symmetry_name_verified && !node.symmetry_irrep.empty())
-        lines.push_back(text(Word::Symmetry,language)+node.symmetry_irrep);
+        lines.push_back(text(Word::Symmetry,language)+format_symmetry_unicode(node.symmetry_irrep));
 }
 const char* angular_symbol(OrbitalAngularFamily family) {
     switch(family) {

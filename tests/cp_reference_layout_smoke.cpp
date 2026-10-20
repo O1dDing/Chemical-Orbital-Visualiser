@@ -161,7 +161,7 @@ int main() {
         std::cerr << "MO numbering leaked into exported figure\n";
         return 11;
     }
-    if (svg.find("font-size=\"10\">MO [list] ") == std::string::npos) {
+    if (svg.find("aria-label=\"MO [list] ") == std::string::npos) {
         std::cerr << "missing name must retain an explicit canonical list identity\n";
         return 12;
     }

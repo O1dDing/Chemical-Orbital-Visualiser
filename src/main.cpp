@@ -1318,7 +1318,8 @@ int main(int argc, char** argv) {
                 }
                 if(inspection && (inspection->selection.semantic_kind=="salc" ||
                     inspection->selection.semantic_kind=="spin_averaged_spatial_orbital"))label=active_view().label;
-                ImGui::TextWrapped("%s",label.c_str());
+                cov::ui::scientific_text(label,ImGui::GetColorU32(ImGuiCol_Text),true,false,
+                    inspection!=nullptr);
                 if(inspection && inspection->selection.mode==cov::NboSelectionMode::Overlay){
                     for(std::size_t i=0;i<inspection->selection.terms.size();++i){
                         const auto& term=inspection->selection.terms[i];

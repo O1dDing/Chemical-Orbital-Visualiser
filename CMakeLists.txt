@@ -762,6 +762,13 @@ if(COV_BUILD_TESTS)
     )
     add_test(NAME ui_smoke COMMAND cov_ui_smoke)
 
+    add_executable(cov_scientific_text_smoke tests/scientific_text_smoke.cpp)
+    target_link_libraries(cov_scientific_text_smoke PRIVATE cov_ui)
+    target_compile_options(cov_scientific_text_smoke PRIVATE
+        $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>
+    )
+    add_test(NAME scientific_text_smoke COMMAND cov_scientific_text_smoke)
+
     add_executable(cov_ui_fchk_smoke tests/ui_fchk_smoke.cpp)
     target_link_libraries(cov_ui_fchk_smoke PRIVATE cov_ui)
     target_compile_options(cov_ui_fchk_smoke PRIVATE

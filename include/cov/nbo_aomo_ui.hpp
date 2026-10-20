@@ -30,6 +30,7 @@ struct NboAomoFragmentGroup {
 
 struct NboAomoNode {
     std::string id,label,detail,energy_semantics;
+    bool label_atom_indices=false; // B1/H1/F1 in an atom label are baseline IDs.
     std::string symmetry_irrep,name_detail;
     std::size_t symmetry_ordinal=0;
     std::size_t symmetry_multiplicity=1;

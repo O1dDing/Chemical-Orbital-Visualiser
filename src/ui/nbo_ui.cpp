@@ -508,10 +508,10 @@ void draw_nbo_focus_view(NboFocusUIState& focus,const NboDataset& dataset,
         const std::string preview=focus.canonical_index?
             focus_mo_label(diagram,canonical,*focus.canonical_index,language):
             nbo_local(language,"Choose MO","选择 MO","MO を選択","Choisir une OM");
-        if(ImGui::BeginCombo("##nbo.focus.mo",preview.c_str())) {
+        if(scientific_combo("##nbo.focus.mo",preview)) {
             for(const auto index:view.eligible) {
                 const auto label=focus_mo_label(diagram,canonical,index,language);
-                if(ImGui::Selectable(label.c_str(),focus.canonical_index==index))focus.canonical_index=index;
+                if(scientific_selectable(label,focus.canonical_index==index))focus.canonical_index=index;
             }
             ImGui::EndCombo();
         }
@@ -602,7 +602,7 @@ void draw_nbo_focus_view(NboFocusUIState& focus,const NboDataset& dataset,
         std::string members;
         for(auto atom:group.atoms){if(!members.empty())members+=", ";
             members+=atoms.contains(atom)?atoms.at(atom)+std::to_string(atom):std::to_string(atom);}
-        ImGui::Text("%s: %s",name.c_str(),members.c_str());ImGui::SameLine();
+        scientific_text(name+": "+members,ImGui::GetColorU32(ImGuiCol_Text),false,false,true);ImGui::SameLine();
         const std::string button=(zh?"删除##":ja?"削除##":fr?"Supprimer##":"Delete##")+name;
         if(ImGui::Button(button.c_str())) {
             const auto removed_id=group.id;
@@ -699,13 +699,13 @@ void draw_nbo_focus_view(NboFocusUIState& focus,const NboDataset& dataset,
             const float mo_x=p.x+80.0f*scale,mo_y=p.y+height*0.5f;
             draw->AddCircleFilled(ImVec2(mo_x,mo_y),24.0f*scale,IM_COL32(64,98,160,255));
             const auto mo_name=canonical_mo_display_label(canonical,*view.index);
-            const auto name_size=ImGui::CalcTextSize(mo_name.c_str());
-            draw->AddText(ImVec2(mo_x-name_size.x*0.5f,mo_y-name_size.y*0.5f),
-                          IM_COL32(255,255,255,255),mo_name.c_str());
+            const ImVec2 name_size(scientific_text_layout(mo_name,ImGui::GetFontSize()).width,ImGui::GetFontSize());
+            draw_scientific_text(draw,ImGui::GetFontSize(),ImVec2(mo_x-name_size.x*0.5f,mo_y-name_size.y*0.5f),
+                          IM_COL32(255,255,255,255),mo_name);
             const auto& mo=canonical.orbitals[*view.index];
             const std::string mo_identity=mo_name+" / "+canonical_mo_source_label(canonical,*view.index)+
                 "  E="+fmt(mo.energy_hartree)+" Ha";
-            draw->AddText(ImVec2(p.x+8.0f*scale,p.y+5.0f*scale),IM_COL32(168,188,218,255),mo_identity.c_str());
+            draw_scientific_text(draw,ImGui::GetFontSize(),ImVec2(p.x+8.0f*scale,p.y+5.0f*scale),IM_COL32(168,188,218,255),mo_identity);
             for(std::size_t i=0;i<graph_nodes.size();++i) {
                 const float y=p.y+50.0f*scale+row*i;
                 const float x=p.x+std::max(170.0f*scale,width*0.38f);
@@ -792,7 +792,7 @@ void draw_selected_nbo_context(NboUIState& s,const NboIntegration& integration,
         const auto label=(orbital.display_label.empty()?orbital.label:orbital.display_label)+
             " ["+nbo_orbital_kind_name(orbital.ref.kind)+
             "]##nbo.context.typed."+orbital.id;
-        if(ImGui::Selectable(label.c_str())) {
+        if(scientific_selectable(label,false,0,true)) {
             s.aomo.pending_selection=nbo_single_selection(integration,orbital.ref);
             if(orbital.ref.kind==NboOrbitalKind::NHO)s.inspected_nho=orbital.ref;
             if(orbital.ref.kind==NboOrbitalKind::NLMO)s.inspected_nlmo=orbital.ref;
@@ -836,7 +836,7 @@ void draw_selected_nbo_context(NboUIState& s,const NboIntegration& integration,
                 ?&s.aomo.names->canonical[index]:nullptr;
             const auto label=(canonical?canonical_mo_display_label(*canonical,index,name):
                 "MO [list] "+std::to_string(index+1))+"##nbo.context.mo."+std::to_string(index);
-            if(ImGui::Selectable(label.c_str())&&descriptor!=integration.orbitals.end())
+            if(scientific_selectable(label)&&descriptor!=integration.orbitals.end())
                 s.aomo.pending_selection=nbo_single_selection(integration,descriptor->ref);
             validation::item("nbo.context.mo."+std::to_string(index));
         }
@@ -882,7 +882,7 @@ NboUIActions draw_nbo_panel(NboUIState& s, Language language,
                     "step ","步骤 ","ステップ ","étape "))+
                     std::to_string(*c.analysis_segment)+"]";
                 label+="##nbo.candidate."+std::to_string(i);
-                if(ImGui::Selectable(label.c_str()))s.pending_candidate=i;
+                if(scientific_selectable(label))s.pending_candidate=i;
                 validation::item("nbo.candidate."+std::to_string(i));
                 if(ImGui::IsItemHovered()) {
                     ImGui::BeginTooltip();
@@ -1035,7 +1035,7 @@ NboUIActions draw_nbo_panel(NboUIState& s, Language language,
                 const auto& evidence=integrated.structure[i];
                 std::string label=nbo_structure_display_label(evidence,canonical,language);
                 label+="##nbo.structure."+std::to_string(i);
-                if(ImGui::Selectable(label.c_str(),s.selected_structure==i)) {
+                if(scientific_selectable(label,s.selected_structure==i)) {
                     s.selected_structure=i;
                     s.selected_atoms.clear();
                     s.selected_atoms.insert(evidence.atoms.begin(),evidence.atoms.end());
@@ -1083,7 +1083,7 @@ NboUIActions draw_nbo_panel(NboUIState& s, Language language,
                 const bool selected=s.aomo.selection && s.aomo.selection->mode==NboSelectionMode::Orbital &&
                     s.aomo.selection->terms.size()==1 &&
                     s.aomo.selection->terms.front().orbital==orbital.ref;
-                if(ImGui::Selectable(label.c_str(),selected)) {
+                if(scientific_selectable(label,selected)) {
                     s.aomo.pending_selection=nbo_single_selection(integrated,orbital.ref);
                     s.selected_atoms.clear();
                     s.selected_atoms.insert(orbital.atoms.begin(),orbital.atoms.end());
@@ -1284,7 +1284,7 @@ NboUIActions draw_nbo_panel(NboUIState& s, Language language,
                              const std::string label=(orbital?orbital->label:std::string("NAO ")+
                                  std::to_string(term.orbital.index+1))+
                                 "##nbo.nho.nao."+std::to_string(term.orbital.index);
-                            if(ImGui::Selectable(label.c_str())) {
+                            if(scientific_selectable(label)) {
                                 NboOrbitalSelection selection;selection.dataset_id=integrated.id;
                                 selection.label=std::string(nbo_local(language,"NAO component of ","NAO 成分：",
                                     "NAO 成分：","Composante NAO de "))+nbo_orbital(integrated,ref)->label;
@@ -1554,8 +1554,8 @@ void export_nbo_focus_bundle(const NboDataset& d,const std::filesystem::path& ba
         fill(75,mo_y-22,150,mo_y+22,64,98,160);
         draw_text(rgba,width,height,88,mo_y-4,mo_label,1);
         svg<<"<rect x=\"75\" y=\""<<mo_y-22<<"\" width=\"75\" height=\"44\" rx=\"16\" fill=\"#4062a0\"/>"
-           <<"<text x=\"88\" y=\""<<mo_y+5<<"\" font-family=\"monospace\" font-size=\"12\" fill=\"white\">"
-           <<escape_xml(mo_label)<<"</text>";
+           <<"<text x=\"88\" y=\""<<mo_y+5<<"\" font-family=\"monospace\" font-size=\"12\" dominant-baseline=\"text-before-edge\" fill=\"white\">"
+           <<scientific_svg_spans(scientific_text_layout(mo_label,12),88,static_cast<float>(mo_y)-4,12)<<"</text>";
         for(std::size_t i=0;i<nodes.size();++i){const auto& node=nodes[i];const int y=90+static_cast<int>(i)*32;
             line(150,mo_y,350,y);fill(345,y-5,355,y+5,57,133,197);
             const std::string value=node.label+"  "+nbo_local(language,"Contribution: ","贡献：",
@@ -1568,7 +1568,8 @@ void export_nbo_focus_bundle(const NboDataset& d,const std::filesystem::path& ba
             svg<<"<line x1=\"150\" y1=\""<<mo_y<<"\" x2=\"350\" y2=\""<<y
                <<"\" stroke=\"#4a97ce\" stroke-width=\"2\"/><circle cx=\"350\" cy=\""<<y
                <<"\" r=\"5\" fill=\"#3985c5\"/><text x=\"370\" y=\""<<y+5
-               <<"\" font-family=\"monospace\" font-size=\"12\">"<<escape_xml(value)<<"</text>";
+               <<"\" font-family=\"monospace\" font-size=\"12\" dominant-baseline=\"text-before-edge\">"
+               <<scientific_svg_spans(scientific_text_layout(value,12),370,static_cast<float>(y)-4,12)<<"</text>";
         }
     }
     const std::string footer=nbo_local(language,"NAO contributions","NAO 组成贡献",
@@ -1710,7 +1711,7 @@ void export_nbo_bundle(const NboDataset& d,std::size_t selected,const std::files
     draw_text(rgba,width,height,28,38,source,1);
     draw_text(rgba,width,height,28,52,scene,1);
     draw_text(rgba,width,height,28,66,selected_text,1);
-    std::ostringstream svg;svg<<"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"960\" height=\"420\" viewBox=\"0 0 960 420\"><rect width=\"960\" height=\"420\" fill=\"white\"/><text x=\"28\" y=\"28\" font-family=\"monospace\" font-size=\"16\">"<<escape_xml(title)<<"</text><text x=\"28\" y=\"48\" font-family=\"monospace\" font-size=\"10\">"<<escape_xml(source.substr(0,145))<<"</text><text x=\"28\" y=\"62\" font-family=\"monospace\" font-size=\"10\">"<<escape_xml(scene)<<"</text><text x=\"28\" y=\"76\" font-family=\"monospace\" font-size=\"10\">"<<escape_xml(selected_text)<<"</text>";
+    std::ostringstream svg;svg<<"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"960\" height=\"420\" viewBox=\"0 0 960 420\"><rect width=\"960\" height=\"420\" fill=\"white\"/><text x=\"28\" y=\"28\" font-family=\"monospace\" font-size=\"16\">"<<escape_xml(title)<<"</text><text x=\"28\" y=\"48\" font-family=\"monospace\" font-size=\"10\">"<<escape_xml(source.substr(0,145))<<"</text><text x=\"28\" y=\"62\" font-family=\"monospace\" font-size=\"10\">"<<scientific_svg_spans(scientific_text_layout(scene,10),28,62,10)<<"</text><text x=\"28\" y=\"76\" font-family=\"monospace\" font-size=\"10\">"<<escape_xml(selected_text)<<"</text>";
     for(std::size_t j=0;j<count;++j){
         const auto& o=d.orbitals[start+j];const int y=90+static_cast<int>(j)*24;
         const int bar=std::clamp(static_cast<int>(std::round(o.occupation/2.0*420)),0,420);

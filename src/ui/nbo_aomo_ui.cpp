@@ -1,3 +1,4 @@
+#include "cov/ui_raster_text.hpp"
 #include "cov/nbo_aomo_ui.hpp"
 #include "cov/nbo_aomo_hover.hpp"
 #include "cov/mo_group_display_json.hpp"
@@ -926,6 +927,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
                     while(!direction.empty()&&std::isdigit(static_cast<unsigned char>(direction.front())))direction.erase(direction.begin());
                     if(!direction.empty()&&direction.front()==shell.back())angular=shell+direction.substr(1);
                 }
+                node.label_atom_indices=true;
                 node.label=canonical.atoms[orbital.atoms.front()].symbol+
                     atom_number(orbital.atoms.front())+" "+angular;
             }
@@ -1244,6 +1246,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
             // angular identity is matched by both producer number and spin.
             if(orbital.atoms.size()==1 && orbital.atoms.front()<canonical.atoms.size()) {
                 const auto atom=orbital.atoms.front();
+                node.label_atom_indices=true;
                 node.label=canonical.atoms[atom].symbol+atom_number(atom);
                 if(orbital.ref.kind==NboOrbitalKind::NAO) {
                     const auto row=std::find_if(data.dataset.naos.begin(),data.dataset.naos.end(),
@@ -1302,6 +1305,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
         for(const auto atom:folded_atoms) {
             NboAomoNode header;
             header.id="atom:"+std::to_string(atom);header.group_header=true;
+            header.label_atom_indices=true;
             header.label="+ "+(atom<canonical.atoms.size()?
                 canonical.atoms[atom].symbol+atom_number(atom):
                 std::string("Other"))+" ("+std::to_string(atom_counts[atom])+")";
@@ -1526,9 +1530,8 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
     }
     // Frozen display geometry: mean-energy MO rows and compact atomic shells.
     // Neither operation modifies raw energies, coefficients or field identities.
-    const auto text_width=[&](const std::string& text) {
-        return ImGui::GetFont()->CalcTextSizeA(view.label_font_size,
-            10000.0f,0.0f,text.c_str()).x;
+    const auto text_width=[&](const std::string& text,bool atom_indices=false) {
+        return scientific_text_layout(text,view.label_font_size,false,atom_indices).width;
     };
     std::map<std::string,std::vector<std::size_t>> shells;
     for(std::size_t i=0;i<view.nodes.size();++i) {
@@ -1711,7 +1714,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
     std::set<std::string> placed_shells;
     for(std::size_t i=0;i<view.nodes.size();++i) {
         auto& node=view.nodes[i];
-        node.label_width=text_width(node.label);node.label_height=view.label_font_size;
+        node.label_width=text_width(node.label,node.label_atom_indices);node.label_height=view.label_font_size*1.08f;
         const auto lane=static_cast<std::size_t>(node.lane);
         if(node.group_header) {
             slot_width[lane]=std::max(slot_width[lane],node.label_width+20.0f);
@@ -1751,7 +1754,7 @@ NboAomoViewSnapshot make_unified_snapshot(NboAomoUIState& state,
             block.bottom=std::max(block.bottom,member.y+22.0f+
                 (side_label?0.0f:view.label_font_size+8.0f));
             block.width=std::max(block.width,side_label?
-                std::max(member.label_width,text_width(member.shell_label))+
+                std::max(member.label_width,text_width(member.shell_label,true))+
                     view.orbital_bar_width+28.0f:
                 std::max(view.orbital_bar_width,member.label_width)+16.0f);
         }
@@ -2404,13 +2407,13 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
     const auto clip_min=draw->GetClipRectMin(),clip_max=draw->GetClipRectMax();
     const auto visible_rect=[&](ImVec2 a,ImVec2 b){return b.x>=clip_min.x && a.x<=clip_max.x &&
         b.y>=clip_min.y && a.y<=clip_max.y;};
-    const auto text_at=[&](float x,float y,ImU32 colour,const std::string& text,float size=14.0f){
+    const auto text_at=[&](float x,float y,ImU32 colour,const std::string& text,float size=14.0f,bool atom_indices=false){
         if(text.empty())return;
         const auto p=point(x,y);
-        const auto extent=ImGui::GetFont()->CalcTextSizeA(size*state.zoom,
-            std::numeric_limits<float>::max(),0.0f,text.c_str());
-        if(visible_rect(p,ImVec2(p.x+extent.x,p.y+extent.y)))
-            draw->AddText(ImGui::GetFont(),size*state.zoom,p,colour,text.c_str());
+        const auto layout=scientific_text_layout(text,size*state.zoom,false,atom_indices);
+        if(visible_rect(ImVec2(p.x,p.y-size*.08f*state.zoom),
+            ImVec2(p.x+layout.width,p.y+size*1.08f*state.zoom)))
+            draw_scientific_text(draw,size*state.zoom,p,colour,text,false,atom_indices);
     };
     // Restrict CPU tessellation to the viewport while preserving the original dash phase.
     // The immutable snapshot and all exports retain every node and raw link.
@@ -2630,7 +2633,7 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
             draw->AddRect(p,q,IM_COL32(110,137,166,255),4*scale);
         } else if(!folded_group && visible_rect(ImVec2(p.x,line_y-2),ImVec2(q.x,line_y+2)))draw->AddLine(ImVec2(p.x,line_y),ImVec2(q.x,line_y),colour,
             snapshot->orbital_bar_stroke_width*state.zoom);
-        text_at(node.label_x,node.label_y,colour,node.label,snapshot->label_font_size);
+        text_at(node.label_x,node.label_y,colour,node.label,snapshot->label_font_size,node.label_atom_indices);
         if(node.occupation_on_bar)
             electron_strokes(node,[&](float x1,float y1,float x2,float y2) {
                 const auto a=point(x1,y1),b=point(x2,y2);
@@ -2659,7 +2662,7 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
             }
             std::string hover_text;
             for(const auto& line:lines) {
-                ImGui::TextUnformatted(line.c_str());
+                scientific_text(line,ImGui::GetColorU32(ImGuiCol_Text),false,false,true);
                 if(!hover_text.empty())hover_text+='\n';hover_text+=line;
             }
             validation::field("aomo.hover",hover_text);
@@ -2835,7 +2838,7 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
             const auto label=it->label+"  E="+
                 (it->energy_hartree?number(*it->energy_hartree):"unknown")+
                 " Ha##"+id;
-            if(ImGui::Selectable(label.c_str())) {
+            if(scientific_selectable(label)) {
                 if(it->orbital)state.pending_selection=nbo_single_selection(data,*it->orbital);
                 state.focused_canonical_index=*it->canonical_index;
                 state.selected_side_node_id.clear();
@@ -2893,8 +2896,9 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
         const auto& edge=*nearby_edges.front().second;
         const auto& source_node=snapshot->nodes[edge.source_node];
         ImGui::BeginTooltip();ImGui::PushTextWrapPos(ImGui::GetFontSize()*32);
-        ImGui::TextUnformatted((source_node.individual_label+" → "+
-            snapshot->nodes[edge.target_node].individual_label).c_str());
+        scientific_text((source_node.individual_label+" → "+
+            snapshot->nodes[edge.target_node].individual_label).c_str(),
+            ImGui::GetColorU32(ImGuiCol_Text),false,false,true);
         ImGui::TextUnformatted(aomo_text(language,"Orbital contribution; not a bond-order label"));
         ImGui::TextUnformatted(aomo_text(language,"Click to show this weighted component"));
         ImGui::PopTextWrapPos();ImGui::EndTooltip();
@@ -2917,7 +2921,7 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
             const auto& a=snapshot->nodes[it->source_node];
             const auto& b=snapshot->nodes[it->target_node];
             const auto label=a.label+" → "+b.label+"  c="+number(it->coefficient)+"##"+id;
-            if(ImGui::Selectable(label.c_str())){activate_edge(*it);ImGui::CloseCurrentPopup();}
+            if(scientific_selectable(label,false,0,true)){activate_edge(*it);ImGui::CloseCurrentPopup();}
             validation::item("aomo.edge.choice."+id);
         }
         ImGui::EndPopup();
@@ -3008,7 +3012,7 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
             }
             validation::item("aomo.sum.item."+row_id(link.orbital));
             ImGui::SameLine();
-            if(ImGui::Selectable(label.c_str(),false))
+            if(scientific_selectable(label,false,0,true))
                 state.pending_selection=nbo_component_selection(data,link);
             validation::item("aomo.component."+row_id(link.orbital));
             if(ImGui::IsItemHovered())ImGui::SetTooltip("%s",aomo_text(language,"Click to show this weighted component"));
@@ -3471,9 +3475,10 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
                    <<"\" stroke=\""<<color<<"\" stroke-width=\""<<view.orbital_bar_stroke_width<<"\"/>";
                 out<<"<text x=\""<<node.label_x
                    <<"\" y=\""<<node.label_y
-                   <<"\" dominant-baseline=\"text-before-edge\" textLength=\""<<node.label_width
-                   <<"\" lengthAdjust=\"spacingAndGlyphs\" fill=\""<<color<<"\" font-size=\""<<view.label_font_size<<"\">"
-                   <<xml(node.label)<<"</text>";
+                   <<"\" dominant-baseline=\"text-before-edge\" aria-label=\""<<xml(node.label)
+                   <<"\" fill=\""<<color<<"\" font-size=\""<<view.label_font_size<<"\">"
+                   <<scientific_svg_spans(scientific_text_layout(node.label,view.label_font_size,false,node.label_atom_indices),
+                       node.label_x,node.label_y,view.label_font_size)<<"</text>";
                 if(node.occupation_on_bar) {
                     out<<"<g class=\"electron-arrows\" data-occupation=\""<<xml(node.occupation_label)
                         <<"\" stroke=\""<<color<<"\" stroke-width=\"1.5\">";
@@ -3504,50 +3509,11 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
             if(x<0||y<0||x>=width||y>=height)return;
             const auto p=(static_cast<std::size_t>(y)*width+x)*4;rgba[p]=r;rgba[p+1]=g;rgba[p+2]=b;
         };
-        // Raster text uses the same live ImGui font atlas as the on-screen
-        // canvas, including the loaded CJK and scientific glyphs.
-        unsigned char* atlas=nullptr;int atlas_w=0,atlas_h=0;
-        ImGui::GetIO().Fonts->GetTexDataAsAlpha8(&atlas,&atlas_w,&atlas_h);
-        const ImFont* font=ImGui::GetFont();
+        // The graph, SVG and PNG share the same positioned script runs.
         std::size_t missing_glyphs=0;
         auto draw_text=[&](float x,float y,const std::string& value,
-                           float size,unsigned char r,unsigned char g,unsigned char b) {
-            if(!font||!atlas||atlas_w<=0||atlas_h<=0)return;
-            const float scale=size/std::max(1.0f,font->FontSize);
-            float cursor=x;
-            for(std::size_t pos=0;pos<value.size();) {
-                const auto byte=static_cast<unsigned char>(value[pos]);
-                unsigned codepoint=byte;std::size_t length=1;
-                if((byte&0xe0)==0xc0){codepoint=byte&0x1f;length=2;}
-                else if((byte&0xf0)==0xe0){codepoint=byte&0x0f;length=3;}
-                else if((byte&0xf8)==0xf0){codepoint=byte&0x07;length=4;}
-                if(pos+length>value.size()){length=1;codepoint='?';}
-                else for(std::size_t k=1;k<length;++k)
-                    codepoint=(codepoint<<6)|(static_cast<unsigned char>(value[pos+k])&0x3f);
-                pos+=length;
-                const auto* glyph=font->FindGlyphNoFallback(static_cast<ImWchar>(codepoint));
-                if(!glyph){++missing_glyphs;glyph=font->FindGlyph('?');}
-                if(!glyph)continue;
-                const int x0=static_cast<int>(std::floor(cursor+glyph->X0*scale));
-                const int x1=static_cast<int>(std::ceil(cursor+glyph->X1*scale));
-                const int y0=static_cast<int>(std::floor(y+glyph->Y0*scale));
-                const int y1=static_cast<int>(std::ceil(y+glyph->Y1*scale));
-                const int sx0=static_cast<int>(glyph->U0*atlas_w);
-                const int sx1=static_cast<int>(glyph->U1*atlas_w);
-                const int sy0=static_cast<int>(glyph->V0*atlas_h);
-                const int sy1=static_cast<int>(glyph->V1*atlas_h);
-                for(int yy=std::max(0,y0);yy<std::min(height,y1);++yy)
-                    for(int xx=std::max(0,x0);xx<std::min(width,x1);++xx) {
-                        const int sx=std::clamp(sx0+(xx-x0)*(sx1-sx0)/std::max(1,x1-x0),0,atlas_w-1);
-                        const int sy=std::clamp(sy0+(yy-y0)*(sy1-sy0)/std::max(1,y1-y0),0,atlas_h-1);
-                        const float alpha=static_cast<float>(atlas[sy*atlas_w+sx])/255.0f;
-                        const auto p=(static_cast<std::size_t>(yy)*width+xx)*4;
-                        rgba[p]=static_cast<unsigned char>(rgba[p]*(1-alpha)+r*alpha);
-                        rgba[p+1]=static_cast<unsigned char>(rgba[p+1]*(1-alpha)+g*alpha);
-                        rgba[p+2]=static_cast<unsigned char>(rgba[p+2]*(1-alpha)+b*alpha);
-                    }
-                cursor+=glyph->AdvanceX*scale;
-            }
+                           float size,unsigned char r,unsigned char g,unsigned char b,bool atom_indices=false) {
+            raster_scientific_text(rgba,width,height,x,y,value,r,g,b,size,&missing_glyphs,atom_indices);
         };
         auto blend=[&](int x,int y,const EdgeAppearance& style){
             if(x<0||y<0||x>=width||y>=height)return;
@@ -3638,7 +3604,7 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
                 }
             }
             draw_text(node.label_x,node.label_y,
-                node.label,view.label_font_size,red,green,blue);
+                node.label,view.label_font_size,red,green,blue,node.label_atom_indices);
             if(node.occupation_on_bar) {
                 EdgeAppearance stroke;stroke.red=red;stroke.green=green;stroke.blue=blue;
                 stroke.alpha=255;stroke.width=1.5f;

@@ -1,3 +1,4 @@
+#include "cov/ui_scientific_text.hpp"
 #include "cov/orbital_ui.hpp"
 #include "cov/orbital_inspection_ui.hpp"
 #include "cov/nbo_aomo_text.hpp"
@@ -61,11 +62,11 @@ ImVec4 text_colour(const ImU32 colour) {
     return ImGui::ColorConvertU32ToFloat4(colour);
 }
 
-void labelled_value(const char* label, const std::string& value, const ImU32 colour) {
+void labelled_value(const char* label, const std::string& value, const ImU32 colour, bool point_group=false) {
     cov::validation::field(label,value);
     ImGui::Text("%s:", label);
     ImGui::SameLine();
-    ImGui::TextColored(text_colour(colour), "%s", value.c_str());
+    scientific_text(value,colour,true,point_group);
 }
 
 bool usable_symmetry_text(const std::string& label) {
@@ -366,38 +367,6 @@ void filter_combo(OrbitalUIState& state, const Language language) {
     }
 }
 
-float rich_symmetry_width(const SymmetryNotation& notation) {
-    if (notation.base.empty()) return ImGui::CalcTextSize("N/A").x;
-    const float base = ImGui::CalcTextSize(notation.base.c_str()).x;
-    const float sub = notation.subscript.empty() ? 0.0f : ImGui::CalcTextSize(notation.subscript.c_str()).x * 0.72f;
-    const float sup = notation.superscript.empty() ? 0.0f : ImGui::CalcTextSize(notation.superscript.c_str()).x * 0.72f;
-    return base + std::max(sub, sup);
-}
-
-void draw_rich_symmetry(const std::string& raw,
-                        const ImU32 colour = IM_COL32(220, 228, 240, 255)) {
-    const SymmetryNotation notation = parse_symmetry_notation(raw);
-    if (notation.base.empty()) {
-        ImGui::TextColored(text_colour(kUnavailableColour), "N/A");
-        return;
-    }
-    const ImVec2 pos = ImGui::GetCursorScreenPos();
-    ImDrawList* draw = ImGui::GetWindowDrawList();
-    ImFont* font = ImGui::GetFont();
-    const float size = ImGui::GetFontSize();
-    draw->AddText(font, size, pos, colour, notation.base.c_str());
-    const float x = pos.x + ImGui::CalcTextSize(notation.base.c_str()).x;
-    if (!notation.subscript.empty()) {
-        draw->AddText(font, size * 0.72f, ImVec2(x, pos.y + size * 0.36f),
-                      colour, notation.subscript.c_str());
-    }
-    if (!notation.superscript.empty()) {
-        draw->AddText(font, size * 0.72f, ImVec2(x, pos.y - size * 0.08f),
-                      colour, notation.superscript.c_str());
-    }
-    ImGui::Dummy(ImVec2(rich_symmetry_width(notation), size * 1.08f));
-}
-
 const char* symmetry_scope_tag(const OrbitalSymmetryExplanation& explanation,Language language) {
     if (orbital_symmetry_is_candidate(explanation)) return orbital_tr(OrbitalText::SymmetryCandidateTag,language);
     if (orbital_symmetry_is_local(explanation)) return orbital_tr(OrbitalText::SymmetryLocalTag,language);
@@ -438,7 +407,7 @@ void draw_symmetry_scope_details(const OrbitalSymmetryExplanation& e,const Wavef
     cov::validation::item(prefix+".label");
     if(!e.point_group.empty())
         labelled_value(orbital_tr(OrbitalText::PointGroup,language),
-                       point_group_display(e.point_group),kSymmetryColour);
+                       point_group_display(e.point_group),kSymmetryColour,true);
     if(!e.orbital_indices.empty())
         labelled_value(orbital_tr(OrbitalText::SymmetryTargetMembers,language),
                        symmetry_members(e.orbital_indices,wf),kNumericColour);
@@ -608,7 +577,7 @@ void draw_level_details(const MODiagramData& data,
     const auto composition_policy=composition_display_policy(level.composition,ml);
     const auto& selected_annotation=orbital_index<data.annotations.size()
         ?data.annotations[orbital_index]:OrbitalAnnotation{};
-    ImGui::TextUnformatted(displayed_canonical_name(wavefunction,orbital_index,state).c_str());
+    scientific_text(displayed_canonical_name(wavefunction,orbital_index,state));
     ImGui::Separator();
     labelled_number(tr(Text::RawMO, language), canonical_mo_source_label(wavefunction,orbital_index));
 
@@ -633,20 +602,24 @@ void draw_level_details(const MODiagramData& data,
     if(usable_symmetry_text(displayed_symmetry) && verified_name &&
        verified_name->verified && !verified_name->point_group.empty())
         labelled_value(verified_name->point_group=="SO(3)"?aomo_text(language,"Rotation group"):orbital_tr(OrbitalText::PointGroup,language),
-                       point_group_display(verified_name->point_group),kSymmetryColour);
+                       point_group_display(verified_name->point_group),kSymmetryColour,true);
     // The row may additionally have a local coordination interpretation.
     draw_symmetry_composition(wavefunction,verified_name,state,language,metadata.orbital_index);
     // It is retained as a separate scope, never substituted for the full MO.
     draw_symmetry_scope_details(level.metadata.symmetry_view,wavefunction,language,
         "details.local-symmetry",composition_policy.reference_shell_traces);
     ImGui::Separator();
-    ImGui::TextWrapped(orbital_tr(OrbitalText::GroupRepresentativeData,language),
-        displayed_canonical_name(wavefunction,level.metadata.orbital_index,state).c_str());
+    {
+        char caption[1024];
+        std::snprintf(caption,sizeof(caption),orbital_tr(OrbitalText::GroupRepresentativeData,language),
+            displayed_canonical_name(wavefunction,level.metadata.orbital_index,state).c_str());
+        scientific_text(caption,ImGui::GetColorU32(ImGuiCol_Text),true);
+    }
     if (!data.ligand_field_point_group.empty()) {
         labelled_value(aomo_text(language,"Local coordination skeleton"),
                        coordination_skeleton_name(data,wavefunction)+" · "+
                            point_group_display(data.ligand_field_point_group),
-                       kSymmetryColour);
+                       kSymmetryColour,true);
         cov::validation::item("details.coordination-skeleton");
         if(ImGui::IsItemHovered() && data.ligand_field_metal_atom<wavefunction.atoms.size()) {
             std::string atoms;
@@ -715,7 +688,7 @@ void draw_level_details(const MODiagramData& data,
                   << point_group_display(geometry.point_group) << ", CN"
                   << geometry.neighbour_atoms.size() << ")";
             labelled_value(orbital_tr(OrbitalText::LocalGeometry, language),
-                           value.str(),kSymmetryColour);
+                           value.str(),kSymmetryColour,true);
             if (++shown==6u) break;
         }
         if (shown<relevant_geometry_count) {
@@ -1012,7 +985,7 @@ void draw_level_tooltip(const MODiagramData& data,
     ImGui::SetNextWindowSizeConstraints(ImVec2(0,0),ImVec2(std::max(120.0f,work_size.x-24.0f),std::max(120.0f,work_size.y-24.0f)));
     ImGui::BeginTooltip();
     ImGui::PushTextWrapPos(ImGui::GetFontSize()*24.0f);
-    ImGui::TextUnformatted(displayed_canonical_name(wavefunction,orbital_index,state).c_str());
+    scientific_text(displayed_canonical_name(wavefunction,orbital_index,state));
 
     labelled_number(tr(Text::ExactEnergy,language),format_energy(metadata.energy_hartree,state.energy_unit,8));
     labelled_number(tr(Text::Occupation,language),
@@ -1441,7 +1414,7 @@ void draw_diagram_details_window(const MODiagramData& data,
         } else if(row && *row<data.levels.size()) {
             draw_level_details(data,data.levels[*row],wavefunction,state,language,selected_index);
         } else if(selected_index<wavefunction.orbitals.size()) {
-            ImGui::TextUnformatted(displayed_canonical_name(wavefunction,selected_index,state).c_str());
+            scientific_text(displayed_canonical_name(wavefunction,selected_index,state));
             const auto* name=canonical_name_for(wavefunction,selected_index,state);
             const auto& source=wavefunction.orbitals[selected_index];
             labelled_number(tr(Text::ExactEnergy,language),format_energy(source.energy_hartree,state.energy_unit,8));
@@ -1630,7 +1603,7 @@ void draw_orbital_browser(const Wavefunction& wavefunction,
                 const std::string label=canonical_mo_display_label(wavefunction,index,name);
                 ImGui::PushID(static_cast<int>(index));
                 ImGui::TableNextRow(0,1.3f*ImGui::GetTextLineHeightWithSpacing()); ImGui::TableNextColumn();
-                if (ImGui::Selectable(label.c_str(), index == selected_index,
+                if (scientific_selectable(label, index == selected_index,
                                       ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
                     actions.select_orbital = index;
                 }
@@ -1643,7 +1616,7 @@ void draw_orbital_browser(const Wavefunction& wavefunction,
                 ImGui::TableNextColumn();
                 ImGui::TextColored(text_colour(kNumericColour), "%.2f", item.occupation);
                 const std::string symmetry=canonical_mo_current_irrep(wavefunction,index,name);
-                ImGui::TableNextColumn(); draw_rich_symmetry(symmetry,kSymmetryColour);
+                ImGui::TableNextColumn(); scientific_text(symmetry,kSymmetryColour);
                 cov::validation::item("browser.symmetry."+std::to_string(index)+".label");
                 cov::validation::field("browser.symmetry."+std::to_string(index),symmetry);
                 ImGui::PopID();
