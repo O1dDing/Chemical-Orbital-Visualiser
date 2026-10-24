@@ -1,0 +1,2479 @@
+{
+  "title": "COV molecule samples",
+  "edition": "2026-10-25",
+  "molecule_count": 34,
+  "calculation_count": 47,
+  "download_all": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-molecule-samples-2026-10-25.zip",
+  "samples": [
+    {
+      "slug": "hydrogen-cation-cartesian-cc-pv5z",
+      "family": "hydrogen-cation",
+      "group": "bonding",
+      "names": {
+        "en": "Hydrogen molecular ion",
+        "zh-CN": "氢分子阳离子",
+        "ja": "水素分子イオン",
+        "fr": "Ion moléculaire hydrogène"
+      },
+      "variant": {
+        "en": "Cartesian basis functions",
+        "zh-CN": "笛卡尔基函数",
+        "ja": "デカルト基底関数",
+        "fr": "Fonctions de base cartésiennes"
+      },
+      "formula": "H2^+",
+      "atoms": 2,
+      "charge": 1,
+      "multiplicity": 2,
+      "method": "ROPBE1PBE",
+      "basis": "cc-pV5Z",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "hydrogen-cation-cartesian-cc-pv5z/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-hydrogen-cation-cartesian-cc-pv5z.zip",
+      "files": [
+        "hydrogen-cation-cartesian-cc-pv5z.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "hydrogen-cation-spherical-cc-pv5z",
+      "family": "hydrogen-cation",
+      "group": "bonding",
+      "names": {
+        "en": "Hydrogen molecular ion",
+        "zh-CN": "氢分子阳离子",
+        "ja": "水素分子イオン",
+        "fr": "Ion moléculaire hydrogène"
+      },
+      "variant": {
+        "en": "Spherical basis functions",
+        "zh-CN": "球谐基函数",
+        "ja": "球面調和基底関数",
+        "fr": "Fonctions de base sphériques"
+      },
+      "formula": "H2^+",
+      "atoms": 2,
+      "charge": 1,
+      "multiplicity": 2,
+      "method": "ROPBE1PBE",
+      "basis": "cc-pV5Z",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "hydrogen-cation-spherical-cc-pv5z/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-hydrogen-cation-spherical-cc-pv5z.zip",
+      "files": [
+        "hydrogen-cation-spherical-cc-pv5z.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "water-6-31g-d",
+      "family": "water",
+      "group": "basic",
+      "names": {
+        "en": "Water",
+        "zh-CN": "水",
+        "ja": "水",
+        "fr": "Eau"
+      },
+      "variant": {
+        "en": "6-31G(d)",
+        "zh-CN": "6-31G(d)",
+        "ja": "6-31G(d)",
+        "fr": "6-31G(d)"
+      },
+      "formula": "H2O",
+      "atoms": 3,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "6-31G(d)",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "water-6-31g-d/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-water-6-31g-d.zip",
+      "files": [
+        "water-6-31g-d.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "methylamine",
+      "family": "methylamine",
+      "group": "basic",
+      "names": {
+        "en": "Methylamine",
+        "zh-CN": "甲胺",
+        "ja": "メチルアミン",
+        "fr": "Méthylamine"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "CH5N",
+      "atoms": 7,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "6-31G(d)",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "methylamine/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-methylamine.zip",
+      "files": [
+        "methylamine.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "formaldehyde-6-31g-d",
+      "family": "formaldehyde",
+      "group": "basic",
+      "names": {
+        "en": "Formaldehyde",
+        "zh-CN": "甲醛",
+        "ja": "ホルムアルデヒド",
+        "fr": "Formaldéhyde"
+      },
+      "variant": {
+        "en": "6-31G(d)",
+        "zh-CN": "6-31G(d)",
+        "ja": "6-31G(d)",
+        "fr": "6-31G(d)"
+      },
+      "formula": "CH2O",
+      "atoms": 4,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "6-31G(d)",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "formaldehyde-6-31g-d/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-formaldehyde-6-31g-d.zip",
+      "files": [
+        "formaldehyde-6-31g-d.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "acetylene-6-31g-d",
+      "family": "acetylene",
+      "group": "basic",
+      "names": {
+        "en": "Acetylene",
+        "zh-CN": "乙炔",
+        "ja": "アセチレン",
+        "fr": "Acétylène"
+      },
+      "variant": {
+        "en": "6-31G(d)",
+        "zh-CN": "6-31G(d)",
+        "ja": "6-31G(d)",
+        "fr": "6-31G(d)"
+      },
+      "formula": "C2H2",
+      "atoms": 4,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "6-31G(d)",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "acetylene-6-31g-d/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-acetylene-6-31g-d.zip",
+      "files": [
+        "acetylene-6-31g-d.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "benzene-6-31g-d",
+      "family": "benzene",
+      "group": "basic",
+      "names": {
+        "en": "Benzene",
+        "zh-CN": "苯",
+        "ja": "ベンゼン",
+        "fr": "Benzène"
+      },
+      "variant": {
+        "en": "6-31G(d)",
+        "zh-CN": "6-31G(d)",
+        "ja": "6-31G(d)",
+        "fr": "6-31G(d)"
+      },
+      "formula": "C6H6",
+      "atoms": 12,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "6-31G(d)",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "benzene-6-31g-d/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-benzene-6-31g-d.zip",
+      "files": [
+        "benzene-6-31g-d.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "formate",
+      "family": "formate",
+      "group": "basic",
+      "names": {
+        "en": "Formate ion",
+        "zh-CN": "甲酸根",
+        "ja": "ギ酸イオン",
+        "fr": "Ion formiate"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "CHO2^-",
+      "atoms": 4,
+      "charge": -1,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "6-31+G(d)",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "formate/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-formate.zip",
+      "files": [
+        "formate.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "methyl-radical",
+      "family": "methyl-radical",
+      "group": "bonding",
+      "names": {
+        "en": "Methyl radical",
+        "zh-CN": "甲基自由基",
+        "ja": "メチルラジカル",
+        "fr": "Radical méthyle"
+      },
+      "variant": {
+        "en": "Doublet",
+        "zh-CN": "双重态",
+        "ja": "二重項",
+        "fr": "Doublet"
+      },
+      "formula": "CH3",
+      "atoms": 4,
+      "charge": 0,
+      "multiplicity": 2,
+      "method": "ROPBE1PBE",
+      "basis": "6-31G(d)",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "methyl-radical/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-methyl-radical.zip",
+      "files": [
+        "methyl-radical.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "ammonia-borane",
+      "family": "ammonia-borane",
+      "group": "bonding",
+      "names": {
+        "en": "Ammonia borane",
+        "zh-CN": "氨硼烷",
+        "ja": "アンモニアボラン",
+        "fr": "Ammoniac-borane"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "NH3BH3",
+      "atoms": 8,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "6-31G(d)",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "ammonia-borane/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-ammonia-borane.zip",
+      "files": [
+        "ammonia-borane.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "diborane-6-31g-d",
+      "family": "diborane",
+      "group": "bonding",
+      "names": {
+        "en": "Diborane",
+        "zh-CN": "乙硼烷",
+        "ja": "ジボラン",
+        "fr": "Diborane"
+      },
+      "variant": {
+        "en": "6-31G(d)",
+        "zh-CN": "6-31G(d)",
+        "ja": "6-31G(d)",
+        "fr": "6-31G(d)"
+      },
+      "formula": "B2H6",
+      "atoms": 8,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "6-31G(d)",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "diborane-6-31g-d/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-diborane-6-31g-d.zip",
+      "files": [
+        "diborane-6-31g-d.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "hydrogen-equilibrium",
+      "family": "hydrogen",
+      "group": "basic",
+      "names": {
+        "en": "Hydrogen",
+        "zh-CN": "氢气",
+        "ja": "水素",
+        "fr": "Dihydrogène"
+      },
+      "variant": {
+        "en": "Equilibrium-length geometry",
+        "zh-CN": "平衡键长构型",
+        "ja": "平衡結合長の構造",
+        "fr": "Géométrie à la longueur d'équilibre"
+      },
+      "formula": "H2",
+      "atoms": 2,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "hydrogen-equilibrium/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-hydrogen-equilibrium.zip",
+      "files": [
+        "hydrogen-equilibrium.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "hydrogen-0-60-angstrom",
+      "family": "hydrogen",
+      "group": "basic",
+      "names": {
+        "en": "Hydrogen",
+        "zh-CN": "氢气",
+        "ja": "水素",
+        "fr": "Dihydrogène"
+      },
+      "variant": {
+        "en": "H-H distance 0.60 Å",
+        "zh-CN": "H-H 距离 0.60 Å",
+        "ja": "H-H 距離 0.60 Å",
+        "fr": "Distance H-H de 0,60 Å"
+      },
+      "formula": "H2",
+      "atoms": 2,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "hydrogen-0-60-angstrom/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-hydrogen-0-60-angstrom.zip",
+      "files": [
+        "hydrogen-0-60-angstrom.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "water-def2svp",
+      "family": "water",
+      "group": "basic",
+      "names": {
+        "en": "Water",
+        "zh-CN": "水",
+        "ja": "水",
+        "fr": "Eau"
+      },
+      "variant": {
+        "en": "def2SVP",
+        "zh-CN": "def2SVP",
+        "ja": "def2SVP",
+        "fr": "def2SVP"
+      },
+      "formula": "H2O",
+      "atoms": 3,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "water-def2svp/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-water-def2svp.zip",
+      "files": [
+        "water-def2svp.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "carbon-dioxide",
+      "family": "carbon-dioxide",
+      "group": "basic",
+      "names": {
+        "en": "Carbon dioxide",
+        "zh-CN": "二氧化碳",
+        "ja": "二酸化炭素",
+        "fr": "Dioxyde de carbone"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "CO2",
+      "atoms": 3,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "carbon-dioxide/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-carbon-dioxide.zip",
+      "files": [
+        "carbon-dioxide.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "methane",
+      "family": "methane",
+      "group": "basic",
+      "names": {
+        "en": "Methane",
+        "zh-CN": "甲烷",
+        "ja": "メタン",
+        "fr": "Méthane"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "CH4",
+      "atoms": 5,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "methane/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-methane.zip",
+      "files": [
+        "methane.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "oxygen-triplet",
+      "family": "oxygen",
+      "group": "basic",
+      "names": {
+        "en": "Oxygen",
+        "zh-CN": "氧气",
+        "ja": "酸素",
+        "fr": "Dioxygène"
+      },
+      "variant": {
+        "en": "Triplet",
+        "zh-CN": "三重态",
+        "ja": "三重項",
+        "fr": "Triplet"
+      },
+      "formula": "O2",
+      "atoms": 2,
+      "charge": 0,
+      "multiplicity": 3,
+      "method": "ROPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "oxygen-triplet/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-oxygen-triplet.zip",
+      "files": [
+        "oxygen-triplet.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "formaldehyde-def2svp",
+      "family": "formaldehyde",
+      "group": "basic",
+      "names": {
+        "en": "Formaldehyde",
+        "zh-CN": "甲醛",
+        "ja": "ホルムアルデヒド",
+        "fr": "Formaldéhyde"
+      },
+      "variant": {
+        "en": "def2SVP",
+        "zh-CN": "def2SVP",
+        "ja": "def2SVP",
+        "fr": "def2SVP"
+      },
+      "formula": "CH2O",
+      "atoms": 4,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "formaldehyde-def2svp/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-formaldehyde-def2svp.zip",
+      "files": [
+        "formaldehyde-def2svp.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "acetylene-def2svp",
+      "family": "acetylene",
+      "group": "basic",
+      "names": {
+        "en": "Acetylene",
+        "zh-CN": "乙炔",
+        "ja": "アセチレン",
+        "fr": "Acétylène"
+      },
+      "variant": {
+        "en": "def2SVP",
+        "zh-CN": "def2SVP",
+        "ja": "def2SVP",
+        "fr": "def2SVP"
+      },
+      "formula": "C2H2",
+      "atoms": 4,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "acetylene-def2svp/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-acetylene-def2svp.zip",
+      "files": [
+        "acetylene-def2svp.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "benzene-def2svp",
+      "family": "benzene",
+      "group": "basic",
+      "names": {
+        "en": "Benzene",
+        "zh-CN": "苯",
+        "ja": "ベンゼン",
+        "fr": "Benzène"
+      },
+      "variant": {
+        "en": "def2SVP",
+        "zh-CN": "def2SVP",
+        "ja": "def2SVP",
+        "fr": "def2SVP"
+      },
+      "formula": "C6H6",
+      "atoms": 12,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "benzene-def2svp/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-benzene-def2svp.zip",
+      "files": [
+        "benzene-def2svp.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "butadiene-planar-trans",
+      "family": "butadiene",
+      "group": "basic",
+      "names": {
+        "en": "1,3-Butadiene",
+        "zh-CN": "1,3-丁二烯",
+        "ja": "1,3-ブタジエン",
+        "fr": "1,3-Butadiène"
+      },
+      "variant": {
+        "en": "Planar trans conformation",
+        "zh-CN": "平面反式构象",
+        "ja": "平面トランス配座",
+        "fr": "Conformation trans plane"
+      },
+      "formula": "C4H6",
+      "atoms": 10,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "butadiene-planar-trans/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-butadiene-planar-trans.zip",
+      "files": [
+        "butadiene-planar-trans.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "butadiene-90-degree-twist",
+      "family": "butadiene",
+      "group": "basic",
+      "names": {
+        "en": "1,3-Butadiene",
+        "zh-CN": "1,3-丁二烯",
+        "ja": "1,3-ブタジエン",
+        "fr": "1,3-Butadiène"
+      },
+      "variant": {
+        "en": "90° vinyl-group rotation",
+        "zh-CN": "乙烯基旋转 90°",
+        "ja": "ビニル基を90°回転",
+        "fr": "Rotation du groupe vinyle de 90°"
+      },
+      "formula": "C4H6",
+      "atoms": 10,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "butadiene-90-degree-twist/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-butadiene-90-degree-twist.zip",
+      "files": [
+        "butadiene-90-degree-twist.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "butadiene-0-degree-scan",
+      "family": "butadiene",
+      "group": "basic",
+      "names": {
+        "en": "1,3-Butadiene",
+        "zh-CN": "1,3-丁二烯",
+        "ja": "1,3-ブタジエン",
+        "fr": "1,3-Butadiène"
+      },
+      "variant": {
+        "en": "0° scan geometry",
+        "zh-CN": "0° 扫描构型",
+        "ja": "0°の走査構造",
+        "fr": "Géométrie du balayage à 0°"
+      },
+      "formula": "C4H6",
+      "atoms": 10,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "butadiene-0-degree-scan/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-butadiene-0-degree-scan.zip",
+      "files": [
+        "butadiene-0-degree-scan.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "water-dimer",
+      "family": "water-dimer",
+      "group": "familiar",
+      "names": {
+        "en": "Water dimer",
+        "zh-CN": "水二聚体",
+        "ja": "水二量体",
+        "fr": "Dimère d'eau"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "(H2O)2",
+      "atoms": 6,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "water-dimer/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-water-dimer.zip",
+      "files": [
+        "water-dimer.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "naphthalene",
+      "family": "naphthalene",
+      "group": "familiar",
+      "names": {
+        "en": "Naphthalene",
+        "zh-CN": "萘",
+        "ja": "ナフタレン",
+        "fr": "Naphtalène"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "C10H8",
+      "atoms": 18,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "naphthalene/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-naphthalene.zip",
+      "files": [
+        "naphthalene.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "dicyanoaurate-linear",
+      "family": "dicyanoaurate",
+      "group": "coordination",
+      "names": {
+        "en": "Dicyanoaurate(I) ion",
+        "zh-CN": "二氰合金(I)酸根",
+        "ja": "ジシアノ金(I)酸イオン",
+        "fr": "Ion dicyanoaurate(I)"
+      },
+      "variant": {
+        "en": "Linear geometry",
+        "zh-CN": "线形构型",
+        "ja": "直線構造",
+        "fr": "Géométrie linéaire"
+      },
+      "formula": "[Au(CN)2]^-",
+      "atoms": 5,
+      "charge": -1,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "dicyanoaurate-linear/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-dicyanoaurate-linear.zip",
+      "files": [
+        "dicyanoaurate-linear.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "tetrachlorozincate-tetrahedral",
+      "family": "tetrachlorozincate",
+      "group": "coordination",
+      "names": {
+        "en": "Tetrachlorozincate(II) ion",
+        "zh-CN": "四氯合锌(II)酸根",
+        "ja": "テトラクロロ亜鉛(II)酸イオン",
+        "fr": "Ion tétrachlorozincate(II)"
+      },
+      "variant": {
+        "en": "Tetrahedral geometry",
+        "zh-CN": "四面体构型",
+        "ja": "正四面体構造",
+        "fr": "Géométrie tétraédrique"
+      },
+      "formula": "[ZnCl4]^2-",
+      "atoms": 5,
+      "charge": -2,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "tetrachlorozincate-tetrahedral/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-tetrachlorozincate-tetrahedral.zip",
+      "files": [
+        "tetrachlorozincate-tetrahedral.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "tetracyanonickelate-square-planar",
+      "family": "tetracyanonickelate",
+      "group": "coordination",
+      "names": {
+        "en": "Tetracyanonickelate(II) ion",
+        "zh-CN": "四氰合镍(II)酸根",
+        "ja": "テトラシアノニッケル(II)酸イオン",
+        "fr": "Ion tétracyanonickélate(II)"
+      },
+      "variant": {
+        "en": "Square-planar geometry",
+        "zh-CN": "平面正方构型",
+        "ja": "正方形平面構造",
+        "fr": "Géométrie plan carré"
+      },
+      "formula": "[Ni(CN)4]^2-",
+      "atoms": 9,
+      "charge": -2,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "tetracyanonickelate-square-planar/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-tetracyanonickelate-square-planar.zip",
+      "files": [
+        "tetracyanonickelate-square-planar.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "iron-pentacarbonyl-trigonal-bipyramidal",
+      "family": "iron-pentacarbonyl",
+      "group": "coordination",
+      "names": {
+        "en": "Iron pentacarbonyl",
+        "zh-CN": "五羰基铁",
+        "ja": "鉄ペンタカルボニル",
+        "fr": "Pentacarbonyle de fer"
+      },
+      "variant": {
+        "en": "Trigonal-bipyramidal geometry",
+        "zh-CN": "三角双锥构型",
+        "ja": "三方両錐構造",
+        "fr": "Géométrie bipyramidale trigonale"
+      },
+      "formula": "Fe(CO)5",
+      "atoms": 11,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "iron-pentacarbonyl-trigonal-bipyramidal/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-iron-pentacarbonyl-trigonal-bipyramidal.zip",
+      "files": [
+        "iron-pentacarbonyl-trigonal-bipyramidal.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "hexafluorotitanate-octahedral",
+      "family": "hexafluorotitanate",
+      "group": "coordination",
+      "names": {
+        "en": "Hexafluorotitanate(IV) ion",
+        "zh-CN": "六氟合钛(IV)酸根",
+        "ja": "ヘキサフルオロチタン(IV)酸イオン",
+        "fr": "Ion hexafluorotitanate(IV)"
+      },
+      "variant": {
+        "en": "Octahedral geometry",
+        "zh-CN": "八面体构型",
+        "ja": "正八面体構造",
+        "fr": "Géométrie octaédrique"
+      },
+      "formula": "[TiF6]^2-",
+      "atoms": 7,
+      "charge": -2,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "hexafluorotitanate-octahedral/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-hexafluorotitanate-octahedral.zip",
+      "files": [
+        "hexafluorotitanate-octahedral.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "chromium-hexacarbonyl-octahedral",
+      "family": "chromium-hexacarbonyl",
+      "group": "coordination",
+      "names": {
+        "en": "Chromium hexacarbonyl",
+        "zh-CN": "六羰基铬",
+        "ja": "クロムヘキサカルボニル",
+        "fr": "Hexacarbonyle de chrome"
+      },
+      "variant": {
+        "en": "Octahedral geometry",
+        "zh-CN": "八面体构型",
+        "ja": "正八面体構造",
+        "fr": "Géométrie octaédrique"
+      },
+      "formula": "Cr(CO)6",
+      "atoms": 13,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "chromium-hexacarbonyl-octahedral/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-chromium-hexacarbonyl-octahedral.zip",
+      "files": [
+        "chromium-hexacarbonyl-octahedral.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "nickel-tetracarbonyl-tetrahedral",
+      "family": "nickel-tetracarbonyl",
+      "group": "coordination",
+      "names": {
+        "en": "Nickel tetracarbonyl",
+        "zh-CN": "四羰基镍",
+        "ja": "ニッケルテトラカルボニル",
+        "fr": "Tétracarbonyle de nickel"
+      },
+      "variant": {
+        "en": "Tetrahedral geometry",
+        "zh-CN": "四面体构型",
+        "ja": "正四面体構造",
+        "fr": "Géométrie tétraédrique"
+      },
+      "formula": "Ni(CO)4",
+      "atoms": 9,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "nickel-tetracarbonyl-tetrahedral/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-nickel-tetracarbonyl-tetrahedral.zip",
+      "files": [
+        "nickel-tetracarbonyl-tetrahedral.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "trihydrogen-cation",
+      "family": "trihydrogen-cation",
+      "group": "bonding",
+      "names": {
+        "en": "Trihydrogen cation",
+        "zh-CN": "三氢阳离子",
+        "ja": "三水素陽イオン",
+        "fr": "Cation trihydrogène"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "H3^+",
+      "atoms": 3,
+      "charge": 1,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "trihydrogen-cation/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-trihydrogen-cation.zip",
+      "files": [
+        "trihydrogen-cation.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "xenon-difluoride",
+      "family": "xenon-difluoride",
+      "group": "bonding",
+      "names": {
+        "en": "Xenon difluoride",
+        "zh-CN": "二氟化氙",
+        "ja": "二フッ化キセノン",
+        "fr": "Difluorure de xénon"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "XeF2",
+      "atoms": 3,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "SDD",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "xenon-difluoride/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-xenon-difluoride.zip",
+      "files": [
+        "xenon-difluoride.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "diborane-def2svp",
+      "family": "diborane",
+      "group": "bonding",
+      "names": {
+        "en": "Diborane",
+        "zh-CN": "乙硼烷",
+        "ja": "ジボラン",
+        "fr": "Diborane"
+      },
+      "variant": {
+        "en": "def2SVP",
+        "zh-CN": "def2SVP",
+        "ja": "def2SVP",
+        "fr": "def2SVP"
+      },
+      "formula": "B2H6",
+      "atoms": 8,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation at the supplied geometry.",
+        "zh-CN": "在所提供构型上的单点计算。",
+        "ja": "提供された構造での一点計算。",
+        "fr": "Calcul ponctuel sur la géométrie fournie."
+      },
+      "source_urls": [],
+      "open_file": "diborane-def2svp/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-diborane-def2svp.zip",
+      "files": [
+        "diborane-def2svp.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "ethane-staggered",
+      "family": "ethane",
+      "group": "basic",
+      "names": {
+        "en": "Ethane",
+        "zh-CN": "乙烷",
+        "ja": "エタン",
+        "fr": "Éthane"
+      },
+      "variant": {
+        "en": "Staggered conformation",
+        "zh-CN": "交错构象",
+        "ja": "ねじれ形配座",
+        "fr": "Conformation décalée"
+      },
+      "formula": "C2H6",
+      "atoms": 8,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6123"
+      ],
+      "open_file": "ethane-staggered/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-ethane-staggered.zip",
+      "files": [
+        "ethane-staggered.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "ethane-eclipsed",
+      "family": "ethane",
+      "group": "basic",
+      "names": {
+        "en": "Ethane",
+        "zh-CN": "乙烷",
+        "ja": "エタン",
+        "fr": "Éthane"
+      },
+      "variant": {
+        "en": "Eclipsed conformation",
+        "zh-CN": "重叠构象",
+        "ja": "重なり形配座",
+        "fr": "Conformation éclipsée"
+      },
+      "formula": "C2H6",
+      "atoms": 8,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6124"
+      ],
+      "open_file": "ethane-eclipsed/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-ethane-eclipsed.zip",
+      "files": [
+        "ethane-eclipsed.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "allene",
+      "family": "allene",
+      "group": "basic",
+      "names": {
+        "en": "Allene",
+        "zh-CN": "丙二烯",
+        "ja": "アレン",
+        "fr": "Allène"
+      },
+      "variant": {
+        "en": "",
+        "zh-CN": "",
+        "ja": "",
+        "fr": ""
+      },
+      "formula": "C3H4",
+      "atoms": 7,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied allene coordinates.",
+        "zh-CN": "在所提供丙二烯坐标上的单点计算。",
+        "ja": "提供されたアレン座標での一点計算。",
+        "fr": "Calcul ponctuel sur les coordonnées fournies de l’allène."
+      },
+      "source_urls": [
+        "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6122"
+      ],
+      "open_file": "allene/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-allene.zip",
+      "files": [
+        "allene.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "boric-acid-planar",
+      "family": "boric-acid",
+      "group": "basic",
+      "names": {
+        "en": "Boric acid",
+        "zh-CN": "硼酸",
+        "ja": "ホウ酸",
+        "fr": "Acide borique"
+      },
+      "variant": {
+        "en": "Planar conformation",
+        "zh-CN": "平面构象",
+        "ja": "平面配座",
+        "fr": "Conformation plane"
+      },
+      "formula": "B(OH)3",
+      "atoms": 7,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6164"
+      ],
+      "open_file": "boric-acid-planar/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-boric-acid-planar.zip",
+      "files": [
+        "boric-acid-planar.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "cyclohexane-chair",
+      "family": "cyclohexane",
+      "group": "familiar",
+      "names": {
+        "en": "Cyclohexane",
+        "zh-CN": "环己烷",
+        "ja": "シクロヘキサン",
+        "fr": "Cyclohexane"
+      },
+      "variant": {
+        "en": "Chair conformation",
+        "zh-CN": "椅式构象",
+        "ja": "いす形配座",
+        "fr": "Conformation chaise"
+      },
+      "formula": "C6H12",
+      "atoms": 18,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://www.chemtube3d.com/model/michaelmodels/cyclohexane.sdf",
+        "https://www.chemtube3d.com/Sym-D3dcyclohexane/"
+      ],
+      "open_file": "cyclohexane-chair/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-cyclohexane-chair.zip",
+      "files": [
+        "cyclohexane-chair.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "neopentane-tetrahedral",
+      "family": "neopentane",
+      "group": "familiar",
+      "names": {
+        "en": "Neopentane",
+        "zh-CN": "新戊烷",
+        "ja": "ネオペンタン",
+        "fr": "Néopentane"
+      },
+      "variant": {
+        "en": "Tetrahedral conformation",
+        "zh-CN": "四面体构象",
+        "ja": "正四面体配座",
+        "fr": "Conformation tétraédrique"
+      },
+      "formula": "C5H12",
+      "atoms": 17,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6132",
+        "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Angstrom&unit2=Degree&n1=C&n2=C&x2=1.539500&n3=C&x3=1.539500&y3=109.471220&na3=1&nb3=2&n4=C&x4=1.539500&y4=109.471220&z4=120.000000&na4=1&nb4=2&nc4=3&n5=C&x5=1.539500&y5=109.471220&z5=240.000000&na5=1&nb5=2&nc5=3&n6=H&x6=1.094500&y6=111.118000&z6=180.000000&na6=2&nb6=1&nc6=3&n7=H&x7=1.094500&y7=111.118000&z7=120.000000&na7=2&nb7=1&nc7=6&n8=H&x8=1.094500&y8=111.118000&z8=240.000000&na8=2&nb8=1&nc8=6&n9=H&x9=1.094500&y9=111.118000&z9=180.000000&na9=3&nb9=1&nc9=2&n10=H&x10=1.094500&y10=111.118000&z10=120.000000&na10=3&nb10=1&nc10=9&n11=H&x11=1.094500&y11=111.118000&z11=240.000000&na11=3&nb11=1&nc11=9&n12=H&x12=1.094500&y12=111.118000&z12=180.000000&na12=4&nb12=1&nc12=2&n13=H&x13=1.094500&y13=111.118000&z13=120.000000&na13=4&nb13=1&nc13=12&n14=H&x14=1.094500&y14=111.118000&z14=240.000000&na14=4&nb14=1&nc14=12&n15=H&x15=1.094500&y15=111.118000&z15=180.000000&na15=5&nb15=1&nc15=2&n16=H&x16=1.094500&y16=111.118000&z16=120.000000&na16=5&nb16=1&nc16=15&n17=H&x17=1.094500&y17=111.118000&z17=240.000000&na17=5&nb17=1&nc17=15"
+      ],
+      "open_file": "neopentane-tetrahedral/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-neopentane-tetrahedral.zip",
+      "files": [
+        "neopentane-tetrahedral.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "neopentane-chiral-twist",
+      "family": "neopentane",
+      "group": "familiar",
+      "names": {
+        "en": "Neopentane",
+        "zh-CN": "新戊烷",
+        "ja": "ネオペンタン",
+        "fr": "Néopentane"
+      },
+      "variant": {
+        "en": "Chirally twisted conformation",
+        "zh-CN": "手性扭转构象",
+        "ja": "キラルなねじれ配座",
+        "fr": "Conformation torsadée chirale"
+      },
+      "formula": "C5H12",
+      "atoms": 17,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6133"
+      ],
+      "open_file": "neopentane-chiral-twist/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-neopentane-chiral-twist.zip",
+      "files": [
+        "neopentane-chiral-twist.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "biphenyl-twisted",
+      "family": "biphenyl",
+      "group": "familiar",
+      "names": {
+        "en": "Biphenyl",
+        "zh-CN": "联苯",
+        "ja": "ビフェニル",
+        "fr": "Biphényle"
+      },
+      "variant": {
+        "en": "Twisted conformation",
+        "zh-CN": "扭转构象",
+        "ja": "ねじれ配座",
+        "fr": "Conformation torsadée"
+      },
+      "formula": "C12H10",
+      "atoms": 22,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://www2.chem.wisc.edu/deptfiles/OrgLab/UWW/Expt1/job_125027.html"
+      ],
+      "open_file": "biphenyl-twisted/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-biphenyl-twisted.zip",
+      "files": [
+        "biphenyl-twisted.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "biphenyl-planar",
+      "family": "biphenyl",
+      "group": "familiar",
+      "names": {
+        "en": "Biphenyl",
+        "zh-CN": "联苯",
+        "ja": "ビフェニル",
+        "fr": "Biphényle"
+      },
+      "variant": {
+        "en": "Planar conformation",
+        "zh-CN": "平面构象",
+        "ja": "平面配座",
+        "fr": "Conformation plane"
+      },
+      "formula": "C12H10",
+      "atoms": 22,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://www2.chem.wisc.edu/deptfiles/OrgLab/UWW/Expt1/job_125027.html"
+      ],
+      "open_file": "biphenyl-planar/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-biphenyl-planar.zip",
+      "files": [
+        "biphenyl-planar.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "biphenyl-perpendicular",
+      "family": "biphenyl",
+      "group": "familiar",
+      "names": {
+        "en": "Biphenyl",
+        "zh-CN": "联苯",
+        "ja": "ビフェニル",
+        "fr": "Biphényle"
+      },
+      "variant": {
+        "en": "Perpendicular conformation",
+        "zh-CN": "正交构象",
+        "ja": "直交配座",
+        "fr": "Conformation perpendiculaire"
+      },
+      "formula": "C12H10",
+      "atoms": 22,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://www2.chem.wisc.edu/deptfiles/OrgLab/UWW/Expt1/job_125027.html"
+      ],
+      "open_file": "biphenyl-perpendicular/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-biphenyl-perpendicular.zip",
+      "files": [
+        "biphenyl-perpendicular.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "sulfur-crown",
+      "family": "sulfur",
+      "group": "familiar",
+      "names": {
+        "en": "Octasulfur",
+        "zh-CN": "八硫",
+        "ja": "八硫黄",
+        "fr": "Octasoufre"
+      },
+      "variant": {
+        "en": "Crown conformation",
+        "zh-CN": "冠状构象",
+        "ja": "冠形配座",
+        "fr": "Conformation en couronne"
+      },
+      "formula": "S8",
+      "atoms": 8,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6145"
+      ],
+      "open_file": "sulfur-crown/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-sulfur-crown.zip",
+      "files": [
+        "sulfur-crown.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    },
+    {
+      "slug": "ferrocene-staggered",
+      "family": "ferrocene",
+      "group": "coordination",
+      "names": {
+        "en": "Ferrocene",
+        "zh-CN": "二茂铁",
+        "ja": "フェロセン",
+        "fr": "Ferrocène"
+      },
+      "variant": {
+        "en": "Staggered conformation",
+        "zh-CN": "交错构象",
+        "ja": "ねじれ形配座",
+        "fr": "Conformation décalée"
+      },
+      "formula": "C10H10Fe",
+      "atoms": 21,
+      "charge": 0,
+      "multiplicity": 1,
+      "method": "RPBE1PBE",
+      "basis": "def2SVP",
+      "geometry_note": {
+        "en": "Single-point calculation on the supplied ideal conformation.",
+        "zh-CN": "在所提供理想构象上的单点计算。",
+        "ja": "提供された理想配座での一点計算。",
+        "fr": "Calcul ponctuel sur la conformation idéale fournie."
+      },
+      "source_urls": [
+        "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6300&unit1=Molecule&unit2=6301"
+      ],
+      "open_file": "ferrocene-staggered/open.covnbopkg",
+      "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-ferrocene-staggered.zip",
+      "files": [
+        "ferrocene-staggered.fchk",
+        "nbo.log",
+        "nbo.47",
+        "FILE.37",
+        "FILE.49",
+        "FILE.50",
+        "FILE.51",
+        "FILE.52",
+        "FILE.53",
+        "FILE.54",
+        "FILE.55",
+        "FILE.56",
+        "FILE.57",
+        "FILE.58",
+        "FILE.59",
+        "FILE.60",
+        "FILE.61",
+        "FILE.62"
+      ]
+    }
+  ]
+}

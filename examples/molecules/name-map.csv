@@ -1,0 +1,48 @@
+﻿previous_id,folder,name,variant
+G-CART,hydrogen-cation-cartesian-cc-pv5z,Hydrogen molecular ion,Cartesian basis functions
+G-PURE,hydrogen-cation-spherical-cc-pv5z,Hydrogen molecular ion,Spherical basis functions
+NBO-01,water-6-31g-d,Water,6-31G(d)
+NBO-02,methylamine,Methylamine,
+NBO-03,formaldehyde-6-31g-d,Formaldehyde,6-31G(d)
+NBO-04,acetylene-6-31g-d,Acetylene,6-31G(d)
+NBO-05,benzene-6-31g-d,Benzene,6-31G(d)
+NBO-06,formate,Formate ion,
+NBO-07,methyl-radical,Methyl radical,Doublet
+NBO-08,ammonia-borane,Ammonia borane,
+NBO-09,diborane-6-31g-d,Diborane,6-31G(d)
+OLD-040,hydrogen-equilibrium,Hydrogen,Equilibrium-length geometry
+OLD-177,hydrogen-0-60-angstrom,Hydrogen,H-H distance 0.60 Å
+OLD-063,water-def2svp,Water,def2SVP
+OLD-061,carbon-dioxide,Carbon dioxide,
+OLD-065,methane,Methane,
+OLD-049,oxygen-triplet,Oxygen,Triplet
+OLD-068,formaldehyde-def2svp,Formaldehyde,def2SVP
+OLD-070,acetylene-def2svp,Acetylene,def2SVP
+OLD-005,benzene-def2svp,Benzene,def2SVP
+OLD-008,butadiene-planar-trans,"1,3-Butadiene",Planar trans conformation
+OLD-016,butadiene-90-degree-twist,"1,3-Butadiene",90° vinyl-group rotation
+OLD-192,butadiene-0-degree-scan,"1,3-Butadiene",0° scan geometry
+OLD-131,water-dimer,Water dimer,
+OLD-015,naphthalene,Naphthalene,
+OLD-242,dicyanoaurate-linear,Dicyanoaurate(I) ion,Linear geometry
+OLD-004,tetrachlorozincate-tetrahedral,Tetrachlorozincate(II) ion,Tetrahedral geometry
+OLD-248,tetracyanonickelate-square-planar,Tetracyanonickelate(II) ion,Square-planar geometry
+OLD-251,iron-pentacarbonyl-trigonal-bipyramidal,Iron pentacarbonyl,Trigonal-bipyramidal geometry
+OLD-003,hexafluorotitanate-octahedral,Hexafluorotitanate(IV) ion,Octahedral geometry
+OLD-012,chromium-hexacarbonyl-octahedral,Chromium hexacarbonyl,Octahedral geometry
+OLD-272,nickel-tetracarbonyl-tetrahedral,Nickel tetracarbonyl,Tetrahedral geometry
+OLD-001,trihydrogen-cation,Trihydrogen cation,
+OLD-002,xenon-difluoride,Xenon difluoride,
+OLD-010,diborane-def2svp,Diborane,def2SVP
+PG-002,ethane-staggered,Ethane,Staggered conformation
+PG-003,ethane-eclipsed,Ethane,Eclipsed conformation
+PG-001,allene,Allene,
+PG-007,boric-acid-planar,Boric acid,Planar conformation
+PG-014,cyclohexane-chair,Cyclohexane,Chair conformation
+PG-029,neopentane-tetrahedral,Neopentane,Tetrahedral conformation
+PG-028,neopentane-chiral-twist,Neopentane,Chirally twisted conformation
+PG-008,biphenyl-twisted,Biphenyl,Twisted conformation
+PG-009,biphenyl-planar,Biphenyl,Planar conformation
+PG-010,biphenyl-perpendicular,Biphenyl,Perpendicular conformation
+PG-019,sulfur-crown,Octasulfur,Crown conformation
+PG-020,ferrocene-staggered,Ferrocene,Staggered conformation
