@@ -1,0 +1,52 @@
+{
+  "slug": "nickel-tetracarbonyl-tetrahedral",
+  "family": "nickel-tetracarbonyl",
+  "group": "coordination",
+  "names": {
+    "en": "Nickel tetracarbonyl",
+    "zh-CN": "四羰基镍",
+    "ja": "ニッケルテトラカルボニル",
+    "fr": "Tétracarbonyle de nickel"
+  },
+  "variant": {
+    "en": "Tetrahedral geometry",
+    "zh-CN": "四面体构型",
+    "ja": "正四面体構造",
+    "fr": "Géométrie tétraédrique"
+  },
+  "formula": "Ni(CO)4",
+  "atoms": 9,
+  "charge": 0,
+  "multiplicity": 1,
+  "method": "RPBE1PBE",
+  "basis": "def2SVP",
+  "geometry_note": {
+    "en": "Single-point calculation at the supplied geometry.",
+    "zh-CN": "在所提供构型上的单点计算。",
+    "ja": "提供された構造での一点計算。",
+    "fr": "Calcul ponctuel sur la géométrie fournie."
+  },
+  "source_urls": [],
+  "open_file": "nickel-tetracarbonyl-tetrahedral/open.covnbopkg",
+  "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-nickel-tetracarbonyl-tetrahedral.zip",
+  "files": [
+    "nickel-tetracarbonyl-tetrahedral.fchk",
+    "nbo.log",
+    "nbo.47",
+    "FILE.37",
+    "FILE.49",
+    "FILE.50",
+    "FILE.51",
+    "FILE.52",
+    "FILE.53",
+    "FILE.54",
+    "FILE.55",
+    "FILE.56",
+    "FILE.57",
+    "FILE.58",
+    "FILE.59",
+    "FILE.60",
+    "FILE.61",
+    "FILE.62"
+  ]
+}

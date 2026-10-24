@@ -1,0 +1,55 @@
+{
+  "slug": "cyclohexane-chair",
+  "family": "cyclohexane",
+  "group": "familiar",
+  "names": {
+    "en": "Cyclohexane",
+    "zh-CN": "环己烷",
+    "ja": "シクロヘキサン",
+    "fr": "Cyclohexane"
+  },
+  "variant": {
+    "en": "Chair conformation",
+    "zh-CN": "椅式构象",
+    "ja": "いす形配座",
+    "fr": "Conformation chaise"
+  },
+  "formula": "C6H12",
+  "atoms": 18,
+  "charge": 0,
+  "multiplicity": 1,
+  "method": "RPBE1PBE",
+  "basis": "def2SVP",
+  "geometry_note": {
+    "en": "Single-point calculation on the supplied ideal conformation.",
+    "zh-CN": "在所提供理想构象上的单点计算。",
+    "ja": "提供された理想配座での一点計算。",
+    "fr": "Calcul ponctuel sur la conformation idéale fournie."
+  },
+  "source_urls": [
+    "https://www.chemtube3d.com/model/michaelmodels/cyclohexane.sdf",
+    "https://www.chemtube3d.com/Sym-D3dcyclohexane/"
+  ],
+  "open_file": "cyclohexane-chair/open.covnbopkg",
+  "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-cyclohexane-chair.zip",
+  "files": [
+    "cyclohexane-chair.fchk",
+    "nbo.log",
+    "nbo.47",
+    "FILE.37",
+    "FILE.49",
+    "FILE.50",
+    "FILE.51",
+    "FILE.52",
+    "FILE.53",
+    "FILE.54",
+    "FILE.55",
+    "FILE.56",
+    "FILE.57",
+    "FILE.58",
+    "FILE.59",
+    "FILE.60",
+    "FILE.61",
+    "FILE.62"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "slug": "ethane-staggered",
+  "family": "ethane",
+  "group": "basic",
+  "names": {
+    "en": "Ethane",
+    "zh-CN": "乙烷",
+    "ja": "エタン",
+    "fr": "Éthane"
+  },
+  "variant": {
+    "en": "Staggered conformation",
+    "zh-CN": "交错构象",
+    "ja": "ねじれ形配座",
+    "fr": "Conformation décalée"
+  },
+  "formula": "C2H6",
+  "atoms": 8,
+  "charge": 0,
+  "multiplicity": 1,
+  "method": "RPBE1PBE",
+  "basis": "def2SVP",
+  "geometry_note": {
+    "en": "Single-point calculation on the supplied ideal conformation.",
+    "zh-CN": "在所提供理想构象上的单点计算。",
+    "ja": "提供された理想配座での一点計算。",
+    "fr": "Calcul ponctuel sur la conformation idéale fournie."
+  },
+  "source_urls": [
+    "https://symmetry.constructor.university/cgi-bin/group.cgi?group=6123"
+  ],
+  "open_file": "ethane-staggered/open.covnbopkg",
+  "download": "https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-ethane-staggered.zip",
+  "files": [
+    "ethane-staggered.fchk",
+    "nbo.log",
+    "nbo.47",
+    "FILE.37",
+    "FILE.49",
+    "FILE.50",
+    "FILE.51",
+    "FILE.52",
+    "FILE.53",
+    "FILE.54",
+    "FILE.55",
+    "FILE.56",
+    "FILE.57",
+    "FILE.58",
+    "FILE.59",
+    "FILE.60",
+    "FILE.61",
+    "FILE.62"
+  ]
+}
