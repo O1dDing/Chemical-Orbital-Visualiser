@@ -2751,13 +2751,13 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
             const auto& info=*state.selection->spatial_spin;
             const auto value=[&](const std::optional<double>& v){return v?number(*v):std::string(aomo_text(language,"Unavailable"));};
             for(const auto& channel:info.channels){
-                ImGui::Text("%s: E=%s Ha; n=%s",nbo_spin_name(channel.spin),value(channel.energy_hartree).c_str(),value(channel.occupation).c_str());
+                ImGui::Text("%s: E=%s Ha; n=%s",channel.spin==NboSpin::Alpha?"α":channel.spin==NboSpin::Beta?"β":"α+β",value(channel.energy_hartree).c_str(),value(channel.occupation).c_str());
                 for(std::size_t i=0;i<channel.members.size();++i){const auto& member=channel.members[i];
                     ImGui::TextWrapped("%s: E=%s Ha; n=%s; c=%s",member.id.c_str(),value(member.energy_hartree).c_str(),value(member.occupation).c_str(),number(channel.mapping[i]).c_str());}
             }
-            ImGui::TextWrapped("%s",info.detail.c_str());
-            if(!info.energy_hartree)ImGui::TextWrapped("%s",info.energy_status.c_str());
-            if(!info.occupation)ImGui::TextWrapped("%s",info.occupation_status.c_str());
+            ImGui::TextWrapped("%s",aomo_text(language,"Common basis: original α spatial orbitals; β operators and density are expressed in this basis. Source coefficients are unchanged."));
+            if(!info.energy_hartree)ImGui::TextWrapped("%s",aomo_text(language,"Spin-average energy unavailable."));
+            if(!info.occupation)ImGui::TextWrapped("%s",aomo_text(language,"Total occupation unavailable."));
         }
     }
     if(hover && ImGui::GetIO().KeyCtrl && ImGui::GetIO().MouseWheel!=0){
@@ -2837,7 +2837,7 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
                 [&](const auto& node){return node.id==id;});
             if(it==snapshot->nodes.end() || !it->canonical_index)continue;
             const auto label=it->label+"  E="+
-                (it->energy_hartree?number(*it->energy_hartree):"unknown")+
+                (it->energy_hartree?number(*it->energy_hartree):aomo_text(language,"Unavailable"))+
                 " Ha##"+id;
             if(scientific_selectable(label)) {
                 if(it->orbital)state.pending_selection=nbo_single_selection(data,*it->orbital);

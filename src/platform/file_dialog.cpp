@@ -97,6 +97,16 @@ extern "C" { extern char** environ; }
 namespace cov {
 namespace {
 
+const char* dialog_text(ui::Language language, const char* en, const char* zh,
+                        const char* ja, const char* fr) {
+    switch (language) {
+        case ui::Language::ChineseSimplified: return zh;
+        case ui::Language::Japanese: return ja;
+        case ui::Language::French: return fr;
+        default: return en;
+    }
+}
+
 struct DialogRun {
     bool available = true;
     int exit_code = -1;
@@ -104,11 +114,16 @@ struct DialogRun {
     std::string error;
 };
 
-DialogRun run_dialog(const std::vector<std::string>& arguments) {
+DialogRun run_dialog(const std::vector<std::string>& arguments, ui::Language language) {
     DialogRun result;
+    const auto failure = [&](const char* en, const char* zh, const char* ja,
+                             const char* fr, int code) {
+        return std::string(dialog_text(language,en,zh,ja,fr)) + " (" + std::to_string(code) + ")";
+    };
     int descriptors[2];
     if (pipe(descriptors) != 0) {
-        result.error = "Could not create file dialog pipe: " + std::string(std::strerror(errno));
+        result.error = failure("The file picker could not open.","无法打开文件选择窗口。",
+            "ファイル選択画面を開けません。","Impossible d’ouvrir la sélection de fichiers.",errno);
         return result;
     }
 
@@ -125,7 +140,8 @@ DialogRun run_dialog(const std::vector<std::string>& arguments) {
         close(descriptors[0]);
         close(descriptors[1]);
         if (init_error == 0) posix_spawn_file_actions_destroy(&actions);
-        result.error = "Could not configure file dialog: " + std::string(std::strerror(action_error));
+        result.error = failure("The file picker could not open.","无法打开文件选择窗口。",
+            "ファイル選択画面を開けません。","Impossible d’ouvrir la sélection de fichiers.",action_error);
         return result;
     }
 
@@ -142,7 +158,8 @@ DialogRun run_dialog(const std::vector<std::string>& arguments) {
     if (launched != 0) {
         close(descriptors[0]);
         if (launched == ENOENT) result.available = false;
-        else result.error = "Could not start file dialog: " + std::string(std::strerror(launched));
+        else result.error = failure("The file picker could not open.","无法打开文件选择窗口。",
+            "ファイル選択画面を開けません。","Impossible d’ouvrir la sélection de fichiers.",launched);
         return result;
     }
 
@@ -153,7 +170,8 @@ DialogRun run_dialog(const std::vector<std::string>& arguments) {
         if (received == 0) break;
         if (received < 0) {
             if (errno == EINTR) continue;
-            result.error = "Could not read file dialog selection: " + std::string(std::strerror(errno));
+            result.error = failure("The selected path could not be read.","无法读取所选路径。",
+                "選択したパスを読み取れません。","Impossible de lire le chemin sélectionné.",errno);
             break;
         }
         if (result.output.size()+static_cast<std::size_t>(received) > 65536u)
@@ -167,35 +185,48 @@ DialogRun run_dialog(const std::vector<std::string>& arguments) {
     do { waited = waitpid(child,&status,0); }
     while (waited == -1 && errno == EINTR);
     if (waited == -1)
-        result.error = "Could not wait for file dialog: " + std::string(std::strerror(errno));
+        result.error = failure("The file picker could not finish.","文件选择窗口未能完成操作。",
+            "ファイル選択を完了できません。","La sélection de fichiers n’a pas abouti.",errno);
     else if (WIFEXITED(status)) result.exit_code = WEXITSTATUS(status);
-    else result.error = "File dialog terminated unexpectedly";
-    if (too_long) result.error = "File dialog returned an oversized path";
+    else result.error = dialog_text(language,"The file picker closed unexpectedly.","文件选择窗口意外关闭。",
+        "ファイル選択画面が予期せず終了しました。","La sélection de fichiers s’est fermée de manière inattendue.");
+    if (too_long) result.error = dialog_text(language,"The selected path is too long.","所选路径过长。",
+        "選択したパスが長すぎます。","Le chemin sélectionné est trop long.");
     return result;
 }
 
 } // namespace
 
-FileDialogResult open_wavefunction_file_dialog(ui::Language, bool) {
+FileDialogResult open_wavefunction_file_dialog(ui::Language language, bool nbo_input) {
     FileDialogResult result;
+    const std::string title = nbo_input
+        ? dialog_text(language,"Open NBO data","打开 NBO 数据","NBO データを開く","Ouvrir des données NBO")
+        : dialog_text(language,"Open calculation","打开计算文件","計算ファイルを開く","Ouvrir un calcul");
 #if defined(__APPLE__)
     const std::vector<std::vector<std::string>> commands{{
         "osascript", "-e",
-        "POSIX path of (choose file with prompt \"Open wavefunction\")"
+        "POSIX path of (choose file with prompt \"" + title + "\")"
     }};
 #else
     if (!std::getenv("DISPLAY") && !std::getenv("WAYLAND_DISPLAY")) {
         result.supported = false;
         return result;
     }
+    const std::string kind = nbo_input
+        ? dialog_text(language,"NBO data","NBO 数据","NBO データ","Données NBO")
+        : dialog_text(language,"Calculation files","计算文件","計算ファイル","Fichiers de calcul");
+    const std::string patterns = nbo_input ? "*.covnbopkg *.log *.out *.nbo *.47"
+        : "*.fchk *.fch *.chk *.molden *.molden.input *.molden.inp *.covnbopkg";
+    const std::string all = dialog_text(language,"All files","所有文件","すべてのファイル","Tous les fichiers");
     const std::vector<std::vector<std::string>> commands{
-        {"zenity","--file-selection","--title=Open wavefunction"},
-        {"kdialog","--getopenfilename",".",
-         "Wavefunctions (*.fchk *.fch *.chk *.molden *.molden.input *.molden.inp);;All files (*)"}
+        {"zenity","--file-selection","--title="+title,"--file-filter="+kind+" | "+patterns,
+            "--file-filter="+all+" | *"},
+        {"kdialog","--title",title,"--getopenfilename",".",
+            kind+" ("+patterns+");;"+all+" (*)"}
     };
 #endif
     for (const auto& command : commands) {
-        auto launched = run_dialog(command);
+        auto launched = run_dialog(command,language);
         if (!launched.available) continue;
         if (!launched.error.empty()) {
             result.error = std::move(launched.error);
@@ -206,7 +237,9 @@ FileDialogResult open_wavefunction_file_dialog(ui::Language, bool) {
             return result;
         }
         if (launched.exit_code != 0) {
-            result.error = "File dialog exited with status " + std::to_string(launched.exit_code);
+            result.error = std::string(dialog_text(language,"The file picker could not finish.","文件选择窗口未能完成操作。",
+                "ファイル選択を完了できません。","La sélection de fichiers n’a pas abouti.")) +
+                " (" + std::to_string(launched.exit_code) + ")";
             return result;
         }
         if (!launched.output.empty() && launched.output.back() == '\n')
@@ -214,7 +247,8 @@ FileDialogResult open_wavefunction_file_dialog(ui::Language, bool) {
         if (!launched.output.empty() && launched.output.back() == '\r')
             launched.output.pop_back();
         if (launched.output.empty()) {
-            result.error = "File dialog returned an empty path";
+            result.error = dialog_text(language,"No file path was returned.","未返回文件路径。",
+                "ファイルのパスが返されませんでした。","Aucun chemin de fichier n’a été renvoyé.");
             return result;
         }
         result.path = std::filesystem::path(std::move(launched.output));

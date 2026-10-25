@@ -16,7 +16,7 @@ FCHK と NBO データは、同じ分子構造、基底、電子状態を表す�
 
 このテンプレートは、COV のソースツリーで Python 3.11 以降、Gaussian 16W A.03、NBO7 i8 を使って実行します。Gaussian と NBO はあらかじめインストールし、`gaunbo6.bat` がその NBO インストール先を参照するように設定しておく必要があります。A.03 は `Pop=NBO6Read` で NBO7 を呼び出します。ほかの Gaussian リビジョンでは、それぞれのインターフェース設定を使います。このテンプレートは A.03 であることを確認します。
 
-v0.3.0 と v0.4.0-pre.1 のダウンロードパッケージには、このテンプレートは含まれていません。テンプレートはソースツリー内の [tests/validation_process.py](../tests/validation_process.py) を使います。
+テンプレートはソースツリー内の [tests/validation_process.py](../tests/validation_process.py) を使います。
 
 [water.json](../examples/nbo-one-job/water.json) をコピーし、分子、構造、計算手法、基底、電荷、多重度を設定します。サンプルは、固定構造の水分子について PBE1PBE / 6-31G(d) を使う一点計算で、電荷は 0、多重度は 1 です。必要な場合は、`basis_ecp_tail` に明示的な基底/ECP ブロックを指定できます。
 
@@ -36,7 +36,7 @@ python examples/nbo-one-job/cov_one_job.py `
 
 ## 結果を開く
 
-NBO プレビューで `work/water-job/cov-package` を開くか、その中の `drop.covnbopkg` を COV にドラッグします。フォルダーには `canonical.fchk`、一つの `analysis.nbo` レポート、`.47` アーカイブ、指定した軌道行列が入っています。
+COV で `work/water-job/cov-package` を開くか、その中の `drop.covnbopkg` を COV にドラッグします。フォルダーには `canonical.fchk`、一つの `analysis.nbo` レポート、`.47` アーカイブ、指定した軌道行列が入っています。
 
 `cov-package` 内のレポート、アーカイブ、行列は、同じ GenNBO 解析で出力されたものです。`canonical.fchk` と `analysis.nbo` はテンプレートで使うファイル名であり、COV で必須の名前ではありません。`.covnbopkg` ファイルは開くファイルの一覧であり、追加の軌道データを提供するものではありません。
 

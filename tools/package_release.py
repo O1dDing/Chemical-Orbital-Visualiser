@@ -64,15 +64,19 @@ def common_files(target, build):
             destination = target / "docs" / source.name
             copy_file(source, destination)
             text = destination.read_text(encoding="utf-8")
-            text = re.sub(r"\(\.\./README(?:\.zh-CN)?\.md(?:#[^)]*)?\)", "(../README.md)", text)
+            # Each shipped language has a platform quickstart. Its section
+            # headings differ from the repository README, so discard anchors.
+            text = re.sub(r"\((\.\./README(?:\.(?:zh-CN|ja|fr))?\.md)#[^)]*\)", r"(\1)", text)
             destination.write_text(text, encoding="utf-8")
 
 
-def quickstart(platform, version):
+def quickstart(platform, version, language="en"):
+    if language != "en":
+        return translated_quickstart(platform, version, language)
     start = {
         "windows": "Extract the ZIP, then open `cov.exe`.",
         "macos": "Extract the ZIP, then open `Chemical Orbital Visualiser.app`. "
-                 "You can move the app to Applications. This preview is signed locally "
+                 "You can move the app to Applications. This app is signed locally "
                  "and is not notarised. If macOS blocks it, use Finder's Open action "
                  "or Privacy & Security to allow the downloaded app.",
         "linux": "Extract the archive, then run `./cov` from the extracted folder.",
@@ -98,6 +102,7 @@ def quickstart(platform, version):
     browse_help = " In Finder, choose Show Package Contents to browse the app's included help and examples." if platform == "macos" else ""
     return (
         f"# Chemical Orbital Visualiser (COV) {version}\n\n"
+        "**English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [Français](README.fr.md)\n\n"
         "Explore orbital energies, occupations, energy-level diagrams, orbital "
         "composition, and three-dimensional orbital shapes. With matching NBO files, "
         "inspect charge, bonding, and connections between atomic, localised, and molecular orbitals.\n\n"
@@ -111,6 +116,91 @@ def quickstart(platform, version):
         "require the matching report, `.47` archive, and orbital matrices.\n\n"
         f"User help is in `{docs}`.{browse_help} Library notices and the COV licence are included.\n"
     )
+
+
+def translated_quickstart(platform, version, language):
+    docs = "Chemical Orbital Visualiser.app/Contents/Resources/docs" if platform == "macos" else "docs"
+    examples = "Chemical Orbital Visualiser.app/Contents/Resources/examples" if platform == "macos" else "examples"
+    navigation = {
+        "zh-CN": "[English](README.md) · **简体中文** · [日本語](README.ja.md) · [Français](README.fr.md)",
+        "ja": "[English](README.md) · [简体中文](README.zh-CN.md) · **日本語** · [Français](README.fr.md)",
+        "fr": "[English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · **Français**",
+    }[language]
+    introduction = {
+        "zh-CN": "查看轨道能量、电子占据、能级图、轨道组成和三维轨道形状。加载匹配的 NBO 文件后，还可查看电荷、成键，以及原子轨道、局域轨道和分子轨道之间的联系。",
+        "ja": "軌道エネルギー、電子占有数、エネルギー準位図、軌道組成、三次元の軌道形状を確認できます。対応する NBO ファイルがあれば、電荷、結合、原子軌道・局在軌道・分子軌道の関係も確認できます。",
+        "fr": "Explorez les énergies orbitalaires, les occupations électroniques, les diagrammes de niveaux d’énergie, la composition et les formes tridimensionnelles des orbitales. Avec les fichiers NBO correspondants, examinez les charges, les liaisons et les relations entre orbitales atomiques, localisées et moléculaires.",
+    }[language]
+    start = {
+        "zh-CN": {
+            "windows": "解压 ZIP，然后打开 `cov.exe`。",
+            "macos": "解压 ZIP，然后打开 `Chemical Orbital Visualiser.app`。也可将应用移到 Applications。此应用采用本地签名，未经 Apple 公证。如 macOS 阻止打开，可在 Finder 中使用“打开”，或在“隐私与安全性”中允许此应用。",
+            "linux": "解压归档，然后在解压后的目录中运行 `./cov`。",
+        },
+        "ja": {
+            "windows": "ZIP を展開し、`cov.exe` を開きます。",
+            "macos": "ZIP を展開し、`Chemical Orbital Visualiser.app` を開きます。アプリケーションフォルダへ移動することもできます。このアプリはローカル署名済みで、Apple の公証は受けていません。macOS にブロックされた場合は Finder の「開く」、または「プライバシーとセキュリティ」から実行を許可してください。",
+            "linux": "アーカイブを展開し、展開先のフォルダから `./cov` を実行します。",
+        },
+        "fr": {
+            "windows": "Extrayez le ZIP, puis ouvrez `cov.exe`.",
+            "macos": "Extrayez le ZIP, puis ouvrez `Chemical Orbital Visualiser.app`. Vous pouvez déplacer l’application dans Applications. Elle est signée localement et n’est pas notariée par Apple. Si macOS la bloque, utilisez l’action Ouvrir du Finder ou autorisez-la dans Confidentialité et sécurité.",
+            "linux": "Extrayez l’archive, puis lancez `./cov` depuis le dossier extrait.",
+        },
+    }[language][platform]
+    usage = {
+        "zh-CN": f"打开 Gaussian FCHK/FCH 或兼容的 Molden 文件，也可打开计算目录，一起加载波函数及其匹配的 NBO 文件。`{examples}` 中包含一个小型氢分子示例。浏览能级、选择轨道，并在界面中导出能级图或数据。",
+        "ja": f"Gaussian FCHK/FCH または対応する Molden ファイルを開くか、計算フォルダを開いて波動関数と対応する NBO ファイルをまとめて読み込みます。`{examples}` フォルダには小さな水素分子の例があります。準位を参照して軌道を選択し、画面から図やデータをエクスポートできます。",
+        "fr": f"Ouvrez un fichier Gaussian FCHK/FCH ou Molden compatible, ou ouvrez le dossier de calcul pour charger ensemble la fonction d’onde et les fichiers NBO correspondants. Le dossier `{examples}` contient un petit exemple de molécule d’hydrogène. Parcourez les niveaux, sélectionnez une orbitale, puis exportez des diagrammes ou des données depuis l’interface.",
+    }[language]
+    requirements = {
+        "zh-CN": {
+            "windows": "需要 Windows x64 和 OpenGL 2.1 或更新版本。轨道渲染在 NVIDIA CUDA 可用时使用 CUDA，否则使用 CPU。GPU 运行需要兼容 CUDA 12.8 的 NVIDIA 驱动；无需另行安装 CUDA 工具包。界面字体使用 Windows 系统字体。",
+            "macos": "需要 macOS 12 或更新版本、Apple 芯片或 Intel 处理器，以及 OpenGL 2.1。应用包含原生 Metal 模块和 CPU 回退。界面字体使用 macOS 系统字体。",
+            "linux": "需要 Linux x86_64、glibc 2.35 或更新版本、X11 显示环境（或 XWayland）和 OpenGL 2.1。此 CPU 版本在 Ubuntu 22.04 上构建。C++ 运行库已链接到程序中；显示及系统库由发行版提供。在 Ubuntu/Debian 上，可使用以下命令安装运行库和界面字体：",
+        },
+        "ja": {
+            "windows": "Windows x64 と OpenGL 2.1 以降が必要です。軌道描画には利用可能な場合に NVIDIA CUDA を使用し、それ以外は CPU を使用します。GPU での実行には CUDA 12.8 対応の NVIDIA ドライバーが必要です。CUDA ツールキットの追加インストールは不要です。画面には Windows のシステムフォントを使用します。",
+            "macos": "macOS 12 以降、Apple シリコンまたは Intel、OpenGL 2.1 が必要です。アプリにはネイティブ Metal モジュールと CPU へのフォールバックが含まれます。画面には macOS のシステムフォントを使用します。",
+            "linux": "Linux x86_64、glibc 2.35 以降、X11 ディスプレイ（または XWayland）、OpenGL 2.1 が必要です。この CPU ビルドは Ubuntu 22.04 で作成されています。C++ ランタイムは実行ファイルにリンクされ、ディスプレイとシステムのライブラリはディストリビューションが提供します。Ubuntu/Debian では、次のコマンドで実行時ライブラリと画面用フォントをインストールできます。",
+        },
+        "fr": {
+            "windows": "Windows x64 et OpenGL 2.1 ou ultérieur sont nécessaires. Le rendu orbital utilise NVIDIA CUDA lorsqu’il est disponible, et le CPU sinon. L’utilisation du GPU nécessite un pilote NVIDIA compatible avec CUDA 12.8 ; l’installation du toolkit CUDA est facultative. Les polices de l’interface proviennent de Windows.",
+            "macos": "macOS 12 ou ultérieur, un processeur Apple silicon ou Intel et OpenGL 2.1 sont nécessaires. L’application inclut le module Metal natif et le repli sur le CPU. Les polices de l’interface proviennent de macOS.",
+            "linux": "Linux x86_64 avec glibc 2.35 ou ultérieur, un affichage X11 (ou XWayland) et OpenGL 2.1 sont nécessaires. Cette version CPU est construite sur Ubuntu 22.04. Le runtime C++ est lié à l’exécutable ; les bibliothèques d’affichage et système proviennent de votre distribution. Sur Ubuntu/Debian, installez les bibliothèques et les polices avec :",
+        },
+    }[language][platform]
+    if platform == "linux":
+        requirements += "\n\n```sh\nsudo apt-get install libgl1 libx11-6 libxrandr2 libxinerama1 libxcursor1 libxi6 fonts-dejavu-core fonts-noto-cjk\n```"
+    dependencies = {
+        "zh-CN": "Gaussian CHK 转换需要您另行安装的 `formchk`。本包不含 Gaussian 和 NBO 程序。NBO 形状和组成需要匹配的报告、`.47` 归档和轨道矩阵。",
+        "ja": "Gaussian CHK の変換には、別途インストールした `formchk` が必要です。Gaussian と NBO のプログラムは含まれていません。NBO の形状と組成には、対応するレポート、`.47` アーカイブ、軌道行列が必要です。",
+        "fr": "La conversion des fichiers Gaussian CHK nécessite votre propre installation de `formchk`. Les programmes Gaussian et NBO ne sont pas inclus. Les formes et la composition NBO nécessitent le rapport, l’archive `.47` et les matrices orbitalaires correspondants.",
+    }[language]
+    help_text = {
+        "zh-CN": f"用户帮助位于 `{docs}`。随包附有库声明和 COV 许可证。",
+        "ja": f"ユーザーヘルプは `{docs}` にあります。ライブラリの告知と COV のライセンスも同梱しています。",
+        "fr": f"L’aide se trouve dans `{docs}`. Les notices des bibliothèques et la licence de COV sont incluses.",
+    }[language]
+    if platform == "macos":
+        help_text += {
+            "zh-CN": " 在 Finder 中选择“显示包内容”，即可浏览随应用附带的帮助和示例。",
+            "ja": " Finder で「パッケージの内容を表示」を選ぶと、同梱のヘルプと例を参照できます。",
+            "fr": " Dans le Finder, choisissez Afficher le contenu du paquet pour parcourir l’aide et les exemples inclus.",
+        }[language]
+    return f"# Chemical Orbital Visualiser (COV) {version}\n\n{navigation}\n\n{introduction}\n\n{start}\n\n{usage}\n\n{requirements}\n\n{dependencies}\n\n{help_text}\n"
+
+
+def write_quickstarts(target, platform, version):
+    for language, suffix in (("en", ""), ("zh-CN", ".zh-CN"), ("ja", ".ja"), ("fr", ".fr")):
+        (target / f"README{suffix}.md").write_text(quickstart(platform, version, language), encoding="utf-8")
+
+
+def numeric_version(version):
+    match = re.fullmatch(r"v(\d+\.\d+\.\d+)(?:-[A-Za-z0-9.]+)?", version)
+    if not match:
+        raise RuntimeError("Invalid release version")
+    return match.group(1)
 
 
 def inspect_windows(binary, audit):
@@ -236,8 +326,8 @@ def prepare_macos(app, audit, version):
     info = {
         "CFBundleName": "Chemical Orbital Visualiser", "CFBundleDisplayName": "Chemical Orbital Visualiser",
         "CFBundleIdentifier": "org.chemicalorbitalvisualiser.cov", "CFBundleExecutable": "cov",
-        "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "0.4.0",
-        "CFBundleVersion": "0.4.0d4", "COVReleaseVersion": version,
+        "CFBundlePackageType": "APPL", "CFBundleShortVersionString": numeric_version(version),
+        "CFBundleVersion": numeric_version(version), "COVReleaseVersion": version,
         "LSMinimumSystemVersion": "12.0", "NSHighResolutionCapable": True,
     }
     with (app / "Contents/Info.plist").open("wb") as stream:
@@ -257,9 +347,10 @@ def package(args):
         raise RuntimeError("Requested source commit does not match the checkout")
     if run("git", "-C", source_root, "status", "--porcelain", "--untracked-files=normal").strip():
         raise RuntimeError("Release packaging requires a clean source checkout")
-    if not re.fullmatch(r"v\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?", args.version):
-        raise RuntimeError("Invalid release version")
+    base_version = numeric_version(args.version)
     cache = (build / "CMakeCache.txt").read_text(encoding="utf-8")
+    if not re.search(rf"^CMAKE_PROJECT_VERSION:STATIC={re.escape(base_version)}$", cache, re.MULTILINE):
+        raise RuntimeError("Release version does not match the configured project version")
     home = re.search(r"^CMAKE_HOME_DIRECTORY:INTERNAL=(.+)$", cache, re.MULTILINE)
     # Resolve both paths: macOS /var aliases /private/var, and Windows runner
     # temporary paths may use short names. Comparing only one resolved side
@@ -284,13 +375,12 @@ def package(args):
     with tempfile.TemporaryDirectory(prefix="cov-package-") as temporary:
         stage = Path(temporary) / name
         stage.mkdir()
-        readme = quickstart(args.platform, args.version)
-        (stage / "README.md").write_text(readme, encoding="utf-8")
+        write_quickstarts(stage, args.platform, args.version)
         if args.platform == "macos":
             app = stage / "Chemical Orbital Visualiser.app"
             resources = app / "Contents/Resources"
             common_files(resources, build)
-            (resources / "README.md").write_text(readme, encoding="utf-8")
+            write_quickstarts(resources, args.platform, args.version)
             copy_file(build / "cov", app / "Contents/MacOS/cov")
             copy_file(build / "libcov_compute_metal.dylib", app / "Contents/MacOS/libcov_compute_metal.dylib")
             prepare_macos(app, audit, args.version)

@@ -16,7 +16,7 @@ Le [modèle de travail unique](../examples/nbo-one-job/cov_one_job.py) lance suc
 
 Le modèle s’exécute depuis l’arborescence des sources de COV avec Python 3.11 ou ultérieur, Gaussian 16W A.03 et NBO7 i8. Gaussian et NBO doivent être déjà installés, et `gaunbo6.bat` doit pointer vers cette installation NBO. A.03 utilise `Pop=NBO6Read` pour appeler NBO7. Les autres révisions de Gaussian ont leur propre configuration d’interface ; ce modèle vérifie la présence d’A.03.
 
-Les paquets téléchargeables v0.3.0 et v0.4.0-pre.1 n’incluent pas le modèle. Celui-ci utilise [tests/validation_process.py](../tests/validation_process.py) dans l’arborescence des sources.
+Le modèle utilise [tests/validation_process.py](../tests/validation_process.py) dans l’arborescence des sources.
 
 Copiez [water.json](../examples/nbo-one-job/water.json) et définissez la molécule, la géométrie, la méthode, la base, la charge et la multiplicité. L’exemple est un calcul ponctuel sur l’eau à géométrie fixe avec PBE1PBE / 6-31G(d), de charge 0 et de multiplicité 1. `basis_ecp_tail` accepte le bloc explicite de base/ECP si nécessaire.
 
@@ -36,7 +36,7 @@ Le modèle autorise jusqu’à trois threads Gaussian. L’arbre des processus e
 
 ## Ouvrir le résultat
 
-Ouvrez `work/water-job/cov-package` dans la préversion NBO, ou glissez son fichier `drop.covnbopkg` dans COV. Le dossier contient `canonical.fchk`, un rapport `analysis.nbo`, l’archive `.47` et les matrices orbitalaires demandées.
+Ouvrez `work/water-job/cov-package` dans COV, ou glissez son fichier `drop.covnbopkg` dans COV. Le dossier contient `canonical.fchk`, un rapport `analysis.nbo`, l’archive `.47` et les matrices orbitalaires demandées.
 
 Le rapport, l’archive et les matrices dans `cov-package` proviennent de la même analyse GenNBO. `canonical.fchk` et `analysis.nbo` sont les noms utilisés par le modèle ; COV n’exige pas ces noms exacts. Le fichier `.covnbopkg` est une liste de fichiers à ouvrir, pas une source supplémentaire de données orbitalaires.
 

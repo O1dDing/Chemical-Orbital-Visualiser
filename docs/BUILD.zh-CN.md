@@ -1,8 +1,8 @@
 # 从源码编译 Chemical Orbital Visualiser
 
-[English](BUILD.md)
+[English](BUILD.md) · **简体中文** · [日本語](BUILD.ja.md) · [Français](BUILD.fr.md)
 
-本文适用于当前源码树。已发布的 Windows 下载包有各自的平台要求；修改源码构建配置不会改变已有下载包。
+本文适用于当前源码树。已发布程序包及其平台要求见[下载说明](../README.zh-CN.md#下载)。
 
 ## 环境要求
 
@@ -86,6 +86,18 @@ cmake --build build/sycl --parallel
 
 COV 读取 Gaussian FCHK/FCH 和 Molden 波函数。打开 CHK 需要单独安装 `formchk`；找不到转换器时，将 `COV_FORMCHK` 设为可执行文件的完整路径。Gaussian `.log` 或 `.out` 可补充波函数信息，不能替代 FCHK/FCH。
 
-每个输入最多 100 个原子。支持 Cartesian 和实球谐 `s/p/d/f/g` 基函数。Molden 展开后的基函数数目须与轨道系数一致。
+每个输入最多 100 个原子。支持笛卡尔和实球谐 `s/p/d/f/g` 基函数。Molden 展开后的基函数数目须与每个分子轨道的系数一致。超出范围的系数索引会被视为输入或壳层约定错误，解析器不会猜测修复。
+
+## 渲染结构
+
+CPU 解析输入，并整理所选轨道用于网格计算。CPU 或选定的计算后端求取三维网格，再由桌面程序上传为 OpenGL 三维纹理。CUDA 也可直接写入纹理。渲染器从该纹理绘制正、负等值面；调整等值面值只改变显示，无需重新计算轨道网格。
+
+对每个网格点，计算器求取：
+
+$$
+\psi_i(\mathbf r)=\sum_\mu C_{\mu i}\chi_\mu(\mathbf r).
+$$
+
+计算时不分配“网格点数 × 基函数数”的完整矩阵。可选网格分辨率为 64³、128³、256³ 和 512³。
 
 Gaussian/NBO 文件准备见[单次作业模板](NBO_ONE_JOB.zh-CN.md)。

@@ -254,6 +254,7 @@ std::optional<std::filesystem::path> file_browser(cov::ui::Language language) {
     static auto directory = std::filesystem::current_path();
     static std::array<char, 2048> location{};
     static std::string error;
+    static bool folder_read_error=false;
     ImGui::TextUnformatted(cov::ui::tr(cov::ui::Text::OpenFile, language));
     ImGui::TextWrapped("%s", path_to_utf8(directory).c_str());
     if (ImGui::Button("..") && directory.has_parent_path()) directory = directory.parent_path();
@@ -264,9 +265,16 @@ std::optional<std::filesystem::path> file_browser(cov::ui::Language language) {
         auto next = path_from_utf8(location.data());
         if (std::filesystem::is_directory(next, ec)) { directory = next; error.clear(); }
         else if (std::filesystem::is_regular_file(next, ec)) { selected = next; ImGui::CloseCurrentPopup(); }
-        else error = ec ? ec.message() : path_to_utf8(next);
+        else {error = ec ? ec.message() : path_to_utf8(next);folder_read_error=false;}
     }
-    if (!error.empty()) ImGui::TextWrapped("%s", error.c_str());
+    if (!error.empty()) {
+        ImGui::TextWrapped("%s",cov::ui::aomo_text(language,folder_read_error?
+            "The folder could not be read.":"The path could not be opened."));
+        if(ImGui::TreeNode(cov::ui::aomo_text(language,"Error details"))) {
+            ImGui::TextWrapped("%s",error.c_str());
+            ImGui::TreePop();
+        }
+    }
     if (ImGui::BeginChild("##entries", ImVec2(0, -36), true)) {
         std::error_code ec;
         std::vector<std::pair<bool, std::filesystem::path>> entries;
@@ -276,7 +284,7 @@ std::optional<std::filesystem::path> file_browser(cov::ui::Language language) {
             if (ec) break;
             entries.emplace_back(folder, it->path());
         }
-        if (ec) error = ec.message();
+        if (ec) {error = ec.message();folder_read_error=true;}
         std::sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) {
             return a.first != b.first ? a.first > b.first : a.second.filename() < b.second.filename();
         });
@@ -977,7 +985,9 @@ int main(int argc, char** argv) {
             // standalone canonical name set immediately before the attached one.
             cov::ui::prepare_nbo_aomo_state(nbo_ui.aomo,*integration,*wavefunction);
             status=nbo_ui.error.empty()?StatusKind::Loaded:StatusKind::Error;
-            status_detail=nbo_ui.error.empty()?integration->dataset.source.path:nbo_ui.error;
+            status_detail=nbo_ui.error.empty()?integration->dataset.source.path:
+                cov::ui::aomo_text(language,"NBO orbital data could not be displayed.");
+            if(!nbo_ui.error.empty())status_error_detail=nbo_ui.error;
             // Do not build large diagnostic payloads during ordinary viewing.
             if(cov::validation::active() && !cov::validation::forensic_mode())
                 cov::validation::record("nbo.integration",cov::serialize_nbo_integration_json(*integration));
@@ -1021,7 +1031,7 @@ int main(int argc, char** argv) {
             profile_stage("nbo-read-and-association");
             attach_integration(std::move(next_integration),true);
             profile_stage("nbo-analysis");
-            nbo_ui.input_status=candidate.label;
+            nbo_ui.input_status=cov::ui::nbo_input_candidate_display_label(candidate,language);
             if(const auto* matched=cov::nbo_capability(*integration,"source_association");
                matched && matched->state==cov::NboCapabilityState::Rejected){
                 nbo_ui.error="NBO data mismatch: "+matched->detail;
@@ -1091,8 +1101,9 @@ int main(int argc, char** argv) {
                 if(dialog.selected())load_inputs({dialog.path});
                 else if(!dialog.cancelled&&!dialog.error.empty()){
                     status=StatusKind::Error;
-                    status_detail=dialog.supported?dialog.error:
+                    status_detail=dialog.supported?cov::ui::aomo_text(language,"The file picker could not be opened."):
                         cov::ui::tr(cov::ui::Text::OpenDialogUnsupported,language);
+                    status_error_detail=dialog.error;
                 }
             }
             if (evaluator) {
@@ -1394,7 +1405,7 @@ int main(int argc, char** argv) {
                     if(evidence.value)ImGui::Text("%.5g %s",*evidence.value,evidence.units.c_str());
                 }
                 if(overlay)for(auto atom:nbo_ui.selected_atoms)if(atom<overlay->atom_values.size() && overlay->atom_values[atom])
-                    ImGui::Text("Atom %zu: %+.6f",atom+1,*overlay->atom_values[atom]);
+                    ImGui::Text(cov::ui::aomo_text(language,"Atom %zu: %+.6f"),atom+1,*overlay->atom_values[atom]);
                 cov::validation::field("scene.orbital_label",label);
                 cov::validation::field("scene.overlay_fields",std::to_string(additional_fields.size()+1));
             }
@@ -1558,8 +1569,9 @@ int main(int argc, char** argv) {
                 } else if (!dialog.cancelled && !dialog.error.empty()) {
                     status = StatusKind::Error;
                     status_detail = dialog.supported
-                                        ? dialog.error
+                                        ? cov::ui::aomo_text(language,"The file picker could not be opened.")
                                         : cov::ui::tr(cov::ui::Text::OpenDialogUnsupported, language);
+                    status_error_detail=dialog.error;
                 }
             }
             if (const auto selected = file_browser(language)) load_inputs({*selected});
@@ -2094,15 +2106,18 @@ int main(int argc, char** argv) {
                     const auto candidate=nbo_ui.input_discovery->candidates[selected];
                     try {apply_candidate(candidate);}catch(const std::exception& e){
                         clear_integration();nbo_ui.input_discovery.reset();nbo_ui.error=e.what();
-                        nbo_ui.input_status="NBO association failed; Gaussian view is retained";
-                        status=StatusKind::Error;status_detail=nbo_ui.error;
+                        nbo_ui.input_status=cov::ui::aomo_text(language,"NBO association failed; the Gaussian view remains available.");
+                        status=StatusKind::Error;status_detail=nbo_ui.input_status;
+                        status_error_detail=nbo_ui.error;
                     }
                 }
             }
             if(nbo_ui.aomo.pending_selection){
                 const auto selection=*nbo_ui.aomo.pending_selection;nbo_ui.aomo.pending_selection.reset();
                 try{apply_selection(selection);}catch(const std::exception& e){nbo_ui.aomo.status=e.what();
-                    nbo_ui.error=e.what();status=StatusKind::Error;status_detail=e.what();
+                    nbo_ui.error=e.what();status=StatusKind::Error;
+                    status_detail=cov::ui::aomo_text(language,"The selected orbital could not be displayed.");
+                    status_error_detail=e.what();
                     cov::validation::record("aomo.selection.error","{\"reason\":"+cov::validation::quote(e.what())+"}");}
             }
             if(nbo_ui.aomo.export_requested){
@@ -2145,7 +2160,8 @@ int main(int argc, char** argv) {
                     evaluate_now();
                 } catch (const std::exception& e) {
                     status = StatusKind::Error;
-                    status_detail = e.what();
+                    status_detail = cov::ui::aomo_text(language,"The orbital grid could not be calculated.");
+                    status_error_detail = e.what();
                     recompute = false;
                 }
             }

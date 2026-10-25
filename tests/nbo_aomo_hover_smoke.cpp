@@ -1,5 +1,6 @@
 #include "cov/nbo_aomo_hover.hpp"
 #include "cov/nbo_aomo_ui.hpp"
+#include "cov/nbo_aomo_text.hpp"
 #include <iostream>
 #include <stdexcept>
 
@@ -125,6 +126,28 @@ int main(){try {
         require_glyphs(without_symmetry,seed);
     }
     wf.orbitals[0].source_orbital_index=source_index;
+    NboAomoNode spatial;spatial.label="SALC 1";
+    spatial.spatial_spin.emplace();
+    spatial.spatial_spin->energy_status="Mean unavailable: alpha: Spin Fock unavailable";
+    spatial.spatial_spin->occupation_status="Total unavailable: beta: Spin density unavailable";
+    NboSpinChannelProjection alpha;alpha.spin=NboSpin::Alpha;
+    alpha.energy_hartree=-0.25;alpha.occupation=1.0;
+    spatial.spatial_spin->channels.push_back(alpha);
+    for(auto language:{Language::English,Language::ChineseSimplified,Language::Japanese,Language::French}) {
+        const auto lines=nbo_aomo_hover_lines(spatial,wf,data,nullptr,language);
+        std::string text;
+        for(const auto& line:lines)text+=line+'\n';
+        require(text.find("α: E=-0.25 Ha; n=1")!=std::string::npos,
+                "source spin values or channel identity changed");
+        require(text.find(aomo_text(language,"Spin-average energy unavailable."))!=std::string::npos,
+                "missing spin energy not localized");
+        require(text.find(aomo_text(language,"Total occupation unavailable."))!=std::string::npos,
+                "missing total occupation not localized");
+        require(text.find("Mean unavailable: alpha:")==std::string::npos &&
+                text.find("Total unavailable: beta:")==std::string::npos,
+                "raw spin status reached hover");
+        require_glyphs(text,nbo_aomo_glyph_seed(language));
+    }
     NboAomoNode group;group.label="Set (3)";group.group_header=true;group.canonical_index=0;
     require(render(group).find("subspace")!=std::string::npos && render(group).find("[\xCE\xB2]")==std::string::npos,"group header misrepresented as an individual orbital");
     require(wf.orbitals[0].occupation==2 && data.dataset.naos[0].angular=="px","hover changed source data");

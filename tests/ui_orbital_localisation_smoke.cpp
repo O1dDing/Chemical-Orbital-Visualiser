@@ -1,4 +1,6 @@
 #include "cov/orbital_ui_text.hpp"
+#include "cov/nbo_aomo_text.hpp"
+#include "cov/nbo_ui.hpp"
 
 #include <array>
 #include <cstdio>
@@ -48,6 +50,62 @@ int main() {
         Language::Japanese,
         Language::French,
     };
+
+    // These errors and source-spin summaries used to bypass the catalogue and
+    // expose English exceptions or internal status tokens in other languages.
+    constexpr const char* integration_text[]{
+        "Atom %zu: %+.6f",
+        "NBO association failed; the Gaussian view remains available.",
+        "NBO orbital data could not be displayed.",
+        "The selected orbital could not be displayed.",
+        "The orbital grid could not be calculated.",
+        "The file picker could not be opened.",
+        "The folder could not be read.",
+        "The path could not be opened.",
+        "Common basis: original α spatial orbitals; β operators and density are expressed in this basis. Source coefficients are unchanged.",
+        "Spin-average energy unavailable.",
+        "Total occupation unavailable.",
+        "Error details",
+        "Current Gaussian wavefunction",
+        "NBO report unavailable",
+        "Analysis step",
+    };
+    for (const auto language : languages) {
+        const auto seed=cov::ui::nbo_aomo_text_glyph_seed(language);
+        for (const auto* key : integration_text) {
+            const std::string_view translated=cov::ui::aomo_text(language,key);
+            require_contains(seed,translated,"integration text glyph seed");
+            if(language!=Language::English)
+                require(translated!=key,"untranslated integration UI: "+std::string(key));
+        }
+        std::array<char,128> atom_label{};
+        const auto length=std::snprintf(atom_label.data(),atom_label.size(),
+            cov::ui::aomo_text(language,"Atom %zu: %+.6f"),std::size_t{12},0.125);
+        require(length>0 && static_cast<std::size_t>(length)<atom_label.size(),
+                "atom tooltip formatting failed");
+        require_contains(atom_label.data(),"12","atom tooltip identity");
+        require_contains(atom_label.data(),"+0.125000","atom tooltip charge");
+
+        cov::NboInputCandidate candidate;
+        candidate.label="active Gaussian | report.out segment 7 | folder";
+        candidate.canonical=std::filesystem::u8path("folder/分子.fchk");
+        candidate.report=std::filesystem::u8path("folder/结果.out");
+        candidate.analysis_segment=7;
+        const auto label=cov::ui::nbo_input_candidate_display_label(candidate,language);
+        require_contains(label,"分子.fchk","candidate canonical path");
+        require_contains(label,"结果.out","candidate report path");
+        const auto step=std::string(cov::ui::aomo_text(language,"Analysis step"))+" 7";
+        require_contains(label,step,"candidate segment identity");
+        require(label.find(step)==label.rfind(step),"candidate step displayed twice");
+        require(label.find("active Gaussian")==std::string::npos &&
+                label.find("segment")==std::string::npos,"backend candidate label leaked into UI");
+        candidate.canonical.clear();candidate.report.clear();
+        const auto missing=cov::ui::nbo_input_candidate_display_label(candidate,language);
+        require_contains(missing,cov::ui::aomo_text(language,"Current Gaussian wavefunction"),
+                         "candidate active wavefunction");
+        require_contains(missing,cov::ui::aomo_text(language,"NBO report unavailable"),
+                         "candidate missing report");
+    }
 
     for (const auto language : languages) {
         for (std::size_t key = 0;

@@ -28,6 +28,6 @@ NBO exports include report tables, `.nbo.json`, `.view.json`, `.view.svg` and `.
 
 The local plan protocol and scene capture are described in [native checks](native-validation.md). NBO controls use `nbo.*` semantic targets; composition controls use `nbo.focus.*`.
 
-The NBO preview source includes `tests/nbo_integration_suite.py` and `tests/nbo_focus_suite.py` to read existing producer data and compare imports, exports and selected GPU textures. Their corresponding negative-input scripts check rejected or incomplete inputs. Independent reference libraries are supplied separately. These checks use fresh result directories and do not start chemistry jobs.
+The source tree includes `tests/nbo_integration_suite.py` and `tests/nbo_focus_suite.py` to read existing producer data and compare imports, exports and selected GPU textures. Their corresponding negative-input scripts check rejected or incomplete inputs. Independent reference libraries are supplied separately. These checks use fresh result directories and do not start chemistry jobs.
 
 Method references are listed in [NBO and symmetry references](SCIENTIFIC-SOURCES.md).

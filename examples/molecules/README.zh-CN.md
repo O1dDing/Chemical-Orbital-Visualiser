@@ -10,7 +10,7 @@
 
 在 COV 中打开 `open.covnbopkg`，可一起载入该样本的分子轨道和 NBO 数据。也可以单独打开 FCHK 文件查看分子轨道。
 
-这里提供计算文件。[COV v0.4.0-pre.4](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/tag/v0.4.0-pre.4) 可在 Windows、macOS 和 Linux 上打开这些样本；查看已有结果无需安装 Gaussian 或 NBO。
+这里提供计算文件。[COV v0.4.0](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/tag/v0.4.0) 可在 Windows、macOS 和 Linux 上打开这些样本；查看已有结果无需安装 Gaussian 或 NBO。
 
 ## 基础小分子
 

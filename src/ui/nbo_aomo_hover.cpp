@@ -160,13 +160,14 @@ std::vector<std::string> nbo_aomo_hover_lines(const NboAomoNode& node,
             std::ostringstream out;out<<std::setprecision(9)<<*v;return out.str();};
         lines={title};
         for(const auto& channel:node.spatial_spin->channels){
-            lines.push_back(std::string(nbo_spin_name(channel.spin))+": E="+value(channel.energy_hartree)+" Ha; n="+value(channel.occupation));
+            lines.push_back(std::string(channel.spin==NboSpin::Alpha?"α":channel.spin==NboSpin::Beta?"β":"α+β")+": E="+value(channel.energy_hartree)+" Ha; n="+value(channel.occupation));
             // Rotated source diagonals differ from the common-basis expectation.
             if(channel.members.size()==1){const auto& source=channel.members.front();
                 lines.push_back(source.id+": E="+value(source.energy_hartree)+" Ha; n="+value(source.occupation));}
         }
         lines.push_back("E=(Eα+Eβ)/2: "+value(node.spatial_spin->energy_hartree)+" Ha; n=nα+nβ: "+value(node.spatial_spin->occupation));
-        if(!node.spatial_spin->energy_hartree)lines.push_back(node.spatial_spin->energy_status);
+        if(!node.spatial_spin->energy_hartree)lines.push_back(aomo_text(language,"Spin-average energy unavailable."));
+        if(!node.spatial_spin->occupation)lines.push_back(aomo_text(language,"Total occupation unavailable."));
         return lines;
     }
     if(node.canonical_index) {

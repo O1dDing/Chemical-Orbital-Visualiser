@@ -10,7 +10,7 @@
 
 COV で `open.covnbopkg` を開くと、分子軌道と NBO データをまとめて読み込めます。FCHK ファイル単独でも分子軌道を表示できます。
 
-ここにあるのは計算ファイルです。[COV v0.4.0-pre.4](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/tag/v0.4.0-pre.4) は Windows・macOS・Linux でこれらを開けます。保存済みの結果を見る際、Gaussian や NBO のインストールは不要です。
+ここにあるのは計算ファイルです。[COV v0.4.0](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/tag/v0.4.0) は Windows・macOS・Linux でこれらを開けます。保存済みの結果を見る際、Gaussian や NBO のインストールは不要です。
 
 ## 基本的な小分子
 

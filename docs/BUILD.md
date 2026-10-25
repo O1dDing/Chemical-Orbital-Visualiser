@@ -1,8 +1,8 @@
 # Build Chemical Orbital Visualiser
 
-[简体中文](BUILD.zh-CN.md)
+**English** · [简体中文](BUILD.zh-CN.md) · [日本語](BUILD.ja.md) · [Français](BUILD.fr.md)
 
-These instructions apply to this source tree. Published Windows downloads have their own platform requirements; changing a source build does not change an existing download.
+These instructions apply to this source tree. For the published packages and their platform requirements, see the [download page](../README.md#download).
 
 ## Requirements
 
@@ -94,9 +94,9 @@ The CPU parses the input and packs the selected orbital for grid computation. Th
 
 For each grid point, the evaluator computes
 
-\[
+$$
 \psi_i(\mathbf r)=\sum_\mu C_{\mu i}\chi_\mu(\mathbf r).
-\]
+$$
 
 It does not allocate a full grid-points-by-basis-functions matrix. Available grid resolutions are 64³, 128³, 256³ and 512³.
 

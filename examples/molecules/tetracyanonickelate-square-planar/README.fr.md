@@ -1,4 +1,4 @@
-# Ion tétracyanonickélate(II) — Géométrie plan carré
+# Ion tétracyanonickélate(II) — Géométrie carrée plane
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · **Français**
 
@@ -12,7 +12,7 @@
 | Multiplicité de spin | 1 |
 | Méthode | RPBE1PBE |
 | Base | def2SVP |
-| Conformation / variante | Géométrie plan carré |
+| Conformation / variante | Géométrie carrée plane |
 
 Calcul ponctuel sur la géométrie fournie.
 

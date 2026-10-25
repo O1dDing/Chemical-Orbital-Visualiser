@@ -10,7 +10,7 @@ Les exemples se téléchargent individuellement ou en une seule archive. Les fic
 
 Ouvrir `open.covnbopkg` dans COV charge ensemble les orbitales moléculaires et les données NBO. Le fichier FCHK peut aussi être ouvert seul.
 
-Il s’agit de fichiers de calcul. [COV v0.4.0-pre.4](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/tag/v0.4.0-pre.4) les ouvre sous Windows, macOS et Linux. Gaussian et NBO ne sont pas nécessaires pour consulter les résultats enregistrés.
+Il s’agit de fichiers de calcul. [COV v0.4.0](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/tag/v0.4.0) les ouvre sous Windows, macOS et Linux. Gaussian et NBO ne sont pas nécessaires pour consulter les résultats enregistrés.
 
 ## Petites molécules
 
@@ -64,7 +64,7 @@ Il s’agit de fichiers de calcul. [COV v0.4.0-pre.4](https://github.com/O1dDing
 | [Pentacarbonyle de fer — Géométrie bipyramidale trigonale](iron-pentacarbonyl-trigonal-bipyramidal/README.fr.md) | Fe(CO)₅ | 11 | RPBE1PBE / def2SVP | [ZIP](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-iron-pentacarbonyl-trigonal-bipyramidal.zip) |
 | [Tétracarbonyle de nickel — Géométrie tétraédrique](nickel-tetracarbonyl-tetrahedral/README.fr.md) | Ni(CO)₄ | 9 | RPBE1PBE / def2SVP | [ZIP](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-nickel-tetracarbonyl-tetrahedral.zip) |
 | [Ion tétrachlorozincate(II) — Géométrie tétraédrique](tetrachlorozincate-tetrahedral/README.fr.md) | [ZnCl₄]²⁻ | 5 | RPBE1PBE / def2SVP | [ZIP](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-tetrachlorozincate-tetrahedral.zip) |
-| [Ion tétracyanonickélate(II) — Géométrie plan carré](tetracyanonickelate-square-planar/README.fr.md) | [Ni(CN)₄]²⁻ | 9 | RPBE1PBE / def2SVP | [ZIP](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-tetracyanonickelate-square-planar.zip) |
+| [Ion tétracyanonickélate(II) — Géométrie carrée plane](tetracyanonickelate-square-planar/README.fr.md) | [Ni(CN)₄]²⁻ | 9 | RPBE1PBE / def2SVP | [ZIP](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/download/samples-2026-10-25/cov-sample-tetracyanonickelate-square-planar.zip) |
 
 ## Ions, radicaux et liaisons multicentriques
 

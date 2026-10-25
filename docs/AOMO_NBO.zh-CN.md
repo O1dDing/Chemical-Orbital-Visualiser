@@ -2,7 +2,7 @@
 
 [English](AOMO_NBO.md) · **简体中文** · [日本語](AOMO_NBO.ja.md) · [Français](AOMO_NBO.fr.md)
 
-Chemical Orbital Visualiser（COV）的预览版把分子轨道的能量、占据和组成关系放在一起查看。打开已有的 Gaussian FCHK 和对应的 NBO 数据后，可以从 MO、原子或键出发，追踪相关轨道及其贡献，再查看所选轨道的三维形状。
+Chemical Orbital Visualiser（COV）把分子轨道的能量、占据和组成关系放在一起查看。打开已有的 Gaussian FCHK 和对应的 NBO 数据后，可以从 MO、原子或键出发，追踪相关轨道及其贡献，再查看所选轨道的三维形状。
 
 ## 各种视图需要哪些文件？
 

@@ -16,7 +16,7 @@ The [one-job template](../examples/nbo-one-job/cov_one_job.py) submits Gaussian/
 
 The template runs from the COV source tree with Python 3.11 or newer, Gaussian 16W A.03 and NBO7 i8. Gaussian and NBO must already be installed, with `gaunbo6.bat` pointing to that NBO installation. A.03 uses `Pop=NBO6Read` to call NBO7. Other Gaussian revisions use their own interface setup; this template checks for A.03.
 
-The v0.3.0 and v0.4.0-pre.1 download packages do not include the template. It uses [tests/validation_process.py](../tests/validation_process.py) from the source tree.
+The template uses [tests/validation_process.py](../tests/validation_process.py) from the source tree.
 
 Copy [water.json](../examples/nbo-one-job/water.json) and set the molecule, geometry, method, basis, charge and multiplicity. The example is a fixed-geometry PBE1PBE / 6-31G(d) water single point, charge 0, multiplicity 1. `basis_ecp_tail` accepts the explicit basis/ECP block when needed.
 
@@ -36,7 +36,7 @@ The template permits up to three Gaussian threads. The process tree is limited t
 
 ## Open the result
 
-Open `work/water-job/cov-package` in the NBO preview, or drag its `drop.covnbopkg` into COV. The folder contains `canonical.fchk`, one `analysis.nbo` report, the `.47` archive and the requested orbital matrices.
+Open `work/water-job/cov-package` in COV, or drag its `drop.covnbopkg` into COV. The folder contains `canonical.fchk`, one `analysis.nbo` report, the `.47` archive and the requested orbital matrices.
 
 The report, archive and matrices in `cov-package` come from the same GenNBO analysis. `canonical.fchk` and `analysis.nbo` are template filenames; COV does not require those exact names. The `.covnbopkg` file is an opening list, not an extra source of orbital data.
 

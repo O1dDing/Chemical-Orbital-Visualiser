@@ -2,7 +2,7 @@
 
 **English** · [简体中文](AOMO_NBO.zh-CN.md) · [日本語](AOMO_NBO.ja.md) · [Français](AOMO_NBO.fr.md)
 
-Chemical Orbital Visualiser (COV) brings orbital energies, occupations and composition into one view. In the v0.4.0 preview, you can open an existing Gaussian FCHK and its corresponding NBO results, then move from an MO, atom or bond to related orbitals and contributions. Inspect a selected orbital in 3D when you want to see its shape.
+Chemical Orbital Visualiser (COV) brings orbital energies, occupations and composition into one view. In COV v0.4.0, you can open an existing Gaussian FCHK and its corresponding NBO results, then move from an MO, atom or bond to related orbitals and contributions. Inspect a selected orbital in 3D when you want to see its shape.
 
 ## Which files do I need?
 

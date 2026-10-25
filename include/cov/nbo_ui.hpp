@@ -94,6 +94,9 @@ std::string nbo_structure_display_label(const NboStructureEvidence& record,
                                         const Wavefunction* canonical,
                                         Language language);
 
+std::string nbo_input_candidate_display_label(const NboInputCandidate& candidate,
+                                            Language language);
+
 void draw_nbo_focus_view(NboFocusUIState& focus, const NboDataset& dataset,
                          const Wavefunction& canonical,
                          const MODiagramViewSnapshot& diagram,

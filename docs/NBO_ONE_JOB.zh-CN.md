@@ -16,7 +16,7 @@ FCHK 和 NBO 数据应对应相同的几何、基组和电子态。GenNBO 重新
 
 模板从 COV 源码树运行，需要 Python 3.11 或更新版本、Gaussian 16W A.03 和 NBO7 i8。Gaussian 与 NBO 需已安装，`gaunbo6.bat` 指向相应 NBO 安装目录。A.03 使用 `Pop=NBO6Read` 调用 NBO7。其他 Gaussian 修订版使用各自接口，本模板检查 A.03。
 
-v0.3.0 和 v0.4.0-pre.1 下载包不含这个模板。它使用源码树中的[进程管理文件](../tests/validation_process.py)。
+模板使用源码树中的[进程管理文件](../tests/validation_process.py)。
 
 复制 [water.json](../examples/nbo-one-job/water.json)，填写分子、几何、方法、基组、电荷和多重度。示例为固定几何水分子，PBE1PBE / 6-31G(d)，电荷 0，多重度 1。自定义基组或 ECP 的完整输入段放在 `basis_ecp_tail` 中。
 
@@ -36,7 +36,7 @@ python examples/nbo-one-job/cov_one_job.py `
 
 ## 打开结果
 
-在 NBO 预览版中打开 `work/water-job/cov-package`，或将其中的 `drop.covnbopkg` 拖入 COV。该目录包含 `canonical.fchk`、一份 `analysis.nbo` 报告、`.47` 档案和请求的轨道矩阵。
+在 COV 中打开 `work/water-job/cov-package`，或将其中的 `drop.covnbopkg` 拖入 COV。该目录包含 `canonical.fchk`、一份 `analysis.nbo` 报告、`.47` 档案和请求的轨道矩阵。
 
 `cov-package` 中的报告、档案和矩阵来自同一次 GenNBO 分析。`canonical.fchk` 和 `analysis.nbo` 是模板采用的名称，COV 不要求固定使用这两个文件名。`.covnbopkg` 只是打开清单，不提供额外的轨道数据。
 

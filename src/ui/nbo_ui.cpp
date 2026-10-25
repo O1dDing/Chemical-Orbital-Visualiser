@@ -1,4 +1,5 @@
 #include "cov/nbo_ui.hpp"
+#include "cov/nbo_aomo_text.hpp"
 #include "cov/nbo_aomo_labels.hpp"
 #include "cov/ui_raster_text.hpp"
 #include "cov/validation.hpp"
@@ -25,7 +26,7 @@ enum Label { Title, Path, Archive, Aonbo, Nbomo, Naomo, Aonao, Naonbo, FocusNote
 constexpr const char* labels[4][Count] = {
     {"NBO analysis", "NBO output path", "ARCHIVE .47 (optional)", "AONBO matrix (optional)", "NBOMO matrix (optional)", "NAOMO matrix: NAO / MO (optional)", "AONAO matrix: AO / NAO (optional)", "NAONBO matrix: NAO / NBO (optional)", "Focused NAO composition appears in the central MO diagram above.", "Analysis segment (-1: select the only candidate)", "Attach NBO", "Canonical MOs", "NBO orbitals", "Calculation files", "NBO orbitals available", "Report available; orbital data unavailable", "NPA populations", "NAOs", "NBO orbital occupations and components", "Wiberg indices", "Second-order interactions", "Orbital matrices", "Diagonal Fock values are not canonical MO energies.", "Export base path", "Export NBO bundle", "Source", "Print threshold", "Units", "No data reported"},
     {"NBO 分析", "NBO 输出路径", "ARCHIVE .47（可选）", "AONBO 矩阵（可选）", "NBOMO 矩阵（可选）", "NAOMO 矩阵：NAO / MO（可选）", "AONAO 矩阵：AO / NAO（可选）", "NAONBO 矩阵：NAO / NBO（可选）", "聚焦的 NAO 成分显示在上方中央 MO 图中。", "分析段（-1：仅有一个候选时自动选择）", "关联 NBO", "正则 MO", "NBO 轨道", "计算文件", "可显示 NBO 轨道", "已读取报告，轨道数据不可用", "NPA 布居", "NAO", "NBO 轨道占据与成分", "Wiberg 指数", "二阶相互作用", "轨道矩阵", "Fock 对角值不是正则 MO 能量。", "导出路径前缀", "导出 NBO 数据", "来源", "打印阈值", "单位", "未报告数据"},
-    {"NBO 解析", "NBO 出力パス", "ARCHIVE .47（任意）", "AONBO 行列（任意）", "NBOMO 行列（任意）", "NAOMO 行列：NAO / MO（任意）", "AONAO 行列：AO / NAO（任意）", "NAONBO 行列：NAO / NBO（任意）", "NAO 成分は上の中央 MO 図に表示します。", "解析区間（-1：候補が1つなら自動選択）", "NBO を関連付け", "正準 MO", "NBO 軌道", "計算ファイル", "NBO 軌道を表示できます", "レポートを読み込みました。軌道データは利用できません", "NPA 原子分布", "NAO", "NBO 軌道の占有数と成分", "Wiberg 指数", "二次相互作用", "軌道行列", "Fock 対角値は正準 MO エネルギーではありません。", "出力先の基底名", "NBO 一式を書き出す", "出典", "印字しきい値", "単位", "報告データなし"},
+    {"NBO 解析", "NBO 出力パス", "ARCHIVE .47（任意）", "AONBO 行列（任意）", "NBOMO 行列（任意）", "NAOMO 行列：NAO / MO（任意）", "AONAO 行列：AO / NAO（任意）", "NAONBO 行列：NAO / NBO（任意）", "NAO 成分は上の中央 MO 図に表示します。", "解析区間（-1：候補が1つなら自動選択）", "NBO を関連付け", "正準 MO", "NBO 軌道", "計算ファイル", "NBO 軌道を表示できます", "レポートを読み込みました。軌道データは利用できません", "NPA 原子ポピュレーション", "NAO", "NBO 軌道の占有数と成分", "Wiberg 指数", "二次相互作用", "軌道行列", "Fock 対角値は正準 MO エネルギーではありません。", "出力先の基底名", "NBO 一式を書き出す", "出典", "印字しきい値", "単位", "報告データなし"},
     {"Analyse NBO", "Chemin de sortie NBO", "ARCHIVE .47 (facultatif)", "Matrice AONBO (facultatif)", "Matrice NBOMO (facultatif)", "Matrice NAOMO : NAO / OM (facultatif)", "Matrice AONAO : AO / NAO (facultatif)", "Matrice NAONBO : NAO / NBO (facultatif)", "La composition NAO ciblée figure dans le diagramme central ci-dessus.", "Segment d’analyse (-1 : choisir le seul candidat)", "Associer NBO", "OM canoniques", "Orbitales NBO", "Fichiers de calcul", "Orbitales NBO disponibles", "Rapport disponible ; données orbitalaires indisponibles", "Populations NPA", "NAO", "Occupation et composants NBO", "Indices de Wiberg", "Interactions du second ordre", "Matrices orbitalaires", "Les valeurs diagonales de Fock ne sont pas des énergies OM canoniques.", "Chemin de base de l’export", "Exporter NBO", "Source", "Seuil d’impression", "Unités", "Aucune donnée rapportée"}
 };
 const char* trn(Language language, Label key) {
@@ -74,8 +75,8 @@ struct ReportText {
 ReportText report_text(Language language) {
     switch(language){
         case Language::ChineseSimplified:return {"原子","电荷","内层","价层","里德堡","打印总布居","占据","Fock 对角 (Ha)","成分","系数","来源","NBOMO 贡献","选中正则 MO","显示阈值 |T|²","已显示权重","剩余权重","无完整 NBOMO 矩阵","行/列或自旋不匹配","能隙 (Ha)","原始权重 |T|²","ECP 核心电子","显式电子布居","FCHK 未提供 beta MO；beta 轨道来源为已关联的 archive 与 NBO 文件，不能当作 FCHK beta MO。","正则轨道系数","直接 FCHK 系数","密度匹配","自旋密度"};
-        case Language::Japanese:return {"原子","電荷","内殻","価電子","リュードベリ","印字総分布","占有数","Fock 対角 (Ha)","成分","係数","出典","NBOMO 寄与","選択した正準 MO","表示しきい値 |T|²","表示した重み","残りの重み","完全な NBOMO 行列なし","行・列またはスピンが不一致","エネルギー差 (Ha)","生の重み |T|²","ECP 内殻電子","明示的電子分布","FCHK に beta MO がありません。beta 軌道は照合済み archive と NBO ファイルに由来し、FCHK の beta MO とみなしません。","正準軌道係数","FCHK 係数を直接確認","密度の一致","スピン密度"};
-        case Language::French:return {"Atome","Charge","Cœur","Valence","Rydberg","Population totale imprimée","Occupation","Diagonale de Fock (Ha)","Composant","Coefficient","Source","Contributions NBOMO","OM canonique choisi","Seuil affiché |T|²","Poids affiché","Poids restant","Aucune matrice NBOMO complète","Lignes, colonnes ou spin incompatibles","Écart d’énergie (Ha)","Poids brut |T|²","Électrons de cœur ECP","Population explicite","Le FCHK ne contient pas d’OM bêta ; les orbitales bêta proviennent de l’archive associée et des fichiers NBO, sans identité OM bêta FCHK.","Preuve des coefficients canoniques","Coefficients FCHK directs","Densité vérifiée","Densité de spin"};
+        case Language::Japanese:return {"原子","電荷","内殻","価電子","リュードベリ","出力された総ポピュレーション","占有数","Fock 対角 (Ha)","成分","係数","出典","NBOMO 寄与","選択した正準 MO","表示しきい値 |T|²","表示した重み","残りの重み","完全な NBOMO 行列なし","行・列またはスピンが不一致","エネルギー差 (Ha)","生の重み |T|²","ECP 内殻電子","明示的な電子ポピュレーション","FCHK に beta MO がありません。beta 軌道は照合済み archive と NBO ファイルに由来し、FCHK の beta MO とみなしません。","正準軌道係数","FCHK 係数を直接確認","密度の一致","スピン密度"};
+        case Language::French:return {"Atome","Charge","Cœur","Valence","Rydberg","Population totale imprimée","Occupation","Diagonale de Fock (Ha)","Composant","Coefficient","Source","Contributions NBOMO","OM canonique choisie","Seuil affiché |T|²","Poids affiché","Poids restant","Aucune matrice NBOMO complète","Lignes, colonnes ou spin incompatibles","Écart d’énergie (Ha)","Poids brut |T|²","Électrons de cœur ECP","Population explicite","Le FCHK ne contient pas d’OM bêta ; les orbitales bêta proviennent de l’archive associée et des fichiers NBO, sans identité OM bêta FCHK.","Coefficients des orbitales canoniques","Coefficients FCHK directs","Densité vérifiée","Densité de spin"};
         default:return {"Atom","Charge","Core","Valence","Rydberg","Printed total population","Occupation","Fock diagonal (Ha)","Component","Coefficient","Source","NBOMO contributions","Selected canonical MO","Display threshold |T|²","Shown weight","Remaining weight","No complete NBOMO matrix","Row/column or spin mismatch","Energy gap (Ha)","Raw weight |T|²","ECP core electrons","Explicit population","FCHK has no beta MO; beta orbitals come from the associated archive and NBO files, not FCHK beta MO identity.","Canonical orbital coefficients","Direct FCHK coefficients","Density agreement","Spin density"};
     }
 }
@@ -471,6 +472,25 @@ std::string nbo_glyph_seed(Language language) {
            "Bond Lone pair Spin density Orbital link Liaison Doublet libre Densité de spin "
            "Lien orbital Structure et orbitales 3D Multicentrique Charge NPA";
     return out;
+}
+
+std::string nbo_input_candidate_display_label(const NboInputCandidate& candidate,
+                                            Language language) {
+    const auto utf8=[](const std::filesystem::path& path) {
+        const auto text=path.u8string();
+        return std::string(text.begin(),text.end());
+    };
+    std::string label=candidate.canonical.empty()?
+        aomo_text(language,"Current Gaussian wavefunction"):utf8(candidate.canonical.filename());
+    label+=" | ";
+    label+=candidate.report.empty()?aomo_text(language,"NBO report unavailable"):
+        utf8(candidate.report.filename());
+    if(candidate.analysis_segment)label+=" ["+std::string(aomo_text(language,"Analysis step"))+" "+
+        std::to_string(*candidate.analysis_segment)+"]";
+    const auto folder=!candidate.archive.empty()?candidate.archive.parent_path():
+        !candidate.report.empty()?candidate.report.parent_path():candidate.canonical.parent_path();
+    if(!folder.empty())label+=" | "+utf8(folder);
+    return label;
 }
 
 void draw_nbo_focus_view(NboFocusUIState& focus,const NboDataset& dataset,
@@ -877,10 +897,7 @@ NboUIActions draw_nbo_panel(NboUIState& s, Language language,
                 "Choose a calculation.");
             for(std::size_t i=0;i<discovery.candidates.size();++i) {
                 const auto& c=discovery.candidates[i];
-                std::string label=c.label.empty()?c.id:c.label;
-                if(c.analysis_segment)label+=" ["+std::string(nbo_local(language,
-                    "step ","步骤 ","ステップ ","étape "))+
-                    std::to_string(*c.analysis_segment)+"]";
+                std::string label=nbo_input_candidate_display_label(c,language);
                 label+="##nbo.candidate."+std::to_string(i);
                 if(scientific_selectable(label))s.pending_candidate=i;
                 validation::item("nbo.candidate."+std::to_string(i));

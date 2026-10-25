@@ -10,7 +10,7 @@ Each ZIP contains one calculation, or the complete collection. Extract it before
 
 Open `open.covnbopkg` in COV to load a sample’s molecular orbitals and NBO data together. The FCHK file can also be opened on its own.
 
-These are calculation files. [COV v0.4.0-pre.4](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/tag/v0.4.0-pre.4) opens them on Windows, macOS and Linux; Gaussian and NBO are not needed to view the saved results.
+These are calculation files. [COV v0.4.0](https://github.com/O1dDing/Chemical-Orbital-Visualiser/releases/tag/v0.4.0) opens them on Windows, macOS and Linux; Gaussian and NBO are not needed to view the saved results.
 
 ## Small molecules
 

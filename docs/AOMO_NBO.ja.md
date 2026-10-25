@@ -2,7 +2,7 @@
 
 [English](AOMO_NBO.md) · [简体中文](AOMO_NBO.zh-CN.md) · **日本語** · [Français](AOMO_NBO.fr.md)
 
-Chemical Orbital Visualiser（COV）では、軌道のエネルギー、占有数、組成を一つの画面で確認できます。v0.4.0 プレビュー版では、既存の Gaussian FCHK と対応する NBO の結果を開き、MO、原子、結合から関連する軌道や寄与をたどれます。形状を確認したいときは、選択した軌道を 3D で表示できます。
+Chemical Orbital Visualiser（COV）では、軌道のエネルギー、占有数、組成を一つの画面で確認できます。COV v0.4.0 では、既存の Gaussian FCHK と対応する NBO の結果を開き、MO、原子、結合から関連する軌道や寄与をたどれます。形状を確認したいときは、選択した軌道を 3D で表示できます。
 
 ## 必要なファイル
 

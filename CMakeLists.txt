@@ -401,6 +401,13 @@ if(COV_BUILD_VIEWER)
 endif()
 
 if(COV_BUILD_TESTS)
+    if(NOT WIN32)
+        add_executable(cov_file_dialog_smoke
+            tests/file_dialog_smoke.cpp
+            src/platform/file_dialog.cpp)
+        target_include_directories(cov_file_dialog_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        add_test(NAME file_dialog_smoke COMMAND cov_file_dialog_smoke)
+    endif()
     add_executable(cov_nbo_skeleton_policy_smoke tests/nbo_skeleton_policy_smoke.cpp)
     add_executable(cov_orbital_group_bonding_smoke tests/orbital_group_bonding_smoke.cpp)
     target_link_libraries(cov_orbital_group_bonding_smoke PRIVATE cov_molecule cov_orbitals cov_parser)

@@ -415,9 +415,6 @@ void draw_energy_diagram(const Wavefunction& wavefunction,
 
     const char* plan_label = tr(Text::SimpleDiagram, language);
     ImGui::TextDisabled("%s", plan_label);
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", data.plan.machine_reason.c_str());
-    }
 
     ImGui::TextDisabled("%s", tr(Text::EnergyScale, language));
     ImGui::SameLine();
