@@ -2723,7 +2723,7 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
         ImGui::TextDisabled("%s",aomo_text(language,"Protected orbital partners need more width; scroll the diagram horizontally."));
     ImGui::TextDisabled("%s",aomo_text(language,"Scroll to explore; Ctrl+wheel zooms. Click an orbital to inspect it."));
     if(state.selection){
-        if(ImGui::Button((std::string(aomo_text(language,"Copy orbital metadata"))+"###aomo.copy").c_str())) {
+        if(ImGui::Button((std::string(aomo_text(language,"Copy orbital data"))+"###aomo.copy").c_str())) {
             auto copied=state.active_view?serialize_active_orbital_view_json(*state.active_view):
                 serialize_nbo_orbital_selection_json(*state.selection);
             std::vector<OrbitalGroupBondingResult> selected_groups;
@@ -3024,8 +3024,8 @@ bool draw_nbo_aomo_diagram(NboAomoUIState& state,const NboIntegration& data,
     if(ImGui::Button(aomo_text(language,"Export images"))){
         state.export_content=DiagramExportContent::Images;state.export_requested=true;}
     validation::item("aomo.export");
-    same_line_for(aomo_text(language,"Light paper export"));
-    if(ImGui::Checkbox(aomo_text(language,"Light paper export"),&state.paper_export))++state.revision;
+    same_line_for(aomo_text(language,"Light export background"));
+    if(ImGui::Checkbox(aomo_text(language,"Light export background"),&state.paper_export))++state.revision;
     validation::item("aomo.paper_export");
     const bool export_options=ImGui::CollapsingHeader(aomo_text(language,"Analysis data (advanced)"));
     validation::item("aomo.export_options");

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 namespace cov::ui {
 
 enum class Language {
@@ -157,6 +159,10 @@ enum class Tone {
 
 void apply_theme(float scale = 1.0f);
 bool configure_fonts(float pixel_size = 17.0f);
+// Queue missing filename/path glyphs without changing the active atlas. Rebuild
+// with configure_fonts only between frames, then refresh the backend texture.
+void request_font_glyphs(std::string_view text);
+[[nodiscard]] bool font_glyphs_pending() noexcept;
 [[nodiscard]] const char* font_status() noexcept;
 [[nodiscard]] const char* font_status(Language language);
 

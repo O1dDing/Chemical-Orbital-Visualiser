@@ -162,6 +162,39 @@ int main() {
         return 1;
     }
 
+    // A real loaded path contained 二茂铁, but only 茂/铁 became '?' because
+    // the atlas previously contained static UI copy only. Request characters
+    // from the actual path, then verify real glyphs after the deferred rebuild.
+    cov::ui::request_font_glyphs("PG-020-二茂铁-交错构象/analysis.log");
+    if(cov::ui::font_glyphs_pending() && !cov::ui::configure_fonts(15.0f)) {
+        std::cerr << "dynamic filename font atlas build failed\n";
+        ImGui::DestroyContext();return 19;
+    }
+    const auto* path_font=ImGui::GetIO().Fonts->Fonts.front();
+    if(std::strstr(cov::ui::font_status(),"ZH fallback missing")==nullptr) {
+        for(ImWchar codepoint:{0x8302,0x94c1}) {
+            const auto* glyph=path_font->FindGlyphNoFallback(codepoint);
+            if(!glyph || !glyph->Visible || glyph->AdvanceX<=0 ||
+               glyph->U0==glyph->U1 || glyph->V0==glyph->V1) {
+                std::cerr << "filename atlas glyph missing U+" << std::hex
+                          <<static_cast<unsigned int>(codepoint)<<std::dec<<'\n';
+                ImGui::DestroyContext();return 20;
+            }
+#ifdef __APPLE__
+            if(!glyph_has_pixels(path_font,codepoint)) {
+                std::cerr << "filename atlas glyph has no pixels\n";
+                ImGui::DestroyContext();return 21;
+            }
+#endif
+        }
+    }
+    cov::ui::request_font_glyphs("PG-020-二茂铁-交错构象/analysis.log");
+    cov::ui::request_font_glyphs("\xf0\x80\x80\x80\xed\xa0\x80\xff");
+    if(cov::ui::font_glyphs_pending()) {
+        std::cerr << "cached filename or malformed UTF-8 requested another rebuild\n";
+        ImGui::DestroyContext();return 22;
+    }
+
     constexpr cov::ui::Language languages[] = {
         cov::ui::Language::English,
         cov::ui::Language::ChineseSimplified,

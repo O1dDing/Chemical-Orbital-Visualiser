@@ -11,6 +11,7 @@
 #include <array>
 #include <filesystem>
 #include <initializer_list>
+#include <set>
 #include <string>
 
 #ifdef __APPLE__
@@ -149,7 +150,7 @@ constexpr std::array<LocalisedString, kTextCount> kStrings{{
     {"Virtual", "虚轨道", "仮想", "Virtuelle"},
     {"Reasonable energy window", "合理能量窗口", "妥当なエネルギー範囲", "Fenêtre d’énergie raisonnable"},
     {"Native Open File is unavailable on this platform.", "当前平台不支持原生“打开文件”。", "このプラットフォームではネイティブのファイル選択を利用できません。", "La boîte de dialogue native n’est pas disponible sur cette plateforme."},
-    {"Copy metadata", "复制元数据", "メタデータをコピー", "Copier les métadonnées"},
+    {"Copy data", "复制数据", "データをコピー", "Copier les données"},
     {"No orbitals", "无轨道", "軌道がありません", "Aucune orbitale"},
     {"Nonlinear energy axis", "非线性能量轴", "非線形エネルギー軸", "Axe d’énergie non linéaire"},
     {"Energy scale", "能量轴", "エネルギー軸", "Échelle d’énergie"},
@@ -244,6 +245,9 @@ constexpr const char* kScientificGlyphs =
     "₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉ ₊ ₋ ′ ″";
 
 std::string g_font_status = "Dear ImGui default";
+std::set<ImWchar> g_requested_glyphs;
+std::string g_requested_glyph_text;
+bool g_font_glyphs_pending = false;
 
 std::string first_existing(std::initializer_list<const char*> candidates) {
     std::error_code ec;
@@ -515,6 +519,44 @@ void apply_theme(const float scale) {
     style.ScaleAllSizes(std::clamp(scale, 0.85f, 2.0f));
 }
 
+void request_font_glyphs(const std::string_view text) {
+    const auto* atlas=ImGui::GetCurrentContext()?ImGui::GetIO().Fonts:nullptr;
+    const auto* font=atlas && !atlas->Fonts.empty()?atlas->Fonts.front():nullptr;
+    for(std::size_t at=0;at<text.size();) {
+        const auto first=static_cast<unsigned char>(text[at]);
+        if(first<0x80){++at;continue;}
+        const std::size_t length=first>=0xc2 && first<0xe0?2:
+            first>=0xe0 && first<0xf0?3:first>=0xf0 && first<0xf5?4:0;
+        if(!length || at+length>text.size()){++at;continue;}
+        unsigned int codepoint=first & (length==2?0x1f:length==3?0x0f:0x07);
+        bool valid=true;
+        for(std::size_t byte=1;byte<length;++byte) {
+            const auto next=static_cast<unsigned char>(text[at+byte]);
+            if((next&0xc0)!=0x80){valid=false;break;}
+            codepoint=(codepoint<<6)|(next&0x3f);
+        }
+        if(!valid || (length==2 && codepoint<0x80) ||
+           (length==3 && codepoint<0x800) || (length==4 && codepoint<0x10000) ||
+           codepoint>0x10ffff || (codepoint>=0xd800 && codepoint<=0xdfff)) {
+            ++at;continue;
+        }
+        // This atlas and the CoreText bridge use BMP ImWchar glyphs. Do not
+        // repeatedly rebuild for characters the current renderer cannot hold.
+        if(codepoint<=0xffff) {
+            const auto glyph=static_cast<ImWchar>(codepoint);
+            if(!g_requested_glyphs.contains(glyph) &&
+               (!font || !font->FindGlyphNoFallback(glyph))) {
+                g_requested_glyphs.insert(glyph);
+                g_requested_glyph_text.append(text.substr(at,length));
+                g_font_glyphs_pending=true;
+            }
+        }
+        at+=length;
+    }
+}
+
+bool font_glyphs_pending() noexcept { return g_font_glyphs_pending; }
+
 bool configure_fonts(const float pixel_size) {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
@@ -555,6 +597,7 @@ bool configure_fonts(const float pixel_size) {
     latin_builder.AddText(inspection_seed.c_str());
     latin_builder.AddText(kIntegrationLatinGlyphs);
     latin_builder.AddText(kOrbitalDiagramLatinGlyphs);
+    latin_builder.AddText(g_requested_glyph_text.c_str());
     ImVector<ImWchar> latin_ranges;
     latin_builder.BuildRanges(&latin_ranges);
 
@@ -586,6 +629,11 @@ bool configure_fonts(const float pixel_size) {
     zh_builder.AddText(inspection_seed.c_str());
     ja_builder.AddText(inspection_seed.c_str());
     ja_builder.AddText(scientific_glyph_seed());
+    // Load only the additional characters actually seen in user paths. This
+    // also covers Chinese filenames while the interface uses English/French,
+    // without baking every CJK character (costly with the CoreText bridge).
+    zh_builder.AddText(g_requested_glyph_text.c_str());
+    ja_builder.AddText(g_requested_glyph_text.c_str());
     ImVector<ImWchar> zh_ranges;
     ImVector<ImWchar> ja_ranges;
     zh_builder.BuildRanges(&zh_ranges);
@@ -606,6 +654,7 @@ bool configure_fonts(const float pixel_size) {
     g_font_status += zh_loaded ? file_name_or_default(chinese, "CJK") : "ZH fallback missing";
     g_font_status += " + ";
     g_font_status += ja_loaded ? file_name_or_default(japanese, "CJK") : "JA fallback missing";
+    if(built)g_font_glyphs_pending=false;
     return built;
 }
 

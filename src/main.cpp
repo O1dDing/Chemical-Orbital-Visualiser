@@ -155,10 +155,12 @@ std::filesystem::path path_from_utf8(const std::string& value) {
 std::string path_to_utf8(const std::filesystem::path& path) {
 #if defined(__cpp_lib_char8_t)
     const auto value = path.u8string();
-    return std::string(reinterpret_cast<const char*>(value.data()), value.size());
+    std::string text(reinterpret_cast<const char*>(value.data()), value.size());
 #else
-    return path.u8string();
+    std::string text=path.u8string();
 #endif
+    cov::ui::request_font_glyphs(text);
+    return text;
 }
 
 void copy_path_to_buffer(const std::filesystem::path& path,
@@ -1153,6 +1155,18 @@ int main(int argc, char** argv) {
             if (fb_w <= 0 || fb_h <= 0) {
                 glfwWaitEventsTimeout(0.05);
                 continue;
+            }
+            // Path characters may be discovered while loading data or drawing
+            // the file browser. Change the atlas only after the previous frame
+            // has finished and before the backend starts the next one.
+            cov::ui::request_font_glyphs(status_detail);
+            cov::ui::request_font_glyphs(nbo_ui.input_status);
+            if(integration)cov::ui::request_font_glyphs(integration->dataset.source.path);
+            if(cov::ui::font_glyphs_pending()) {
+                ImGui_ImplOpenGL2_DestroyFontsTexture();
+                if(!cov::ui::configure_fonts(16.5f*ui_scale) ||
+                   !ImGui_ImplOpenGL2_CreateFontsTexture())
+                    throw std::runtime_error("Could not update the UI font atlas");
             }
             ImGui_ImplOpenGL2_NewFrame();
             ImGui_ImplGlfw_NewFrame();
