@@ -59,4 +59,6 @@ Si `formchk` est installé, COV peut convertir les fichiers Gaussian CHK en FCHK
 
 ## Licence
 
-[Licence Apache 2.0](LICENSE). Les licences des bibliothèques fournies avec l’application figurent dans les [mentions relatives aux composants tiers](THIRD_PARTY_NOTICES.md).
+Les sources de développement actuelles utilisent la [CPAL-1.0](LICENSE), qui autorise l’utilisation commerciale et impose la fourniture des sources et l’attribution dans l’interface graphique pour le code couvert. Consultez la page [licence, attribution et conseils de citation facultatifs](docs/license.fr.md) et [CITATION.cff](CITATION.cff).
+
+Le code propre à COV dans le tag v0.4.0 et les téléchargements v0.4.0 déjà publiés ci-dessus reste sous [Apache-2.0](licenses/Apache-2.0.txt). Les droits Apache existants restent valables. Les [composants tiers](THIRD_PARTY_NOTICES.md) conservent leurs licences ; ce changement ne modifie pas les licences des calculs, des données d’exemple ou des images exportées.

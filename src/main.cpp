@@ -1,3 +1,28 @@
+/*
+ * SPDX-License-Identifier: CPAL-1.0
+ *
+ * The contents of this file are subject to the Common Public Attribution License
+ * Version 1.0 (the “License”); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ * https://opensource.org/license/CPAL-1.0. The License is based on the Mozilla Public
+ * License Version 1.1 but Sections 14 and 15 have been added to cover use of software
+ * over a computer network and provide for limited attribution for the Original
+ * Developer. In addition, Exhibit A has been modified to be consistent with Exhibit B.
+ *
+ * Software distributed under the License is distributed on an “AS IS” basis, WITHOUT
+ * WARRANTY OF ANY KIND, either express or implied. See the License for the specific
+ * language governing rights and limitations under the License.
+ *
+ * The Original Code is Chemical Orbital Visualiser (COV).
+ *
+ * The Original Developer is O1dDing, who is also the Initial Developer.
+ *
+ * The Initial Developer of the Original Code is O1dDing. All portions of the code
+ * written by O1dDing are Copyright (c) 2026 O1dDing. All Rights Reserved.
+ *
+ * Contributor O1dDing.
+ */
+
 #include "cov/orbital_evaluator.hpp"
 #include "cov/numerical_diagnostics.hpp"
 #include "cov/pi_topology_evidence.hpp"
@@ -22,6 +47,7 @@
 #include "cov/validation.hpp"
 #include "cov/viewer_layout.hpp"
 #include "cov/ui_window_layers.hpp"
+#include "cov/version.hpp"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -34,6 +60,7 @@
 #include <array>
 #include <cmath>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <cstdio>
 #include <filesystem>
@@ -46,11 +73,41 @@
 #include <vector>
 #ifdef _WIN32
 #include <shellapi.h>
+#else
+#include <cerrno>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <thread>
+extern char** environ;
 #endif
 
 namespace {
 
 std::vector<std::filesystem::path> g_dropped_paths;
+
+bool open_project_page() {
+#ifdef _WIN32
+    return reinterpret_cast<std::intptr_t>(ShellExecuteA(nullptr, "open",
+        cov::project_url, nullptr, nullptr, SW_SHOWNORMAL)) > 32;
+#else
+#ifdef __APPLE__
+    constexpr char launcher[] = "/usr/bin/open";
+#else
+    constexpr char launcher[] = "xdg-open";
+#endif
+    char* arguments[] = {const_cast<char*>(launcher),
+                         const_cast<char*>(cov::project_url), nullptr};
+    pid_t child = 0;
+    if (posix_spawnp(&child, launcher, nullptr, nullptr, arguments, environ) != 0)
+        return false;
+    // A browser helper may outlive the click; reap it without blocking the UI.
+    std::thread([child] {
+        int status = 0;
+        while (waitpid(child, &status, 0) < 0 && errno == EINTR) {}
+    }).detach();
+    return true;
+#endif
+}
 
 void report_fatal_error(const char* message) {
     std::fprintf(stderr,"COV: %s\n",message);
@@ -1509,8 +1566,10 @@ int main(int argc, char** argv) {
             cov::validation::hit("layout.control-panel", panel_position,
                 ImVec2(panel_position.x + panel_size.x, panel_position.y + panel_size.y));
 
-            // Keep the complete panel reachable when the window is short.
-            ImGui::BeginChild("##cov_panel_scroll", ImVec2(0, 0), false,
+            // Keep attribution visible while the controls scroll.
+            const float footer_height = ImGui::GetFrameHeight() +
+                2.0f * ImGui::GetStyle().ItemSpacing.y + 1.0f;
+            ImGui::BeginChild("##cov_panel_scroll", ImVec2(0, -footer_height), false,
                               ImGuiWindowFlags_None);
             const auto brand = [&] {
                 ImGui::TextWrapped("%s", cov::ui::tr(cov::ui::Text::AppTitle, language));
@@ -2061,6 +2120,24 @@ int main(int argc, char** argv) {
             cov::ui::end_card();
 
             ImGui::EndChild();
+            ImGui::Separator();
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            if (ImGui::SmallButton(cov::attribution) && !open_project_page()) {
+                status = StatusKind::Error;
+                status_detail = scene_text(language, "The project page could not be opened.",
+                    "无法打开项目页面。", "プロジェクトページを開けませんでした。",
+                    "La page du projet n’a pas pu être ouverte.");
+                status_error_detail = cov::project_url;
+            }
+            ImGui::PopStyleColor();
+            cov::validation::item("app.attribution");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::SetTooltip("%s", cov::project_url);
+            }
+            cov::validation::field("app.attribution", cov::attribution);
+            cov::validation::field("app.project-url", cov::project_url);
+            cov::validation::field("app.version", cov::version);
             ImGui::End();
             cov::validation::field("language",std::to_string(static_cast<int>(language)));
             identity();

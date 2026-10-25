@@ -1,0 +1,2 @@
+# Keep the archived reference inputs byte-for-byte on every checkout platform.
+/validation/paused-20260906/reference-inputs/** -text

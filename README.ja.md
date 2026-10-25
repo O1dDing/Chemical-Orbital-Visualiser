@@ -59,4 +59,6 @@ COV v0.4 では NBO 解析にも対応しました。同じ計算の NBO 出力�
 
 ## ライセンス
 
-[Apache License 2.0](LICENSE)。同梱ライブラリのライセンスは[サードパーティーに関するお知らせ](THIRD_PARTY_NOTICES.md)に記載しています。
+現在の開発ソースは [CPAL-1.0](LICENSE) を使用します。商用利用を認め、対象コードのソース提供と GUI での帰属表示を求めます。[ライセンス、帰属表示、任意の引用方法](docs/license.ja.md)および [CITATION.cff](CITATION.cff) を参照してください。
+
+v0.4.0 タグと上記の公開済み v0.4.0 ダウンロードの COV 自身のコードには、引き続き [Apache-2.0](licenses/Apache-2.0.txt) が適用されます。既存の Apache に基づく権利は有効です。[第三者のコンポーネント](THIRD_PARTY_NOTICES.md)は各自のライセンスを維持し、この変更は計算、サンプルデータ、書き出した画像のライセンスを変更しません。

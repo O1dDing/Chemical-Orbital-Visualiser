@@ -1,0 +1,31 @@
+Chemical Orbital Visualiser (COV)
+Copyright (c) 2026 O1dDing. All Rights Reserved.
+
+Initial Developer and Original Developer: O1dDing (an individual).
+Project and source: https://github.com/O1dDing/Chemical-Orbital-Visualiser
+
+The current COV development source is licensed under the Common Public
+Attribution License Version 1.0 (CPAL-1.0). See LICENSE for the complete terms
+and Exhibits A and B for the source notice and GUI attribution information.
+The repository provides the source for this development revision. Distributors
+of modified versions must identify and provide the source for their own version
+as required by the license; this repository alone does not provide their changes.
+
+Attribution phrase: COV by O1dDing
+Attribution URL: https://github.com/O1dDing/Chemical-Orbital-Visualiser
+No attribution copyright notice is specified for the GUI.
+No graphic image is specified. Exhibit B requires attribution in Larger Works.
+
+The v0.4.0 tag and already released v0.4.0 packages remain under Apache-2.0
+for COV's own code. Earlier Apache grants remain valid for the code received
+under those grants. The former license text is in licenses/Apache-2.0.txt;
+its retention does not grant an Apache alternative for new CPAL-only changes.
+
+Third-party components keep their own licenses; see THIRD_PARTY_NOTICES.md.
+Calculation files, sample datasets, and images exported from COV are outside
+this software-code license notice. No license to third-party data is granted
+here. Software attribution metadata identifies the software and its developer;
+it does not assert copyright in the user's image or calculation.
+
+Citation suggestions in docs/license.md and its translations are nonbinding
+guidance. They add no license conditions for papers, reports, images, or data.

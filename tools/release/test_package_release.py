@@ -1,3 +1,26 @@
+# SPDX-License-Identifier: CPAL-1.0
+#
+# The contents of this file are subject to the Common Public Attribution License
+# Version 1.0 (the “License”); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+# https://opensource.org/license/CPAL-1.0. The License is based on the Mozilla Public
+# License Version 1.1 but Sections 14 and 15 have been added to cover use of software
+# over a computer network and provide for limited attribution for the Original
+# Developer. In addition, Exhibit A has been modified to be consistent with Exhibit B.
+#
+# Software distributed under the License is distributed on an “AS IS” basis, WITHOUT
+# WARRANTY OF ANY KIND, either express or implied. See the License for the specific
+# language governing rights and limitations under the License.
+#
+# The Original Code is Chemical Orbital Visualiser (COV).
+#
+# The Original Developer is O1dDing, who is also the Initial Developer.
+#
+# The Initial Developer of the Original Code is O1dDing. All portions of the code
+# written by O1dDing are Copyright (c) 2026 O1dDing. All Rights Reserved.
+#
+# Contributor O1dDing.
+
 """Archive/provenance checks with synthetic inputs; platform tools run in CI."""
 
 import argparse
@@ -23,7 +46,9 @@ class PackageChecks(unittest.TestCase):
     def fixture(self, directory, platform):
         root = Path(directory) / "source with spaces"
         build = root / "build-release"
-        for filename in ("LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/eigen/COPYING",
+        for filename in ("LICENSE", "NOTICE", "CITATION.cff", "THIRD_PARTY_NOTICES.md", "licenses/eigen/COPYING",
+                         "licenses/Apache-2.0.txt", "docs/license.md", "docs/license.zh-CN.md",
+                         "docs/license.ja.md", "docs/license.fr.md",
                          "examples/h2.molden", "tests/validation_process.py", "docs/UI.md",
                          "docs/AOMO_NBO.md", "docs/NBO_ONE_JOB.md", "docs/UI.zh-CN.md",
                          "docs/UI.ja.md", "docs/UI.fr.md",
@@ -70,6 +95,8 @@ class PackageChecks(unittest.TestCase):
                     self.assertIn(prefix + "cov.exe", members)
                     self.assertEqual(bundle.read(prefix + "cov.exe"), b"synthetic executable")
                     self.assertIn(prefix + "licenses/glfw/LICENSE.md", members)
+                    for name in ("LICENSE", "NOTICE", "CITATION.cff", "licenses/Apache-2.0.txt"):
+                        self.assertIn(prefix + name, members)
                     self.assertIn(prefix + "tests/validation_process.py", members)
                     self.assertIn(prefix + "examples/h2.molden", members)
                     self.assertFalse(any("acceptance-report" in name for name in members))
@@ -79,6 +106,9 @@ class PackageChecks(unittest.TestCase):
                         self.assertIn("v0.4.0", text)
                         self.assertIn("cov.exe", text)
                         self.assertIn("CUDA 12.8", text)
+                        self.assertIn("CPAL-1.0", text)
+                        self.assertIn("O1dDing", text)
+                        self.assertIn(prefix + f"docs/license{suffix}.md", members)
                     for language in ("zh-CN", "ja", "fr"):
                         text = bundle.read(prefix + f"docs/UI.{language}.md").decode("utf-8")
                         self.assertEqual(text, f"[quickstart](../README.{language}.md)")
@@ -98,6 +128,11 @@ class PackageChecks(unittest.TestCase):
             with tarfile.open(archive) as bundle:
                 binary = bundle.getmember(archive.name.removesuffix(".tar.gz") + "/cov")
                 self.assertEqual(binary.mode & 0o777, 0o755)
+                prefix = archive.name.removesuffix(".tar.gz") + "/"
+                for name in ("LICENSE", "NOTICE", "CITATION.cff", "licenses/Apache-2.0.txt"):
+                    self.assertIn(prefix + name, bundle.getnames())
+                for suffix in ("", ".zh-CN", ".ja", ".fr"):
+                    self.assertIn(prefix + f"docs/license{suffix}.md", bundle.getnames())
 
     def test_macos_archive_includes_localised_help_and_resources(self):
         def archive_tools(*command):
@@ -125,6 +160,9 @@ class PackageChecks(unittest.TestCase):
                     filename = f"README{suffix}.md"
                     self.assertEqual(bundle.read(prefix + filename), bundle.read(app + "Resources/" + filename))
                     self.assertIn(app + f"Resources/docs/UI{suffix}.md", bundle.namelist())
+                    self.assertIn(app + f"Resources/docs/license{suffix}.md", bundle.namelist())
+                for name in ("LICENSE", "NOTICE", "CITATION.cff", "licenses/Apache-2.0.txt"):
+                    self.assertIn(app + "Resources/" + name, bundle.namelist())
 
     def test_mismatched_project_version_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

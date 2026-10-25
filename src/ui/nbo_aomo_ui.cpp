@@ -1,4 +1,30 @@
+/*
+ * SPDX-License-Identifier: CPAL-1.0
+ *
+ * The contents of this file are subject to the Common Public Attribution License
+ * Version 1.0 (the “License”); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ * https://opensource.org/license/CPAL-1.0. The License is based on the Mozilla Public
+ * License Version 1.1 but Sections 14 and 15 have been added to cover use of software
+ * over a computer network and provide for limited attribution for the Original
+ * Developer. In addition, Exhibit A has been modified to be consistent with Exhibit B.
+ *
+ * Software distributed under the License is distributed on an “AS IS” basis, WITHOUT
+ * WARRANTY OF ANY KIND, either express or implied. See the License for the specific
+ * language governing rights and limitations under the License.
+ *
+ * The Original Code is Chemical Orbital Visualiser (COV).
+ *
+ * The Original Developer is O1dDing, who is also the Initial Developer.
+ *
+ * The Initial Developer of the Original Code is O1dDing. All portions of the code
+ * written by O1dDing are Copyright (c) 2026 O1dDing. All Rights Reserved.
+ *
+ * Contributor O1dDing.
+ */
+
 #include "cov/ui_raster_text.hpp"
+#include "cov/export_attribution.hpp"
 #include "cov/nbo_aomo_ui.hpp"
 #include "cov/nbo_aomo_hover.hpp"
 #include "cov/mo_group_display_json.hpp"
@@ -3390,6 +3416,7 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
             out<<"<svg xmlns=\"http://www.w3.org/2000/svg\" font-family=\"Segoe UI, Arial, sans-serif\" width=\""<<width
                <<"\" height=\""<<height<<"\" viewBox=\"0 0 "<<width<<' '<<height
                <<"\" data-energy-definition=\""<<xml(view.display_energy_definition)<<"\">\n";
+            out<<export_attribution::svg_metadata();
             out<<"<rect width=\"100%\" height=\"100%\" fill=\""
                <<(paper?"#ffffff":"#18202d")<<"\"/>\n";
             const bool has_nonquant=std::any_of(view.nodes.begin(),view.nodes.end(),
@@ -3662,7 +3689,8 @@ NboAomoExportResult export_nbo_aomo_bundle(const NboAomoViewSnapshot& view,
         std::vector<unsigned char> png={137,80,78,71,13,10,26,10};
         std::vector<unsigned char> ihdr;put32(ihdr,width);put32(ihdr,height);
         ihdr.insert(ihdr.end(),{8,6,0,0,0});
-        chunk(png,"IHDR",ihdr);chunk(png,"IDAT",z);chunk(png,"IEND",{});
+        chunk(png,"IHDR",ihdr);chunk(png,"IDAT",z);
+        export_attribution::append_png_text_chunks(png);chunk(png,"IEND",{});
         std::ofstream out(result.png_path,std::ios::binary);
         if(!out)throw std::runtime_error(aomo_text(view.language,"Could not save the diagram image."));
         out.write(reinterpret_cast<const char*>(png.data()),static_cast<std::streamsize>(png.size()));

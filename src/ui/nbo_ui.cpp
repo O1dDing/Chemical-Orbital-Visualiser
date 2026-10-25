@@ -1,4 +1,30 @@
+/*
+ * SPDX-License-Identifier: CPAL-1.0
+ *
+ * The contents of this file are subject to the Common Public Attribution License
+ * Version 1.0 (the “License”); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ * https://opensource.org/license/CPAL-1.0. The License is based on the Mozilla Public
+ * License Version 1.1 but Sections 14 and 15 have been added to cover use of software
+ * over a computer network and provide for limited attribution for the Original
+ * Developer. In addition, Exhibit A has been modified to be consistent with Exhibit B.
+ *
+ * Software distributed under the License is distributed on an “AS IS” basis, WITHOUT
+ * WARRANTY OF ANY KIND, either express or implied. See the License for the specific
+ * language governing rights and limitations under the License.
+ *
+ * The Original Code is Chemical Orbital Visualiser (COV).
+ *
+ * The Original Developer is O1dDing, who is also the Initial Developer.
+ *
+ * The Initial Developer of the Original Code is O1dDing. All portions of the code
+ * written by O1dDing are Copyright (c) 2026 O1dDing. All Rights Reserved.
+ *
+ * Contributor O1dDing.
+ */
+
 #include "cov/nbo_ui.hpp"
+#include "cov/export_attribution.hpp"
 #include "cov/nbo_aomo_text.hpp"
 #include "cov/nbo_aomo_labels.hpp"
 #include "cov/ui_raster_text.hpp"
@@ -250,7 +276,8 @@ void write_png(const std::filesystem::path& path,const std::vector<unsigned char
     std::uint32_t a=1,b=0;for(auto v:raw){a=(a+v)%65521u;b=(b+a)%65521u;}put32(z,(b<<16)|a);
     std::vector<unsigned char> png={137,80,78,71,13,10,26,10};
     std::vector<unsigned char> ihdr;put32(ihdr,width);put32(ihdr,height);ihdr.insert(ihdr.end(),{8,6,0,0,0});
-    chunk(png,"IHDR",ihdr);chunk(png,"IDAT",z);chunk(png,"IEND",{});
+    chunk(png,"IHDR",ihdr);chunk(png,"IDAT",z);
+    export_attribution::append_png_text_chunks(png);chunk(png,"IEND",{});
     std::ofstream out(path,std::ios::binary);if(!out)throw std::runtime_error("Cannot write PNG");
     out.write(reinterpret_cast<const char*>(png.data()),static_cast<std::streamsize>(png.size()));
     if(!out)throw std::runtime_error("PNG write failed");
@@ -1552,7 +1579,7 @@ void export_nbo_focus_bundle(const NboDataset& d,const std::filesystem::path& ba
     const std::string subtitle=mo_name+mo_descriptor;
     std::ostringstream svg;svg<<"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\""<<width
         <<"\" height=\""<<height<<"\" viewBox=\"0 0 "<<width<<' '<<height
-        <<"\"><rect width=\"100%\" height=\"100%\" fill=\"white\"/>"
+        <<"\">"<<export_attribution::svg_metadata()<<"<rect width=\"100%\" height=\"100%\" fill=\"white\"/>"
         <<"<text x=\"24\" y=\"30\" font-family=\"monospace\" font-size=\"18\">"<<escape_xml(title)<<"</text>"
         <<"<text x=\"24\" y=\"54\" font-family=\"monospace\" font-size=\"12\">"<<escape_xml(subtitle)<<"</text>";
     draw_text(rgba,width,height,24,15,title,2);draw_text(rgba,width,height,24,45,subtitle,1);
@@ -1728,7 +1755,7 @@ void export_nbo_bundle(const NboDataset& d,std::size_t selected,const std::files
     draw_text(rgba,width,height,28,38,source,1);
     draw_text(rgba,width,height,28,52,scene,1);
     draw_text(rgba,width,height,28,66,selected_text,1);
-    std::ostringstream svg;svg<<"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"960\" height=\"420\" viewBox=\"0 0 960 420\"><rect width=\"960\" height=\"420\" fill=\"white\"/><text x=\"28\" y=\"28\" font-family=\"monospace\" font-size=\"16\">"<<escape_xml(title)<<"</text><text x=\"28\" y=\"48\" font-family=\"monospace\" font-size=\"10\">"<<escape_xml(source.substr(0,145))<<"</text><text x=\"28\" y=\"62\" font-family=\"monospace\" font-size=\"10\">"<<scientific_svg_spans(scientific_text_layout(scene,10),28,62,10)<<"</text><text x=\"28\" y=\"76\" font-family=\"monospace\" font-size=\"10\">"<<escape_xml(selected_text)<<"</text>";
+    std::ostringstream svg;svg<<"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"960\" height=\"420\" viewBox=\"0 0 960 420\">"<<export_attribution::svg_metadata()<<"<rect width=\"960\" height=\"420\" fill=\"white\"/><text x=\"28\" y=\"28\" font-family=\"monospace\" font-size=\"16\">"<<escape_xml(title)<<"</text><text x=\"28\" y=\"48\" font-family=\"monospace\" font-size=\"10\">"<<escape_xml(source.substr(0,145))<<"</text><text x=\"28\" y=\"62\" font-family=\"monospace\" font-size=\"10\">"<<scientific_svg_spans(scientific_text_layout(scene,10),28,62,10)<<"</text><text x=\"28\" y=\"76\" font-family=\"monospace\" font-size=\"10\">"<<escape_xml(selected_text)<<"</text>";
     for(std::size_t j=0;j<count;++j){
         const auto& o=d.orbitals[start+j];const int y=90+static_cast<int>(j)*24;
         const int bar=std::clamp(static_cast<int>(std::round(o.occupation/2.0*420)),0,420);
