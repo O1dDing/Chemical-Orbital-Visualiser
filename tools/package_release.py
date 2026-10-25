@@ -1,4 +1,27 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: CPAL-1.0
+#
+# The contents of this file are subject to the Common Public Attribution License
+# Version 1.0 (the “License”); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+# https://opensource.org/license/CPAL-1.0. The License is based on the Mozilla Public
+# License Version 1.1 but Sections 14 and 15 have been added to cover use of software
+# over a computer network and provide for limited attribution for the Original
+# Developer. In addition, Exhibit A has been modified to be consistent with Exhibit B.
+#
+# Software distributed under the License is distributed on an “AS IS” basis, WITHOUT
+# WARRANTY OF ANY KIND, either express or implied. See the License for the specific
+# language governing rights and limitations under the License.
+#
+# The Original Code is Chemical Orbital Visualiser (COV).
+#
+# The Original Developer is O1dDing, who is also the Initial Developer.
+#
+# The Initial Developer of the Original Code is O1dDing. All portions of the code
+# written by O1dDing are Copyright (c) 2026 O1dDing. All Rights Reserved.
+#
+# Contributor O1dDing.
+
 """Build release archives from existing, inspected binaries; never publish them.
 
 Run from a clean checkout. The build tree must belong to that checkout, and
@@ -50,7 +73,7 @@ def tar_permissions(info):
 
 
 def common_files(target, build):
-    for name in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
+    for name in ("LICENSE", "NOTICE", "CITATION.cff", "THIRD_PARTY_NOTICES.md"):
         copy_file(ROOT / name, target / name)
     shutil.copytree(ROOT / "licenses", target / "licenses")
     copy_file(build / "_deps/glfw-src/LICENSE.md", target / "licenses/glfw/LICENSE.md")
@@ -59,7 +82,7 @@ def common_files(target, build):
     # The shipped one-job example imports this small process helper.
     copy_file(ROOT / "tests/validation_process.py", target / "tests/validation_process.py")
     # Ship user help, without development archives or acceptance reports.
-    for pattern in ("UI*.md", "AOMO_NBO*.md", "NBO_ONE_JOB*.md"):
+    for pattern in ("UI*.md", "AOMO_NBO*.md", "NBO_ONE_JOB*.md", "license*.md"):
         for source in sorted((ROOT / "docs").glob(pattern)):
             destination = target / "docs" / source.name
             copy_file(source, destination)
@@ -193,7 +216,17 @@ def translated_quickstart(platform, version, language):
 
 def write_quickstarts(target, platform, version):
     for language, suffix in (("en", ""), ("zh-CN", ".zh-CN"), ("ja", ".ja"), ("fr", ".fr")):
-        (target / f"README{suffix}.md").write_text(quickstart(platform, version, language), encoding="utf-8")
+        text = quickstart(platform, version, language)
+        # The same README is shipped beside the macOS app and in Resources.
+        # Use a path description rather than a link that breaks in one location.
+        guide = f"docs/license{suffix}.md"
+        note = {
+            "en": f"COV by O1dDing. COV source is licensed under CPAL-1.0; see `LICENSE`, `NOTICE` and `{guide}` with the bundled help for licensing and citation details.",
+            "zh-CN": f"COV 由 O1dDing 开发，源码采用 CPAL-1.0。授权与引用说明见随包附带的 `LICENSE`、`NOTICE` 和帮助目录中的 `{guide}`。",
+            "ja": f"COV の開発者は O1dDing です。ソースコードには CPAL-1.0 が適用されます。ライセンスと引用については、同梱の `LICENSE`、`NOTICE` とヘルプ内の `{guide}` を参照してください。",
+            "fr": f"COV est développé par O1dDing. Son code source est sous CPAL-1.0. La licence et les conseils de citation figurent dans `LICENSE`, `NOTICE` et `{guide}`, avec l’aide fournie.",
+        }[language]
+        (target / f"README{suffix}.md").write_text(text + "\n" + note + "\n", encoding="utf-8")
 
 
 def numeric_version(version):

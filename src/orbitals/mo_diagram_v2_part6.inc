@@ -1,3 +1,28 @@
+/*
+ * SPDX-License-Identifier: CPAL-1.0
+ *
+ * The contents of this file are subject to the Common Public Attribution License
+ * Version 1.0 (the “License”); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ * https://opensource.org/license/CPAL-1.0. The License is based on the Mozilla Public
+ * License Version 1.1 but Sections 14 and 15 have been added to cover use of software
+ * over a computer network and provide for limited attribution for the Original
+ * Developer. In addition, Exhibit A has been modified to be consistent with Exhibit B.
+ *
+ * Software distributed under the License is distributed on an “AS IS” basis, WITHOUT
+ * WARRANTY OF ANY KIND, either express or implied. See the License for the specific
+ * language governing rights and limitations under the License.
+ *
+ * The Original Code is Chemical Orbital Visualiser (COV).
+ *
+ * The Original Developer is O1dDing, who is also the Initial Developer.
+ *
+ * The Initial Developer of the Original Code is O1dDing. All portions of the code
+ * written by O1dDing are Copyright (c) 2026 O1dDing. All Rights Reserved.
+ *
+ * Contributor O1dDing.
+ */
+
     data.plan.classification = DiagramClassification::Simple;
     data.plan.complex_system =
         wavefunction.atoms.size() > 12 || wavefunction.orbitals.size() > 80;
@@ -290,6 +315,7 @@ bool write_mo_diagram_svg(const MODiagramData& data,
          << data.crystal_field_gaps.size() << "\" data-diagram-mode=\""
          << mo_diagram_mode_name(data.mode) << "\" data-view-snapshot=\""
          << (data.view?xml_escape(data.view->id):"") << "\">\n";
+    out << export_attribution::svg_metadata();
     out << "<rect width=\"100%\" height=\"100%\" fill=\"#fbfcfe\"/>\n";
     out << "<text x=\"36\" y=\"40\" fill=\"#182231\" font-family=\"" << kSvgFontFamily << "\" "
            "font-size=\"24\" font-weight=\"600\">"

@@ -59,4 +59,6 @@ COV v0.4 加入了 NBO 分析。配合计算生成的 NBO 文件，可以查看�
 
 ## 许可证
 
-[Apache License 2.0](LICENSE)。随附程序库的许可证列于[第三方声明](THIRD_PARTY_NOTICES.md)。
+当前开发源码采用 [CPAL-1.0](LICENSE)，允许商业使用，同时对受许可代码规定源码提供和图形界面署名义务。请参阅[许可证、署名与可选引用建议](docs/license.zh-CN.md)及 [CITATION.cff](CITATION.cff)。
+
+v0.4.0 标签及上方已经发布的 v0.4.0 下载包中的 COV 自有代码仍采用 [Apache-2.0](licenses/Apache-2.0.txt)，既有 Apache 权利继续有效。[第三方组件](THIRD_PARTY_NOTICES.md)保留各自的许可证；本次变更不会更改计算数据、示例数据集或导出图片的许可。

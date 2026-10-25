@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use COV in your work, please cite the software. This request is nonbinding."
+type: software
+title: "Chemical Orbital Visualiser (COV)"
+authors:
+  - family-names: "O1dDing"
+repository-code: "https://github.com/O1dDing/Chemical-Orbital-Visualiser"
+url: "https://github.com/O1dDing/Chemical-Orbital-Visualiser"
+license: CPAL-1.0

@@ -1,6 +1,31 @@
+# SPDX-License-Identifier: CPAL-1.0
+#
+# The contents of this file are subject to the Common Public Attribution License
+# Version 1.0 (the “License”); you may not use this file except in compliance with the
+# License. You may obtain a copy of the License at
+# https://opensource.org/license/CPAL-1.0. The License is based on the Mozilla Public
+# License Version 1.1 but Sections 14 and 15 have been added to cover use of software
+# over a computer network and provide for limited attribution for the Original
+# Developer. In addition, Exhibit A has been modified to be consistent with Exhibit B.
+#
+# Software distributed under the License is distributed on an “AS IS” basis, WITHOUT
+# WARRANTY OF ANY KIND, either express or implied. See the License for the specific
+# language governing rights and limitations under the License.
+#
+# The Original Code is Chemical Orbital Visualiser (COV).
+#
+# The Original Developer is O1dDing, who is also the Initial Developer.
+#
+# The Initial Developer of the Original Code is O1dDing. All portions of the code
+# written by O1dDing are Copyright (c) 2026 O1dDing. All Rights Reserved.
+#
+# Contributor O1dDing.
+
 cmake_minimum_required(VERSION 3.28)
 
 project(CUDAOrbitalVisualisation VERSION 0.4.0 LANGUAGES CXX)
+
+configure_file(cmake/version.hpp.in generated/cov/version.hpp @ONLY)
 
 option(COV_BUILD_VIEWER "Build the desktop viewer" ON)
 option(COV_ENABLE_CUDA "Build NVIDIA CUDA acceleration" OFF)
@@ -120,6 +145,7 @@ set_source_files_properties(src/orbitals/mo_diagram_v2.cpp PROPERTIES
 )
 target_include_directories(cov_orbitals PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 target_link_libraries(cov_orbitals PUBLIC cov_parser)
 target_compile_features(cov_orbitals PUBLIC cxx_std_20)
@@ -712,6 +738,19 @@ if(COV_BUILD_TESTS)
     target_link_libraries(cov_mo_diagram_export_semantics_smoke PRIVATE cov_orbitals)
     add_test(NAME mo_diagram_export_semantics_smoke
         COMMAND cov_mo_diagram_export_semantics_smoke)
+
+    add_executable(cov_export_attribution_smoke tests/export_attribution_smoke.cpp)
+    target_link_libraries(cov_export_attribution_smoke PRIVATE cov_ui)
+    target_compile_options(cov_export_attribution_smoke PRIVATE
+        $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/utf-8>)
+    add_test(NAME export_attribution_smoke COMMAND cov_export_attribution_smoke
+        "${CMAKE_CURRENT_BINARY_DIR}/attribution_exports")
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME export_attribution_metadata
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_export_attribution.py"
+        "${CMAKE_CURRENT_BINARY_DIR}/attribution_exports" --version "${PROJECT_VERSION}")
+    set_tests_properties(export_attribution_smoke PROPERTIES FIXTURES_SETUP attribution_exports)
+    set_tests_properties(export_attribution_metadata PROPERTIES FIXTURES_REQUIRED attribution_exports)
 
     add_executable(cov_mo_diagram_snapshot_smoke tests/mo_diagram_snapshot_smoke.cpp)
     add_executable(cov_nbo_layout_probe tests/nbo_layout_probe.cpp)
